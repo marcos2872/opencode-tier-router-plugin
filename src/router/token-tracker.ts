@@ -237,6 +237,55 @@ export class TokenTracker {
   }
 
   /**
+   * Record a step-finish event with real token usage.
+   * Called after model response with input/output tokens and cost.
+   */
+  async recordStepFinish(event: {
+    sessionID: string;
+    tokens: {
+      input: number;
+      output: number;
+      reasoning?: number;
+      cache?: { read?: number; write?: number };
+    };
+    cost: number;
+    timestamp?: number;
+  }): Promise<void> {
+    await this.recordEvent(event);
+  }
+
+  /**
+   * Record a routing decision for a session.
+   * Stores which tier was selected and enables correlation with subsequent events.
+   */
+  async recordRoutingDecision(sessionId: string, routingDecision: RoutingDecision): Promise<void> {
+    try {
+      let records = this.sessionRecords.get(sessionId);
+      if (!records) {
+        records = [];
+        this.sessionRecords.set(sessionId, records);
+        this.delegationCounts.set(sessionId, 0);
+      }
+
+      // Try to correlate any orphans for this session
+      const orphaned = this.orphanBuffer.tryCorrelate(sessionId, routingDecision);
+      if (orphaned) {
+        records.push(orphaned);
+        this.delegationCounts.set(sessionId, (this.delegationCounts.get(sessionId) ?? 0) + 1);
+      }
+
+      // Aggregate and cache
+      const summary = this.aggregator.aggregateSessionMetrics(records, this.config);
+      this.cache.set(sessionId, summary, this.delegationCounts.get(sessionId) ?? 0);
+
+      // Check for evictions
+      await this.handleEvictions();
+    } catch (err) {
+      console.error('[TokenTracker] Failed to record routing decision:', err);
+    }
+  }
+
+  /**
    * Get formatted report for a session.
    */
   async getSessionReport(sessionId: string): Promise<string> {
