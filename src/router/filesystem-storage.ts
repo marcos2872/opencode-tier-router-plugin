@@ -24,8 +24,17 @@ export class FilesystemStorage implements MetricsStorage {
   async load(filename: string): Promise<string> {
     try {
       return await readFile(filename, 'utf-8');
-    } catch {
-      // File doesn't exist or can't be read
+    } catch (err) {
+      const error = err as NodeJS.ErrnoException;
+      if (error.code === 'ENOENT') {
+        // Expected: file doesn't exist yet
+        return '';
+      }
+      // Unexpected error
+      console.warn(`[FilesystemStorage] Failed to read file:`, {
+        code: error.code,
+        message: error.message,
+      });
       return '';
     }
   }
@@ -33,8 +42,17 @@ export class FilesystemStorage implements MetricsStorage {
   async listFiles(dir: string): Promise<string[]> {
     try {
       return await readdir(dir);
-    } catch {
-      // Directory doesn't exist
+    } catch (err) {
+      const error = err as NodeJS.ErrnoException;
+      if (error.code === 'ENOENT') {
+        // Expected: file doesn't exist yet
+        return [];
+      }
+      // Unexpected error
+      console.warn(`[FilesystemStorage] Failed to list directory:`, {
+        code: error.code,
+        message: error.message,
+      });
       return [];
     }
   }
@@ -42,8 +60,17 @@ export class FilesystemStorage implements MetricsStorage {
   async delete(filename: string): Promise<void> {
     try {
       await unlink(filename);
-    } catch {
-      // File doesn't exist, no-op
+    } catch (err) {
+      const error = err as NodeJS.ErrnoException;
+      if (error.code === 'ENOENT') {
+        // Expected: file doesn't exist yet
+        return;
+      }
+      // Unexpected error
+      console.warn(`[FilesystemStorage] Failed to delete file:`, {
+        code: error.code,
+        message: error.message,
+      });
     }
   }
 
@@ -51,7 +78,17 @@ export class FilesystemStorage implements MetricsStorage {
     try {
       await stat(filename);
       return true;
-    } catch {
+    } catch (err) {
+      const error = err as NodeJS.ErrnoException;
+      if (error.code === 'ENOENT') {
+        // Expected: file doesn't exist yet
+        return false;
+      }
+      // Unexpected error
+      console.warn(`[FilesystemStorage] Failed to check file existence:`, {
+        code: error.code,
+        message: error.message,
+      });
       return false;
     }
   }
