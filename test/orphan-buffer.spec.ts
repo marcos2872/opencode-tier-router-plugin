@@ -275,6 +275,65 @@ describe('OrphanBuffer - Expiration (5s Timeout)', () => {
 
     vi.useRealTimers();
   });
+
+  it('does not start cleanup automatically', () => {
+    vi.useFakeTimers();
+
+    try {
+      const record = createTokenRecord('session-1', Date.now() - 6000);
+      buffer.add(record);
+      const expired = buffer.getExpired();
+
+      expect(expired).toHaveLength(0);
+      expect(buffer.size()).toBe(1);
+
+      vi.advanceTimersByTime(10000);
+      expect(buffer.size()).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('runs cleanup every 10 seconds and invokes the callback', () => {
+    vi.useFakeTimers();
+
+    try {
+      const record = createTokenRecord('session-1', Date.now() - 6000);
+      const callback = vi.fn();
+
+      buffer.add(record);
+      buffer.startCleanup(callback);
+      vi.advanceTimersByTime(10000);
+
+      expect(callback).toHaveBeenCalledTimes(1);
+      expect(callback).toHaveBeenCalledWith([record]);
+      expect(buffer.size()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+      buffer.stopCleanup();
+    }
+  });
+
+  it('stops cleanup when cleanup is stopped', () => {
+    vi.useFakeTimers();
+
+    try {
+      const record = createTokenRecord('session-1', Date.now() - 6000);
+      const callback = vi.fn();
+
+      buffer.add(record);
+      buffer.startCleanup(callback);
+      vi.advanceTimersByTime(10000);
+      buffer.stopCleanup();
+      vi.advanceTimersByTime(10000);
+
+      expect(callback).toHaveBeenCalledTimes(1);
+      expect(buffer.size()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+      buffer.stopCleanup();
+    }
+  });
 });
 
 // ============================================================================

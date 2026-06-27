@@ -34,6 +34,7 @@ interface OrphanEntry {
  */
 export class OrphanBuffer {
   private buffer: Map<string, OrphanEntry> = new Map();
+  private cleanupInterval: ReturnType<typeof setInterval> | null = null;
   private readonly MAX_ATTEMPTS = 5;
   private readonly RETRY_INTERVAL_MS = 1000; // 1s between retries
   private readonly MAX_WAIT_MS = 5000; // 5s total wait before marking as unknown
@@ -109,6 +110,27 @@ export class OrphanBuffer {
    */
   size(): number {
     return this.buffer.size;
+  }
+
+  /**
+   * Start periodic cleanup of expired orphan records.
+   */
+  startCleanup(callback: (expired: TokenRecord[]) => void): void {
+    this.stopCleanup();
+    this.cleanupInterval = setInterval(() => {
+      const expired = this.getExpired();
+      callback(expired);
+    }, 10000);
+  }
+
+  /**
+   * Stop periodic cleanup of expired orphan records.
+   */
+  stopCleanup(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
   }
 
   /**

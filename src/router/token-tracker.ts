@@ -171,6 +171,13 @@ export class TokenTracker {
       ttConfig?.sessionTTLMinutes ?? 30,
     );
     this.orphanBuffer = new OrphanBuffer();
+    this.orphanBuffer.startCleanup(() => {
+      try {
+        this.processExpiredOrphans();
+      } catch (err) {
+        console.error('[TokenTracker] Failed to process expired orphans:', err);
+      }
+    });
   }
 
   /**
@@ -224,16 +231,9 @@ export class TokenTracker {
 
       // Check for evictions
       await this.handleEvictions();
-      
+
       // Check for expired orphans
-      const expired = this.orphanBuffer.getExpired();
-      for (const expiredRecord of expired) {
-        records.push(expiredRecord);
-      }
-      if (expired.length > 0) {
-        const updated = this.aggregator.aggregateSessionMetrics(records, this.config);
-        this.cache.set(sessionId, updated, this.delegationCounts.get(sessionId) ?? 0);
-      }
+      this.processExpiredOrphans();
     } catch (err) {
       // ✅ best-effort: never crash the plugin
       console.error('[TokenTracker] Failed to record event:', err);
@@ -310,6 +310,24 @@ export class TokenTracker {
       await this.handleEvictions();
     } catch (err) {
       console.error('[TokenTracker] Failed to record routing decision:', err);
+    }
+  }
+
+  private processExpiredOrphans(): void {
+    const expired = this.orphanBuffer.getExpired();
+    if (expired.length === 0) return;
+
+    for (const expiredRecord of expired) {
+      const records = this.sessionRecords.get(expiredRecord.sessionId);
+      if (!records) continue;
+      records.push(expiredRecord);
+    }
+
+    for (const expiredRecord of expired) {
+      const records = this.sessionRecords.get(expiredRecord.sessionId);
+      if (!records) continue;
+      const updated = this.aggregator.aggregateSessionMetrics(records, this.config);
+      this.cache.set(expiredRecord.sessionId, updated, this.delegationCounts.get(expiredRecord.sessionId) ?? 0);
     }
   }
 
@@ -559,6 +577,14 @@ export class TokenTracker {
     } catch (err) {
       console.error('[TokenTracker] Cleanup failed:', err);
     }
+  }
+
+  /**
+   * Stop cleanup timers and clear all in-memory data.
+   */
+  dispose(): void {
+    this.orphanBuffer.stopCleanup();
+    this.clear();
   }
 
   /**
