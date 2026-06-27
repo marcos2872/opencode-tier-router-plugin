@@ -127,7 +127,7 @@ Ordem de resolução:
     "heavy": ["design", "architecture", "debug", "analyze", "quality", "review", "arquitetura", "depurar", "analisar", "qualidade", "revisar"]
   },
   "enforcement": {
-    "mode": "advisory",
+    "mode": "hard-block",
     "trivialDirectAllowed": true
   }
 }

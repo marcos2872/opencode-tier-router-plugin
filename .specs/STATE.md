@@ -27,9 +27,9 @@
 - **Status**: active
 
 ### AD-004
-- **Decision**: Enforcement is advisory-only (banners), never hard-block
-- **Reason**: Plugins should never crash or block the user's session. Subagents see `[cap: 3/8]` and `[⚠ REDUNDANT]` banners in tool outputs — strong nudge, no hard error. Hard-block mode is opt-in for advanced users.
-- **Trade-off**: A misbehaving model can ignore banners. In practice, the banners work because they appear inside tool output text that the model reads as ground truth.
+- **Decision**: Enforcement defaults to hard-block with `trivialDirectAllowed=true`; advisory remains available via config
+- **Reason**: Real sessions showed advisory-only drift (wrong agent/model despite hints). Hard-block by default increases deterministic delegation and cost control.
+- **Trade-off**: Stricter default can interrupt direct tool execution until delegation occurs. Mitigation: trivial fast tasks remain allowed and users can switch to advisory mode.
 - **Scope**: enforcement layer
 - **Date**: 2026-06-26
 - **Status**: active

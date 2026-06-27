@@ -95,7 +95,7 @@
     ]
   },
   "enforcement": {
-    "mode": "advisory",
+    "mode": "hard-block",
     "trivialDirectAllowed": true
   }
 }

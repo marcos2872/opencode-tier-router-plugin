@@ -46,7 +46,7 @@ opencode-tier-router/
 - Plugin, not standalone agent or proxy
 - Single `tiers.json`, no separate state file, no provider presets
 - Routing via system prompt injection (~210 tokens), not a router model
-- Enforcement advisory-only (banners), never hard-block
+- Enforcement defaults to hard-block (`trivialDirectAllowed=true`), advisory available via config
 - Config resolution: project `tiers.json` > `~/.config/opencode/tiers.json` > create in project dir
 
 ## Commands

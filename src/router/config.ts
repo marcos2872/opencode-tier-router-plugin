@@ -128,7 +128,7 @@ const DEFAULT_CONFIG: RouterConfig = {
     ],
   },
   enforcement: {
-    mode: 'advisory',
+    mode: 'hard-block',
     trivialDirectAllowed: true,
   },
 };

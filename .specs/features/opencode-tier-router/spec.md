@@ -39,7 +39,7 @@ Every ambiguity is resolved or recorded here — nothing is left silently unclea
 | Default models (GitHub Copilot) | @fast=github-copilot/claude-haiku-4.5, @medium=github-copilot/gpt-5.3-codex, @heavy=github-copilot/claude-sonnet-4.5 | GitHub Copilot users don't need extra API keys; models are familiar from Copilot ecosystem | y |
 | Cost ratios | 1x / 5x / 20x | Directional signal for orchestrator; user-tunable | y |
 | Default mode | normal | Balanced; user switches via /budget | y |
-| Enforcement mode | advisory by default, optional hard-block | Safe default + strict mode for advanced users | y |
+| Enforcement mode | hard-block by default, configurable to advisory | Prioritize deterministic delegation in production sessions | y |
 | Fallback behavior | Orquestrador executa diretamente se subagente falhar | Fail-safe: nunca perder a tarefa | y |
 | Concurrency | Hooks podem ser chamados concorrentemente; cada sessão tem seu tracker | Plugin stores são criados por instância (closure) | y |
 
