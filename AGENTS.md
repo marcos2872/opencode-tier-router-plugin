@@ -32,12 +32,18 @@ opencode-tier-router/
 ├── tiers.json                 # Single config: tiers, modes, taskPatterns, enforcement, routing, tokenTracking
 ├── src/
 │   ├── index.ts               # Plugin entry: all hooks wired (config, chat.message, chat.system.transform, tool.execute.after, command.execute.before)
+│   ├── plugin-orchestrator.ts # Hook orchestration (SRP extraction)
+│   ├── constants.ts           # Named constants (FALLBACK_CONFIG, regex)
+│   ├── narration.ts           # Narration pattern detection
+│   ├── utils/
+│   │   └── safe-json.ts       # Safe JSON parsing with size limit
 │   └── router/
 │       ├── config.ts          # Load/validate tiers.json, layered resolution
 │       ├── protocol.ts        # ~210 token delegation protocol generator
 │       ├── classifier.ts      # Keyword → tier classification
 │       ├── selector.ts        # keyword/llm routing selector + fallback chain
 │       ├── caps.ts            # Cap tracker + redundancy detection
+│       ├── cost-calculator.ts # Centralized cost calculation
 │       ├── enforcement-validator.ts    # Enforcement validation (validateEnforcement, assertEnforcement, reportEnforcement)
 │       ├── token-tracker.ts   # Real Token Cost Tracking API (recordStepFinish, getSummary, persistTokenMetrics)
 │       ├── token-commands.ts  # Command execution layer (/token-report, /token-history, /token-compare)
@@ -48,7 +54,6 @@ opencode-tier-router/
 │       ├── in-memory-storage.ts        # Memory cache
 │       ├── metrics-formatter.ts        # Markdown report generation
 │       └── orphan-buffer.ts   # Event correlation (5s retry, FIFO matching)
-├── narration.ts               # Narration pattern detection
 ├── ENFORCEMENT.md             # Enforcement rules, architecture guarantees, security checklist
 └── test/                      # Unit tests per phase (300 tests total)
     ├── phase0-modules.spec.ts          # 163 tests: 5 SRP modules + OrphanBuffer
@@ -57,7 +62,15 @@ opencode-tier-router/
     ├── phase2-persistence.spec.ts      # 16 tests: load/save + session management
     ├── phase3-commands.spec.ts         # 25 tests: /token-* commands + detection
     ├── phase4-e2e.spec.ts              # 20 tests: full session lifecycle
-    └── phase5-plugin-integration.spec.ts   # 15 tests: plugin hooks + real usage
+    ├── phase5-plugin-integration.spec.ts   # 15 tests: plugin hooks + real usage
+    ├── caps.test.ts                    # Cap tracker unit tests
+    ├── cleanup-versioning.spec.ts      # Cleanup + versioning tests
+    ├── config-thresholds.spec.ts       # Config thresholds tests
+    ├── index.test.ts                   # Index integration tests
+    ├── lru-eviction.spec.ts            # LRU eviction tests
+    ├── orphan-buffer.spec.ts           # Orphan buffer unit tests
+    ├── race-conditions.spec.ts         # Concurrent access tests
+    └── token-tracking.spec.ts          # Token tracking integration tests
 ```
 
 ## Architecture decisions (STATE.md AD-001–005)
@@ -66,7 +79,7 @@ opencode-tier-router/
 - Single `tiers.json`, no separate state file, no provider presets
 - Routing via system prompt injection (~210 tokens), not a router model
 - Enforcement defaults to hard-block (`trivialDirectAllowed=false`), advisory available via config
-- Routing strategy defaults to `keyword`, optional `llm` selector with fallback (`llm -> keyword -> defaultTier`)
+- Routing strategy: `llm` selector with fallback (`llm -> keyword -> defaultTier`), `keyword` also available
 - Config resolution: project `tiers.json` > `~/.config/opencode/tiers.json` > create in project dir
 
 ## Token Tracking & Real Cost Analysis (STATE.md AD-006–010)
@@ -89,6 +102,10 @@ npm run typecheck
 
 # Run unit tests
 npx vitest run
+
+# Lint + format
+npm run lint
+npm run format
 
 # Full gate (typecheck + test)
 npm run typecheck && npx vitest run

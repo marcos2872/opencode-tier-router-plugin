@@ -97,19 +97,31 @@ Ordem de resolução:
   "mode": "normal",
   "tiers": {
     "fast": {
-      "model": "github-copilot/claude-haiku-4.5",
+      "model": "opencode/big-pickle",
       "costRatio": 1,
-      "cap": 8
+      "cap": 8,
+      "thresholds": {
+        "min": 0,
+        "max": 2000
+      }
     },
     "medium": {
-      "model": "github-copilot/gpt-5.3-codex",
+      "model": "llama.cpp/Nex-N2-mini",
       "costRatio": 5,
-      "cap": 12
+      "cap": 12,
+      "thresholds": {
+        "min": 2000,
+        "max": 10000
+      }
     },
     "heavy": {
-      "model": "github-copilot/claude-sonnet-4.5",
+      "model": "llama.cpp/Nex-N2-mini",
       "costRatio": 20,
-      "cap": 20
+      "cap": 20,
+      "thresholds": {
+        "min": 10000,
+        "max": null
+      }
     }
   },
   "modes": {
@@ -137,11 +149,11 @@ Ordem de resolução:
   },
   "enforcement": {
     "mode": "hard-block",
-    "trivialDirectAllowed": true
+    "trivialDirectAllowed": false
   },
   "routing": {
-    "strategy": "keyword",
-    "selectorModel": "github-copilot/claude-haiku-4.5",
+    "strategy": "llm",
+    "selectorModel": "opencode/big-pickle",
     "selectorTimeoutMs": 1200,
     "selectorMaxTokens": 16
   },
@@ -164,6 +176,7 @@ Ordem de resolução:
 | `tiers.<tier>.model` | `provider/model` | Modelo usado no tier |
 | `tiers.<tier>.costRatio` | número > 0 | Sinal de custo para decisão |
 | `tiers.<tier>.cap` | número > 0 | Limite de leitura para banners/cap |
+| `tiers.<tier>.thresholds` | `{min, max}` | Limites de inputTokens para classificação automática |
 | `taskPatterns` | lista de keywords | Classificação por intenção |
 | `enforcement.mode` | `advisory`, `hard-block` | Advisory só orienta; hard-block nega execução direta quando necessário |
 | `enforcement.trivialDirectAllowed` | `true`, `false` | Em hard-block, permite/bloqueia tarefas triviais |
@@ -173,6 +186,7 @@ Ordem de resolução:
 | `routing.selectorMaxTokens` | número > 0 | Limite de tokens para resposta do selector |
 | `tokenTracking.enabled` | `true`, `false` | Ativa/desativa rastreamento de tokens |
 | `tokenTracking.maxHistoryFiles` | número > 0 | Máximo de arquivos de histórico no disco (FIFO cleanup) |
+| `tokenTracking.maxHistoryDays` | número > 0 | Dias de retenção do histórico |
 | `tokenTracking.sessionTTLMinutes` | número > 0 | Tempo de vida de sessões em cache (minutos) |
 | `tokenTracking.maxSessionsMemory` | número > 0 | Máximo de sessões mantidas em memória (LRU eviction) |
 
@@ -283,7 +297,8 @@ Hypothetical Cost Comparison for abc123-def456:
 
 - Tenta forçar delegação para tier correto
 - Se sessão principal tentar executar tools direto em tarefa não trivial, nega permissão
-- Com `trivialDirectAllowed=true`, tarefas triviais fast continuam diretas
+- Com `trivialDirectAllowed=false` (padrão), **toda** tarefa precisa delegar — mesmo tarefas triviais
+- Com `trivialDirectAllowed=true`, tarefas triviais fast podem executar direto
 
 ---
 
@@ -330,15 +345,22 @@ npx vitest run
 
 Estrutura principal:
 
-### Roteamento & Delegação
+### Core
 
 - `src/index.ts` → hooks e comandos do plugin
+- `src/plugin-orchestrator.ts` → orquestração de hooks (SRP extraction)
+- `src/constants.ts` → constantes nomeadas (FALLBACK_CONFIG, regex)
+- `src/narration.ts` → detecção de narração
+
+### Roteamento & Delegação
+
 - `src/router/config.ts` → load/validate/save de config
 - `src/router/protocol.ts` → protocolo injetado no system (~210 tokens)
 - `src/router/classifier.ts` → classificação de tarefas por keywords
 - `src/router/selector.ts` → seletor de tier (keyword/LLM + fallback)
 - `src/router/caps.ts` → cap tracker + redundância
-- `src/narration.ts` → detecção de narração
+- `src/router/cost-calculator.ts` → cálculo centralizado de custo
+- `src/router/enforcement-validator.ts` → validação de enforcement
 
 ### Token Tracking & Análise
 
