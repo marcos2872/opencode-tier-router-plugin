@@ -24,8 +24,16 @@ const FALLBACK_CONFIG: RouterConfig = {
   mode: 'normal',
   tiers: {
     fast: { model: 'github-copilot/claude-haiku-4.5', costRatio: DEFAULT_FAST_COST_RATIO, cap: DEFAULT_TIER_CAP },
-    medium: { model: 'github-copilot/gpt-5.3-codex', costRatio: DEFAULT_MEDIUM_COST_RATIO, cap: DEFAULT_MEDIUM_TIER_CAP },
-    heavy: { model: 'github-copilot/claude-sonnet-4.5', costRatio: DEFAULT_HEAVY_COST_RATIO, cap: DEFAULT_HEAVY_TIER_CAP },
+    medium: {
+      model: 'github-copilot/gpt-5.3-codex',
+      costRatio: DEFAULT_MEDIUM_COST_RATIO,
+      cap: DEFAULT_MEDIUM_TIER_CAP,
+    },
+    heavy: {
+      model: 'github-copilot/claude-sonnet-4.5',
+      costRatio: DEFAULT_HEAVY_COST_RATIO,
+      cap: DEFAULT_HEAVY_TIER_CAP,
+    },
   },
   modes: {
     normal: {
@@ -47,19 +55,68 @@ const FALLBACK_CONFIG: RouterConfig = {
   },
   taskPatterns: {
     fast: [
-      'find', 'grep', 'search', 'where', 'locate', 'list', 'show', 'read', 'explore',
-      'buscar', 'busque', 'busca', 'procurar', 'procure', 'procura', 'ler', 'leia',
-      'listar', 'liste', 'mostrar', 'mostre',
+      'find',
+      'grep',
+      'search',
+      'where',
+      'locate',
+      'list',
+      'show',
+      'read',
+      'explore',
+      'buscar',
+      'busque',
+      'busca',
+      'procurar',
+      'procure',
+      'procura',
+      'ler',
+      'leia',
+      'listar',
+      'liste',
+      'mostrar',
+      'mostre',
     ],
     medium: [
-      'refactor', 'implement', 'add', 'write', 'fix', 'update', 'change', 'create',
-      'edit', 'rename', 'implementar', 'refatorar', 'adicionar', 'corrigir', 'atualizar',
-      'criar', 'editar', 'renomear', 'validar',
+      'refactor',
+      'implement',
+      'add',
+      'write',
+      'fix',
+      'update',
+      'change',
+      'create',
+      'edit',
+      'rename',
+      'implementar',
+      'refatorar',
+      'adicionar',
+      'corrigir',
+      'atualizar',
+      'criar',
+      'editar',
+      'renomear',
+      'validar',
     ],
     heavy: [
-      'design', 'architecture', 'debug', 'complex', 'explain', 'reason', 'analyze',
-      'optimize', 'quality', 'review', 'arquitetura', 'depurar', 'complexo', 'analisar',
-      'otimizar', 'qualidade', 'revisar', 'diagnosticar',
+      'design',
+      'architecture',
+      'debug',
+      'complex',
+      'explain',
+      'reason',
+      'analyze',
+      'optimize',
+      'quality',
+      'review',
+      'arquitetura',
+      'depurar',
+      'complexo',
+      'analisar',
+      'otimizar',
+      'qualidade',
+      'revisar',
+      'diagnosticar',
     ],
   },
   enforcement: {
@@ -108,7 +165,8 @@ const tierRouterPlugin: Plugin = async (ctx) => {
   return {
     config: (input: Config) => orchestrator.handleConfig(input),
     'chat.message': (input: any, output: any) => orchestrator.handleChatMessage(input, output),
-    'experimental.chat.system.transform': (input: any, output: any) => orchestrator.handleSystemTransform(input, output),
+    'experimental.chat.system.transform': (input: any, output: any) =>
+      orchestrator.handleSystemTransform(input, output),
     'permission.ask': (input: any, output: any) => orchestrator.handlePermissionAsk(input, output),
     'tool.execute.after': (input: any, output: any) => orchestrator.handleToolExecuteAfter(input, output),
     'experimental.text.complete': (input: any, output: any) => orchestrator.handleTextComplete(input, output),
@@ -116,4 +174,20 @@ const tierRouterPlugin: Plugin = async (ctx) => {
   };
 };
 
+/**
+ * Plugin de roteamento inteligente de tiers OpenCode.
+ *
+ * Cria e retorna um objeto plugin que conecta todos os hooks do OpenCode
+ * (config, chat.message, chat.system.transform, permission.ask,
+ * tool.execute.after, experimental.text.complete, command.execute.before)
+ * a uma única instância compartilhada de PluginOrchestrator.
+ *
+ * @returns Objeto plugin no formato esperado pelo runtime OpenCode.
+ *
+ * @example
+ * ```ts
+ * import tierRouterPlugin from './index.js';
+ * export default tierRouterPlugin;
+ * ```
+ */
 export default tierRouterPlugin;
