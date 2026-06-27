@@ -52,14 +52,17 @@ opencode-tier-router/
 ## Commands
 
 ```bash
-# Build + typecheck
-npx tsc --noEmit
+# Build (outputs dist/index.js from src/index.ts)
+npm run build
+
+# Typecheck src + tests
+npm run typecheck
 
 # Run unit tests
 npx vitest run
 
-# Full gate (build + test)
-npx tsc --noEmit && npx vitest run
+# Full gate (typecheck + test)
+npm run typecheck && npx vitest run
 
 # Activate the TLC skill
 # (loaded by name — do not resolve by filesystem path)

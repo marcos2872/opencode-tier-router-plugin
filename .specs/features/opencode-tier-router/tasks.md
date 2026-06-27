@@ -52,7 +52,7 @@ All unit tests are pure function tests (no shared state, no filesystem, no netwo
 | Gate Level | When to Use | Command |
 | ---------- | ----------- | ------- |
 | Quick | After tasks with unit tests only | `npx vitest run` |
-| Build | After phase completion or config-only tasks | `npx tsc --noEmit && npx vitest run` |
+| Build | After phase completion or config-only tasks | `npm run typecheck && npx vitest run` |
 
 ---
 
@@ -104,7 +104,7 @@ T5, T6 → T7
 - [x] `tsconfig.json` created with `"module": "preserve"`, `"strict": true`, `"outDir": "dist"`
 - [x] `tiers.json` created with three tiers (fast/medium/heavy), four modes (normal/budget/quality/deep), and taskPatterns matching spec.md
 - [x] Default models in tiers.json: @fast=`github-copilot/claude-haiku-4-5`, @medium=`github-copilot/claude-sonnet-4-5`, @heavy=`github-copilot/claude-opus-4-8`
-- [x] `npx tsc --noEmit` passes
+- [x] `npm run typecheck` passes
 
 **Tests**: none (config files only)
 **Gate**: build
@@ -262,7 +262,7 @@ T5, T6 → T7
   - `/router` — shows status (on/off); `/router on` re-enables; `/router off` disables all routing (hooks short-circuit with no side effects)
 - [x] Router state (on/off) is a simple boolean in the plugin closure, no persistence needed — starts ON by default
 - [x] All hooks wrapped in try/catch with `// best-effort: never crash a real session`
-- [x] Build gate passes: `npx tsc --noEmit`
+- [x] Build gate passes: `npm run typecheck`
 - [x] `npx vitest run` passes (existing tests from prior tasks)
 
 **Tests**: none (integration-level — needs OpenCode runtime)
