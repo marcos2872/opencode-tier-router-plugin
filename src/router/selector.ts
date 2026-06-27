@@ -138,8 +138,8 @@ function classifyByLexicon(text: string): TierName | null {
 }
 
 /**
- * Type guard to validate that an unknown value is an OpenCode client
- * with a session.prompt function.
+ * Guarda de tipo para validar que um valor desconhecido é um cliente OpenCode
+ * com função session.prompt.
  */
 function isOpenCodeClient(client: unknown): client is { session: { prompt: Function } } {
   return client !== null &&

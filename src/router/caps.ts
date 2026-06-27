@@ -5,39 +5,39 @@ const DEFAULT_MAX = DEFAULT_TIER_CAP;
 const WARNING_THRESHOLD_REMAINING = CAP_WARNING_REMAINING_THRESHOLD;
 
 /**
- * CapTracker manages per-session tool-call caps and redundancy warnings.
+ * CapTracker gerencia limites de chamadas de ferramenta por sessão e avisos de redundância.
  *
- * The tracker counts read-only tool calls and fingerprints repeated
- * read-only calls so the orchestrator can warn when the same read operation
- * is repeated or when a configured cap is reached.
+ * O tracker conta chamadas de ferramenta somente leitura e registra impressão digital de chamadas
+ * somente leitura repetidas para que o orquestrador possa avisar quando a mesma operação de leitura
+ * é repetida ou quando um limite configurado é atingido.
  */
 export interface CapTracker {
   /**
-   * Record a tool call for a session and update cap counters.
+   * Registra uma chamada de ferramenta para uma sessão e atualiza os contadores de limite.
    *
-   * @param sessionId - OpenCode session identifier.
-   * @param tool - Tool name to record.
-   * @param args - Tool arguments used to fingerprint read-only calls.
-   * @returns Nothing.
+   * @param sessionId - Identificador da sessão OpenCode.
+   * @param tool - Nome da ferramenta a registrar.
+   * @param args - Argumentos da ferramenta usados para registrar impressão digital de chamadas somente leitura.
+   * @returns Nada.
    */
   record(sessionId: string, tool: string, args: Record<string, unknown>): void;
 
   /**
-   * Build a banner for the latest tool call in a session.
+   * Cria um banner para a chamada de ferramenta mais recente em uma sessão.
    *
-   * @param sessionId - OpenCode session identifier.
-   * @param tool - Tool name to inspect.
-   * @param args - Tool arguments used to detect repeated read-only calls.
-   * @returns A warning/banner string, or an empty string when no banner applies.
+   * @param sessionId - Identificador da sessão OpenCode.
+   * @param tool - Nome da ferramenta a inspecionar.
+   * @param args - Argumentos da ferramenta usados para detectar chamadas somente leitura repetidas.
+   * @returns Uma string de aviso/banner, ou uma string vazia quando nenhum banner se aplica.
    */
   getBanner(sessionId: string, tool: string, args: Record<string, unknown>): string;
 }
 
 /**
- * Create a cap tracker with a configurable maximum read-only call count.
+ * Cria um tracker de caps com limite configurável de chamadas somente leitura.
  *
- * @param max - Maximum allowed read-only calls before a cap banner is shown.
- * @returns A CapTracker implementation.
+ * @param max - Máximo de chamadas somente leitura permitidas antes de exibir banner de limite.
+ * @returns Uma implementação de CapTracker.
  * @example
  * ```ts
  * const tracker = createCapTracker(3);
@@ -101,11 +101,11 @@ interface SessionState {
 }
 
 /**
- * Return existing session state or create it when absent.
+ * Retorna estado de sessão existente ou cria quando ausente.
  *
- * @param sessions - Session state map owned by the tracker.
- * @param sessionId - OpenCode session identifier.
- * @returns The current session state.
+ * @param sessions - Mapa de estados de sessão de propriedade do tracker.
+ * @param sessionId - Identificador da sessão OpenCode.
+ * @returns O estado atual da sessão.
  */
 function getSessionState(sessions: Map<string, SessionState>, sessionId: string): SessionState {
   let state = sessions.get(sessionId);
@@ -117,24 +117,25 @@ function getSessionState(sessions: Map<string, SessionState>, sessionId: string)
 }
 
 /**
- * Determine whether a tool is considered read-only.
+ * Determina se uma ferramenta é considerada somente leitura.
  *
- * @param tool - Tool name.
- * @returns `true` when the tool is in the read-only whitelist.
+ * @param tool - Nome da ferramenta.
+ * @returns `true` quando a ferramenta está na lista permitida de ferramentas somente leitura.
  */
 function isReadOnly(tool: string): boolean {
   return READ_ONLY_TOOLS.has(tool.toLowerCase());
 }
 
 /**
- * Build a fingerprint for a read-only tool call.
+ * Cria uma impressão digital para uma chamada de ferramenta somente leitura.
  *
- * The fingerprint is derived from the tool name and sorted, non-undefined
- * arguments. It returns `null` for non-read-only tools or empty argument sets.
+ * A impressão digital é derivada do nome da ferramenta e dos argumentos
+ * ordenados não indefinidos. Retorna `null` para ferramentas não somente leitura
+ * ou conjuntos de argumentos vazios.
  *
- * @param tool - Tool name.
- * @param args - Tool arguments.
- * @returns A deterministic fingerprint string, or `null` when unavailable.
+ * @param tool - Nome da ferramenta.
+ * @param args - Argumentos da ferramenta.
+ * @returns Uma string de impressão digital determinística, ou `null` quando indisponível.
  */
 function buildFingerprint(tool: string, args: Record<string, unknown>): string | null {
   if (!isReadOnly(tool)) return null;
@@ -146,10 +147,10 @@ function buildFingerprint(tool: string, args: Record<string, unknown>): string |
 }
 
 /**
- * Normalize read-only tool arguments into a stable string.
+ * Normaliza argumentos de ferramenta somente leitura em uma string estável.
  *
- * @param args - Tool arguments to normalize.
- * @returns A sorted argument string, or `null` when arguments are empty.
+ * @param args - Argumentos da ferramenta a normalizar.
+ * @returns Uma string de argumentos ordenada, ou `null` quando argumentos estão vazios.
  */
 function normalizeArgs(args: Record<string, unknown>): string | null {
   if (args === null || typeof args !== 'object') return null;

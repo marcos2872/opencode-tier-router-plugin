@@ -3,15 +3,15 @@ import type { TaskPatterns } from './config.js';
 const regexCache = new Map<string, RegExp>();
 
 /**
- * Classify a task text into the first matching OpenCode tier.
+ * Classifica um texto de tarefa no primeiro tier OpenCode correspondente.
  *
- * The classifier checks heavy, medium, and then fast patterns in that order
- * so more complex keywords take precedence. It matches pattern prefixes at
- * word boundaries and returns `null` when no tier pattern matches.
+ * O classificador verifica padrões heavy, medium e depois fast nessa ordem
+ * para que palavras-chave mais complexas tenham precedência. Ele combina prefixos de padrões em
+ * limites de palavra e retorna `null` quando nenhum padrão de tier corresponde.
  *
- * @param text - User task text to classify.
- * @param patterns - Tier-to-keyword pattern map from router config.
- * @returns The matched tier, or `null` when no pattern matches.
+ * @param text - Texto da tarefa do usuário a classificar.
+ * @param patterns - Mapa de padrões de tier para palavra-chave da config do router.
+ * @returns O tier correspondente, ou `null` quando nenhum padrão corresponde.
  * @example
  * ```ts
  * const tier = classifyTask('fix the build script', { fast: [], medium: ['build', 'fix'], heavy: [] });
@@ -38,14 +38,14 @@ export function classifyTask(
 }
 
 /**
- * Match a normalized keyword at the start of a word.
+ * Corresponde uma palavra-chave normalizada no início de uma palavra.
  *
- * Patterns are escaped before creating the regular expression so special
- * characters are treated literally and cannot become regex syntax.
+ * Os padrões são escapados antes de criar a expressão regular para que caracteres especiais
+ * sejam tratados literalmente e não se tornem sintaxe regex.
  *
- * @param text - Lowercase task text to search.
- * @param pattern - Keyword pattern to match.
- * @returns `true` when the pattern appears at a word boundary.
+ * @param text - Texto de tarefa em minúsculas a pesquisar.
+ * @param pattern - Padrão de palavra-chave a corresponder.
+ * @returns `true` quando o padrão aparece em um limite de palavra.
  */
 function matchesWordStart(text: string, pattern: string): boolean {
   const escaped = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

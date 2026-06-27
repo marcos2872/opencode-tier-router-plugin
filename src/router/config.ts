@@ -17,219 +17,219 @@ import {
 } from '../constants.js';
 
 /**
- * Tier name used by the router.
+ * Nome de tier usado pelo router.
  */
 export type TierName = 'fast' | 'medium' | 'heavy';
 
 /**
- * Token threshold bounds for a tier.
+ * Limites de limiar de tokens para um tier.
  */
 export interface TokenThresholds {
   /**
-   * Minimum token count for this tier.
+   * Contagem mínima de tokens para este tier.
    */
   min: number;
 
   /**
-   * Maximum token count for this tier, or `null` for unlimited.
+   * Contagem máxima de tokens para este tier, ou `null` para ilimitado.
    */
   max: number | null;
 }
 
 /**
- * Configuration for one router tier.
+ * Configuração para um tier do router.
  */
 export interface TierConfig {
   /**
-   * OpenCode model identifier for this tier.
+   * Identificador do modelo OpenCode para este tier.
    */
   model: string;
 
   /**
-   * Relative cost multiplier for this tier.
+   * Multiplicador de custo relativo para este tier.
    */
   costRatio: number;
 
   /**
-   * Maximum allowed call count for this tier.
+   * Contagem máxima permitida de chamadas para este tier.
    */
   cap: number;
 
   /**
-   * Optional token threshold bounds for this tier.
+   * Limites opcionais de limiar de tokens para este tier.
    */
   thresholds?: TokenThresholds;
 }
 
 /**
- * Configuration for a routing mode.
+ * Configuração para um modo de roteamento.
  */
 export interface ModeConfig {
   /**
-   * Human-readable description of the mode.
+   * Descrição legível por humanos do modo.
    */
   description?: string;
 
   /**
-   * Default tier name selected when no classifier matches.
+   * Nome do tier padrão selecionado quando nenhum classificador corresponde.
    */
   defaultTier: string;
 }
 
 /**
- * Keyword patterns grouped by tier.
+ * Padrões de palavras-chave agrupados por tier.
  */
 export interface TaskPatterns {
   /**
-   * Keywords that should route to the fast tier.
+   * Palavras-chave que devem rotear para o tier fast.
    */
   fast: string[];
 
   /**
-   * Keywords that should route to the medium tier.
+   * Palavras-chave que devem rotear para o tier medium.
    */
   medium: string[];
 
   /**
-   * Keywords that should route to the heavy tier.
+   * Palavras-chave que devem rotear para o tier heavy.
    */
   heavy: string[];
 }
 
 /**
- * Enforcement policy for delegation.
+ * Política de aplicação para delegação.
  */
 export interface EnforcementConfig {
   /**
-   * Enforcement mode: advisory hints or hard-block.
+   * Modo de aplicação: avisos advisory ou hard-block.
    */
   mode: 'advisory' | 'hard-block';
 
   /**
-   * Whether trivial fast tasks may execute directly.
+   * Indica se tarefas rápidas triviais podem executar diretamente.
    */
   trivialDirectAllowed: boolean;
 }
 
 /**
- * Routing configuration for strategy selection.
+ * Configuração de roteamento para seleção de estratégia.
  */
 export interface RoutingConfig {
   /**
-   * Routing strategy to use.
+   * Estratégia de roteamento a usar.
    */
   strategy: 'keyword' | 'llm';
 
   /**
-   * Selector model used when `llm` routing is enabled.
+   * Modelo de selector usado quando roteamento `llm` está habilitado.
    */
   selectorModel: string;
 
   /**
-   * Selector timeout in milliseconds.
+   * Tempo limite do selector em milissegundos.
    */
   selectorTimeoutMs: number;
 
   /**
-   * Maximum selector output tokens.
+   * Número máximo de tokens de saída do selector.
    */
   selectorMaxTokens: number;
 }
 
 /**
- * Token tracking configuration.
+ * Configuração de rastreamento de tokens.
  */
 export interface TokenTrackingConfig {
   /**
-   * Whether token tracking is enabled when present.
+   * Indica se o rastreamento de tokens está habilitado quando presente.
    */
   enabled?: boolean;
 
   /**
-   * Maximum persisted token metric files to retain.
+   * Número máximo de arquivos de métricas de tokens persistidos para reter.
    */
   maxHistoryFiles?: number;
 
   /**
-   * Maximum days to retain historical token records.
+   * Número máximo de dias para reter registros históricos de tokens.
    */
   maxHistoryDays?: number;
 
   /**
-   * Session TTL in minutes before eviction.
+   * TTL da sessão em minutos antes da expiração.
    */
   sessionTTLMinutes?: number;
 
   /**
-   * Maximum number of sessions kept in memory before LRU eviction.
+   * Número máximo de sessões mantidas em memória antes da evicção LRU.
    */
   maxSessionsMemory?: number;
 }
 
 /**
- * Complete router configuration.
+ * Configuração completa do router.
  */
 export interface RouterConfig {
   /**
-   * Active routing mode name.
+   * Nome do modo de roteamento ativo.
    */
   mode: string;
 
   /**
-   * Tier definitions keyed by tier name.
+   * Definições de tiers agrupadas pelo nome do tier.
    */
   tiers: Record<string, TierConfig>;
 
   /**
-   * Routing modes keyed by mode name.
+   * Modos de roteamento agrupados pelo nome do modo.
    */
   modes: Record<string, ModeConfig>;
 
   /**
-   * Tier keyword patterns.
+   * Padrões de palavras-chave de tiers.
    */
   taskPatterns: TaskPatterns;
 
   /**
-   * Enforcement policy.
+   * Política de aplicação.
    */
   enforcement: EnforcementConfig;
 
   /**
-   * Routing strategy configuration.
+   * Configuração da estratégia de roteamento.
    */
   routing: RoutingConfig;
 
   /**
-   * Optional token tracking configuration.
+   * Configuração opcional de rastreamento de tokens.
    */
   tokenTracking?: TokenTrackingConfig;
 }
 
 /**
- * Active tier summary for the selected mode.
+ * Resumo de tiers ativos para o modo selecionado.
  */
 export interface ActiveTiers {
   /**
-   * Default tier for the active mode.
+   * Tier padrão para o modo ativo.
    */
   defaultTier: string;
 
   /**
-   * Tier definitions available to the router.
+   * Definições de tiers disponíveis para o router.
    */
   tiers: Record<string, TierConfig>;
 }
 
 /**
- * Configuration error thrown when tiers.json is invalid.
+ * Erro de configuração lançado quando tiers.json é inválido.
  */
 export class ConfigError extends Error {
   /**
-   * Create a configuration error with an optional underlying cause.
+   * Cria um erro de configuração com uma causa subjacente opcional.
    *
-   * @param message - Human-readable error message.
-   * @param cause - Underlying error or reason for the invalid configuration.
+   * @param message - Mensagem de erro legível por humanos.
+   * @param cause - Erro subjacente ou motivo da configuração inválida.
    */
   constructor(message: string, public readonly cause?: unknown) {
     super(message);
@@ -372,15 +372,15 @@ async function pathExists(p: string): Promise<boolean> {
 }
 
 /**
- * Resolve the tiers.json path using project-local override then global fallback.
+ * Resolve o caminho de tiers.json usando override local do projeto e fallback global.
  *
- * If both project and global files exist, the project-local file wins. If
- * neither exists, the function returns the project-local path so callers can
- * create it there.
+ * Se ambos os arquivos existem, o arquivo local do projeto prevalece. Se
+ * nenhum existir, a função retorna o caminho local do projeto para que os chamadores
+ * possam criá-lo lá.
  *
- * @param projectDir - Directory containing the OpenCode project.
- * @param globalDir - Directory containing the global OpenCode config.
- * @returns The resolved tiers.json path.
+ * @param projectDir - Diretório contendo o projeto OpenCode.
+ * @param globalDir - Diretório contendo a config global OpenCode.
+ * @returns O caminho resolvido de tiers.json.
  * @example
  * ```ts
  * const path = await resolveTiersPath(process.cwd(), join(homedir(), '.config', 'opencode'));
@@ -397,15 +397,15 @@ export async function resolveTiersPath(projectDir: string, globalDir: string): P
 }
 
 /**
- * Load and validate tiers.json from the resolved config path.
+ * Carrega e valida tiers.json a partir do caminho de config resolvido.
  *
- * The function reads a project-local config first, falls back to global config,
- * and throws ConfigError when the file is unreadable or malformed.
+ * A função lê primeiro a config local do projeto, faz fallback para a config
+ * global e lança ConfigError quando o arquivo não pode ser lido ou está malformatado.
  *
- * @param projectDir - Directory containing the OpenCode project.
- * @param globalDir - Directory containing the global OpenCode config.
- * @returns Validated router configuration.
- * @throws {ConfigError} When the config cannot be read, parsed, or validated.
+ * @param projectDir - Diretório contendo o projeto OpenCode.
+ * @param globalDir - Diretório contendo a config global OpenCode.
+ * @returns Configuração de roteamento validada.
+ * @throws {ConfigError} Quando a config não pode ser lida, analisada ou validada.
  * @example
  * ```ts
  * const cfg = await loadTiers(process.cwd(), join(homedir(), '.config', 'opencode'));
@@ -433,15 +433,15 @@ export async function loadTiers(projectDir: string, globalDir: string): Promise<
 }
 
 /**
- * Validate and normalize a raw tiers.json object.
+ * Valida e normaliza um objeto bruto de tiers.json.
  *
- * The function accepts partial config and fills defaults for enforcement and
- * routing sections when they are missing, but it throws for malformed required
- * fields. It is intentionally permissive about unknown top-level properties.
+ * A função aceita config parcial e preenche padrões para as seções enforcement
+ * e routing quando ausentes, mas lança erro para campos obrigatórios malformatados.
+ * É intencionalmente permissiva quanto a propriedades top-level desconhecidas.
  *
- * @param config - Raw parsed JSON object to validate.
- * @throws {ConfigError} When the config is invalid or incomplete.
- * @returns Nothing; if validation succeeds, `config` is narrowed to RouterConfig.
+ * @param config - Objeto JSON analisado bruto para validar.
+ * @throws {ConfigError} Quando a config é inválida ou incompleta.
+ * @returns Nada; se a validação tiver sucesso, `config` é refinado para RouterConfig.
  * @example
  * ```ts
  * validateConfig({ mode: 'normal', tiers: {}, modes: {} });
@@ -583,16 +583,16 @@ export function validateConfig(config: unknown): asserts config is RouterConfig 
 }
 
 /**
- * Save the active routing mode to project-local tiers.json.
+ * Salva o modo de roteamento ativo em tiers.json local do projeto.
  *
- * The function creates the project directory if needed, reads the existing
- * project config when present, updates `mode`, and writes a temporary file
- * before renaming it into place.
+ * A função cria o diretório do projeto se necessário, lê a config do projeto
+ * existente quando presente, atualiza `mode` e grava um arquivo temporário antes
+ * de renomeá-lo para o destino.
  *
- * @param mode - Mode name to activate.
- * @param projectDir - Directory where tiers.json should be written.
- * @returns Updated router configuration.
- * @throws {ConfigError} When the mode is unknown, the existing config is malformed, or writing fails.
+ * @param mode - Nome do modo a ativar.
+ * @param projectDir - Diretório onde tiers.json deve ser gravado.
+ * @returns Configuração de roteamento atualizada.
+ * @throws {ConfigError} Quando o modo é desconhecido, a config existente está malformatada ou a gravação falha.
  * @example
  * ```ts
  * const cfg = await saveMode('budget', process.cwd());
@@ -640,11 +640,11 @@ export async function saveMode(mode: string, projectDir: string): Promise<Router
 }
 
 /**
- * Return the active mode default tier and configured tier map.
+ * Retorna o tier padrão do modo ativo e o mapa de tiers configurado.
  *
- * @param cfg - Router configuration to inspect.
- * @returns Active tier summary for the configured mode.
- * @throws {ConfigError} When the active mode is unknown.
+ * @param cfg - Configuração de roteamento a inspecionar.
+ * @returns Resumo de tiers ativos para o modo configurado.
+ * @throws {ConfigError} Quando o modo ativo é desconhecido.
  * @example
  * ```ts
  * const active = getActiveTiers(config);

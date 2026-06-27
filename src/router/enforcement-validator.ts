@@ -1,15 +1,15 @@
 /**
- * Enforcement Validator — Guarantee 100% Delegation
+ * Validador de aplicação — Garantir 100% de delegação
  *
- * Validates that the plugin ALWAYS delegates tasks to subagents.
- * Never allows direct execution in the main window.
+ * Valida que o plugin SEMPRE delega tarefas para subagentes.
+ * Nunca permite execução direta na janela principal.
  *
- * Principles:
- * 1. Main window is ONLY an orchestrator
- * 2. All work delegated to @fast/@medium/@heavy subagents
- * 3. No exceptions for "trivial" tasks
- * 4. enforcement.mode = "hard-block" (not advisory)
- * 5. enforcement.trivialDirectAllowed = false (no bypass)
+ * Princípios:
+ * 1. A janela principal é SOMENTE um orquestrador
+ * 2. Todo trabalho é delegado aos subagentes @fast/@medium/@heavy
+ * 3. Sem exceções para tarefas "triviais"
+ * 4. enforcement.mode = "hard-block" (não advisory)
+ * 5. enforcement.trivialDirectAllowed = false (sem bypass)
  */
 
 import type { RouterConfig } from './config.js';
@@ -22,13 +22,13 @@ export interface EnforcementValidation {
 }
 
 /**
- * Validate enforcement configuration for 100% delegation
+ * Valida configuração de aplicação para 100% de delegação
  *
- * Rules:
- * - enforcement.mode MUST be "hard-block" (not "advisory")
- * - enforcement.trivialDirectAllowed MUST be false (no bypass)
- * - All 3 tiers (fast, medium, heavy) must be configured with valid models
- * - Config must have sensible routing strategy
+ * Regras:
+ * - enforcement.mode DEVE ser "hard-block" (não "advisory")
+ * - enforcement.trivialDirectAllowed DEVE ser false (sem bypass)
+ * - Os 3 tiers (fast, medium, heavy) devem estar configurados com modelos válidos
+ * - Config precisa ter estratégia de roteamento adequada
  */
 export function validateEnforcement(cfg: RouterConfig): EnforcementValidation {
   const errors: string[] = [];
@@ -134,8 +134,8 @@ export function validateEnforcement(cfg: RouterConfig): EnforcementValidation {
 }
 
 /**
- * Assert enforcement configuration is valid for 100% delegation
- * Throws if validation fails
+ * Asserta que configuração de aplicação é válida para 100% de delegação
+ * Lança erro se validação falhar
  */
 export function assertEnforcement(cfg: RouterConfig): void {
   const validation = validateEnforcement(cfg);
@@ -158,7 +158,7 @@ export function assertEnforcement(cfg: RouterConfig): void {
 }
 
 /**
- * Generate enforcement report for debugging
+ * Gera relatório de aplicação para depuração
  */
 export function reportEnforcement(cfg: RouterConfig): string {
   const validation = validateEnforcement(cfg);
