@@ -390,4 +390,4 @@ Estrutura principal:
 
 ## Licença
 
-Defina a licença do projeto em `package.json` conforme sua necessidade.
+MIT

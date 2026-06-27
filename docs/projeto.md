@@ -356,4 +356,4 @@ analyze code quality and propose architecture changes
 
 ## Licença
 
-Defina a licença no `package.json` conforme a política do projeto.
+MIT

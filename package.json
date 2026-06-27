@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "type": "module",
   "description": "OpenCode plugin that routes tasks to the cheapest adequate model tier",
+  "license": "MIT",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
