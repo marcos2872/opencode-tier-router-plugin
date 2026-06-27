@@ -1,5 +1,6 @@
 import type { RouterConfig } from './config.js';
 import { classifyTask as classifyByPattern } from './classifier.js';
+import { buildSelectorPrompt } from '../prompts.js';
 
 /**
  * Representa um dos tiers de complexidade usados pelo roteador.
@@ -182,14 +183,7 @@ async function classifyByLLM(text: string, cfg: RouterConfig, client: unknown): 
   const model = cfg.routing.selectorModel;
   const timeoutMs = cfg.routing.selectorTimeoutMs;
 
-  const selectorPrompt = [
-    'Classify the user request into one tier: fast, medium, or heavy.',
-    'Return exactly one word: fast OR medium OR heavy.',
-    'fast = search/read/list/explore',
-    'medium = implement/refactor/fix/change/create',
-    'heavy = architecture/debug/analyze/quality/review',
-    `request: ${text}`,
-  ].join('\n');
+  const selectorPrompt = buildSelectorPrompt(text);
 
   const timeoutPromise = new Promise<null>((resolve) => {
     setTimeout(() => resolve(null), timeoutMs);

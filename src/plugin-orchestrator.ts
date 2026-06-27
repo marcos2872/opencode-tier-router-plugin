@@ -11,7 +11,12 @@
 import type { Config } from '@opencode-ai/plugin';
 import type { TextPart } from '@opencode-ai/sdk';
 import { type RouterConfig, saveMode } from './router/config.js';
-import { buildDelegationProtocol } from './router/protocol.js';
+import {
+  buildDelegationProtocol,
+  buildRoutingHint,
+  buildHardBlockMessage,
+  buildNarrationAnnotation,
+} from './prompts.js';
 import { selectTierByStrategy, type SelectionSource } from './router/selector.js';
 import { createCapTracker } from './router/caps.js';
 import { detectNarration } from './narration.js';
@@ -224,17 +229,13 @@ export class PluginOrchestrator {
       const preferredTier = input.sessionID ? this.preferredTierSessions.get(input.sessionID) : undefined;
       if (preferredTier) {
         const source = input.sessionID ? this.selectionSourceSessions.get(input.sessionID) : undefined;
-        output.system.push(
-          `Routing hint: Preferred tier for this request is @${preferredTier}${source ? ` (source: ${source})` : ''}. Delegate to @${preferredTier} when not trivial.`,
-        );
+        output.system.push(buildRoutingHint(preferredTier, source));
       }
 
       const tier = input.sessionID ? this.hardBlockedSessions.get(input.sessionID) : undefined;
       if (cfg.enforcement.mode === 'hard-block' && tier) {
         const reason = input.sessionID ? this.hardBlockReasons.get(input.sessionID) : undefined;
-        output.system.push(
-          `HARD-BLOCK: This request MUST be delegated to @${tier}. Do not execute tools directly in this session. Attempt delegation now. If direct execution is blocked, immediately delegate to @${tier}.${reason ? ` ${reason}` : ''}`,
-        );
+        output.system.push(buildHardBlockMessage(tier, reason));
       }
     } catch (err) {
       console.warn(
@@ -292,7 +293,7 @@ export class PluginOrchestrator {
 
       const match = detectNarration(output.text);
       if (match) {
-        output.text += `\n\n[⚠ narration detected: "${match}"]`;
+        output.text += buildNarrationAnnotation(match);
       }
     } catch (err) {
       console.warn(
