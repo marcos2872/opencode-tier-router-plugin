@@ -19,7 +19,7 @@ OpenCode users typically run one model for every task — paying Opus prices to 
 | External proxy / gateway | Weave Router approach requires infra; plugin-only is the constraint |
 | Fine-tuned router model | Paper uses Qwen3.5-0.8B; prompt-based routing is sufficient for MVP |
 | Persistent vector store / Memory | Adds embeddings dependency; keyword classification is good enough |
-| Hard-block enforcement (Layer 1) | Too risky for MVP — advisory banners only |
+| Hard-block enabled by default | Too risky for default UX — hard-block remains opt-in |
 | Cross-session budget tracking | Stateless by design; each session starts fresh |
 | Provider fallback chains | OpenCode already handles provider failover natively |
 
@@ -39,6 +39,7 @@ Every ambiguity is resolved or recorded here — nothing is left silently unclea
 | Default models (GitHub Copilot) | @fast=github-copilot/claude-haiku-4.5, @medium=github-copilot/gpt-5.3-codex, @heavy=github-copilot/claude-sonnet-4.5 | GitHub Copilot users don't need extra API keys; models are familiar from Copilot ecosystem | y |
 | Cost ratios | 1x / 5x / 20x | Directional signal for orchestrator; user-tunable | y |
 | Default mode | normal | Balanced; user switches via /budget | y |
+| Enforcement mode | advisory by default, optional hard-block | Safe default + strict mode for advanced users | y |
 | Fallback behavior | Orquestrador executa diretamente se subagente falhar | Fail-safe: nunca perder a tarefa | y |
 | Concurrency | Hooks podem ser chamados concorrentemente; cada sessão tem seu tracker | Plugin stores são criados por instância (closure) | y |
 
@@ -163,6 +164,23 @@ Every ambiguity is resolved or recorded here — nothing is left silently unclea
 
 ---
 
+### P8: Enforcement Modes + Agent Mapping
+
+**User Story**: As a developer, I want optional hard-block enforcement and deterministic mapping of built-in OpenCode agents to tiers so that delegation uses the expected model and direct execution can be blocked when strict routing is required.
+
+**Why P8**: Advisory prompts alone are not always enough in real sessions; strict mode and agent mapping reduce routing drift.
+
+**Acceptance Criteria**:
+
+1. WHEN `enforcement.mode = "hard-block"` AND request is non-trivial THEN direct tool execution in the main session SHALL be denied and the protocol SHALL instruct delegation to the required tier
+2. WHEN `enforcement.mode = "hard-block"` AND `trivialDirectAllowed = true` AND request is trivial fast THEN direct execution SHALL remain allowed
+3. WHEN OpenCode delegates using built-in agents (`explore`, `build`, `general`, `plan`) THEN the plugin SHALL map them to tier models (`@fast`, `@medium`, `@heavy`, `@heavy`)
+4. WHEN user runs `/tiers` THEN output SHALL include the active enforcement mode and built-in agent mapping summary
+
+**Independent Test**: Set hard-block mode and request a non-trivial quality review — verify direct main-session tool calls are denied and delegation guidance is injected. In advisory mode, verify `build/explore` use mapped tier models.
+
+---
+
 ## Edge Cases
 
 - WHEN tiers.json is missing or malformed THEN the plugin SHALL log a warning and continue with hardcoded defaults
@@ -170,6 +188,8 @@ Every ambiguity is resolved or recorded here — nothing is left silently unclea
 - WHEN a user edits tiers.json while OpenCode is running THEN the plugin SHALL pick up changes on the next message (no hot-reload needed — re-read on each hook call)
 - WHEN the model in a tier string is invalid THEN the tier SHALL be skipped with a logged warning, and the orchestrator SHALL fall back to direct execution
 - WHEN /budget is called with an invalid mode name THEN the plugin SHALL show available modes and keep the current mode unchanged
+- WHEN built-in agent `build` is selected THEN routing model SHALL map to `@medium` tier model
+- WHEN hard-block is enabled and redirection fails THEN direct main-session tool execution SHALL be denied
 
 ---
 
@@ -194,6 +214,8 @@ Every ambiguity is resolved or recorded here — nothing is left silently unclea
 | RTR-15 | EC: Mode invalido | Tasks | ✅ Verified |
 | RTR-16 | P7: Comando /router | Tasks | ✅ Verified |
 | RTR-17 | P7: Plugin desligado (noop) | Tasks | ✅ Verified |
+| RTR-18 | P8: Hard-block opt-in | Tasks | ✅ Verified |
+| RTR-19 | P8: Agent mapping build/explore/general/plan | Tasks | ✅ Verified |
 
 **ID format:** `RTR-[NUMBER]` (Router)
 

@@ -99,6 +99,12 @@ describe('tierRouterPlugin', () => {
       model: 'github-copilot/claude-sonnet-4.5',
       mode: 'subagent',
     });
+    expect(config.agent?.explore).toMatchObject({
+      model: 'github-copilot/claude-haiku-4.5',
+    });
+    expect(config.agent?.build).toMatchObject({
+      model: 'github-copilot/gpt-5.3-codex',
+    });
   });
 
   it('skips tiers with invalid model strings and logs a warning', async () => {
@@ -140,6 +146,7 @@ describe('tierRouterPlugin', () => {
 
     const text = textOf(output.parts);
     expect(text).toContain('Mode: normal');
+    expect(text).toContain('Agent mapping: explore->@fast, build->@medium, general->@heavy, plan->@heavy');
     expect(text).toContain('@fast:');
     expect(text).toContain('github-copilot/claude-haiku-4.5');
   });
@@ -330,6 +337,47 @@ describe('tierRouterPlugin', () => {
       systemOut,
     );
     expect(systemOut.system.join('\n')).toContain('HARD-BLOCK');
+  });
+
+  it('hard-block denies direct tool permissions for mapped build agent sessions', async () => {
+    await writeTiers(projectDir, {
+      enforcement: {
+        mode: 'hard-block',
+        trivialDirectAllowed: true,
+      },
+    });
+
+    const plugin = await tierRouterPlugin(makeCtx(projectDir));
+    await plugin['chat.message']?.(
+      { sessionID: 'main-build', agent: 'build' },
+      {
+        message: {
+          role: 'user',
+          id: 'm-build',
+          sessionID: 'main-build',
+          time: { created: 0 },
+          agent: 'build',
+          model: { providerID: 'github-copilot', modelID: 'gpt-5.3-codex' },
+        },
+        parts: [{ type: 'text', text: 'busque auth no projeto' } as unknown as TextPart],
+      },
+    );
+
+    const askOut: { status: 'ask' | 'deny' | 'allow' } = { status: 'ask' };
+    await plugin['permission.ask']?.(
+      {
+        id: 'p-build',
+        type: 'bash',
+        sessionID: 'main-build',
+        messageID: 'm-build',
+        title: 'run command',
+        metadata: {},
+        time: { created: 0 },
+      },
+      askOut,
+    );
+
+    expect(askOut.status).toBe('deny');
   });
 
   it('hard-block still allows trivial fast requests when configured', async () => {

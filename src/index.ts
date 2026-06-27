@@ -10,6 +10,12 @@ import { detectNarration } from './narration.js';
 
 const TIER_NAMES = ['fast', 'medium', 'heavy'] as const;
 type TierName = (typeof TIER_NAMES)[number];
+const AGENT_TIER_MAP: Record<string, TierName> = {
+  explore: 'fast',
+  build: 'medium',
+  general: 'heavy',
+  plan: 'heavy',
+};
 
 const FALLBACK_CONFIG: RouterConfig = {
   mode: 'normal',
@@ -168,6 +174,17 @@ const tierRouterPlugin: Plugin = async (ctx) => {
           };
         }
 
+        // Align OpenCode built-in agent names with tier models so delegation keeps the expected model.
+        for (const [agentName, tier] of Object.entries(AGENT_TIER_MAP)) {
+          const model = cfg.tiers[tier]?.model;
+          if (!model || !/^[^/]+\/[^/]+$/.test(model)) continue;
+          input.agent[agentName] = {
+            ...(input.agent[agentName] ?? {}),
+            model,
+            description: `Tier router mapped ${agentName} -> @${tier}`,
+          };
+        }
+
         input.command = input.command ?? {};
         input.command.tiers = {
           template: '/tiers',
@@ -203,6 +220,16 @@ const tierRouterPlugin: Plugin = async (ctx) => {
         const cfg = await loadConfig(ctx.directory);
         if (cfg.enforcement.mode !== 'hard-block') {
           hardBlockedSessions.delete(input.sessionID);
+          return;
+        }
+
+        const mappedTier = input.agent ? AGENT_TIER_MAP[input.agent] : undefined;
+        if (mappedTier) {
+          if (mappedTier === 'fast' && cfg.enforcement.trivialDirectAllowed) {
+            hardBlockedSessions.delete(input.sessionID);
+            return;
+          }
+          hardBlockedSessions.set(input.sessionID, mappedTier);
           return;
         }
 
@@ -324,6 +351,7 @@ const tierRouterPlugin: Plugin = async (ctx) => {
           const lines = [
             `Mode: ${cfg.mode} (${cfg.modes[cfg.mode]?.description ?? ''})`,
             `Enforcement: ${cfg.enforcement.mode} (trivial direct allowed: ${cfg.enforcement.trivialDirectAllowed ? 'yes' : 'no'})`,
+            `Agent mapping: explore->@fast, build->@medium, general->@heavy, plan->@heavy`,
             'Tiers:',
           ];
           for (const tier of TIER_NAMES) {
