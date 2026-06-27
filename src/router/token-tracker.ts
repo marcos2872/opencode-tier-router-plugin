@@ -361,6 +361,79 @@ export class TokenTracker {
   }
 
   /**
+   * Get aggregated summary for a session (in-memory or from disk).
+   * RTT-T6: getSummary() aggregates metrics.
+   */
+  async getSummary(sessionId: string): Promise<SessionTokenSummary | null> {
+    try {
+      // Try in-memory cache first
+      const cached = this.cache.get(sessionId);
+      if (cached) {
+        return cached;
+      }
+
+      // If not in cache, try to load from disk
+      return await this.loadPersistedTokenMetrics(sessionId);
+    } catch (err) {
+      console.error('[TokenTracker] Failed to get summary:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Explicitly persist token metrics for a session to disk.
+   * RTT-T7: persistTokenMetrics() saves aggregated metrics.
+   */
+  async persistTokenMetrics(sessionId: string): Promise<void> {
+    try {
+      const summary = this.cache.get(sessionId);
+      if (!summary) {
+        console.warn(`[TokenTracker] No session data to persist for ${sessionId}`);
+        return;
+      }
+
+      const delegationCount = this.delegationCounts.get(sessionId) ?? 0;
+      await this.persistSession(sessionId, summary, delegationCount);
+      await this.cleanupOldFiles();
+    } catch (err) {
+      console.error('[TokenTracker] Failed to persist metrics:', err);
+    }
+  }
+
+  /**
+   * Load persisted token metrics from disk for a session.
+   * RTT-T7: loadPersistedTokenMetrics() restores from disk.
+   */
+  async loadPersistedTokenMetrics(sessionId: string): Promise<SessionTokenSummary | null> {
+    try {
+      const files = await this.storage.listFiles(this.storageDir);
+      const sessionFiles = files
+        .filter(f => f.startsWith(`token-${sessionId.slice(0, 8)}-`) && f.endsWith('.json'))
+        .sort()
+        .reverse(); // Newest first
+
+      if (sessionFiles.length === 0) {
+        return null;
+      }
+
+      // Load the most recent file
+      const latestFile = sessionFiles[0];
+      const path = `${this.storageDir}/${latestFile}`;
+      const content = await this.storage.load(path);
+
+      if (!content) {
+        return null;
+      }
+
+      const persisted = JSON.parse(content) as PersistedTokenSession;
+      return persisted.summary;
+    } catch (err) {
+      console.error('[TokenTracker] Failed to load persisted metrics:', err);
+      return null;
+    }
+  }
+
+  /**
    * Handle session evictions (TTL + LRU).
    * Persist evicted sessions to disk and apply cleanup.
    */
