@@ -405,12 +405,68 @@ const tierRouterPlugin: Plugin = async (ctx) => {
     'tool.execute.after': async (input, output) => {
       try {
         if (!enabled) return;
-        if (!input.sessionID || !subagentSessions.has(input.sessionID)) return;
+        if (!input.sessionID) return;
 
-        capTracker.record(input.sessionID, input.tool, input.args ?? {});
-        const banner = capTracker.getBanner(input.sessionID, input.tool, input.args ?? {});
-        if (banner) {
-          output.output += `\n${banner}`;
+        // Record cap tracking (existing behavior)
+        if (subagentSessions.has(input.sessionID)) {
+          capTracker.record(input.sessionID, input.tool, input.args ?? {});
+          const banner = capTracker.getBanner(input.sessionID, input.tool, input.args ?? {});
+          if (banner) {
+            output.output += `\n${banner}`;
+          }
+        }
+
+        // FASE5: Record token usage for tracking
+        if (tokenTracker) {
+          const out = output as any;
+          let usage = out.usage;
+          if (!usage && out.output) {
+            // Try to extract usage from output string (if JSON-encoded)
+            try {
+              const parsed = JSON.parse(out.output);
+              usage = parsed.usage || usage;
+            } catch {
+              // Not JSON, skip
+            }
+          }
+
+          if (usage) {
+            const inputTokens = usage.inputTokens ?? usage.input ?? 0;
+            const outputTokens = usage.outputTokens ?? usage.output ?? 0;
+            const reasoningTokens = usage.reasoningTokens ?? usage.reasoning ?? 0;
+            const cacheRead = usage.cacheReadTokens ?? usage.cache?.read ?? 0;
+            const cacheWrite = usage.cacheWriteTokens ?? usage.cache?.write ?? 0;
+
+            // Estimate cost based on tier
+            // Most providers charge ~$0.0015/1k input, ~$0.006/1k output
+            const estimatedCost = ((inputTokens * 0.0015) + (outputTokens * 0.006)) / 1000;
+
+            // Get current routing decision for this session
+            const tier = preferredTierSessions.get(input.sessionID);
+            const cfg = await loadConfig(ctx.directory);
+            const routing = tier ? {
+              tier: tier,
+              costRatio: cfg.tiers[tier]?.costRatio ?? 1,
+            } : undefined;
+
+            // Record the event
+            await tokenTracker.recordStepFinish({
+              sessionID: input.sessionID,
+              tokens: {
+                input: inputTokens,
+                output: outputTokens,
+                reasoning: reasoningTokens,
+                cache: { read: cacheRead, write: cacheWrite },
+              },
+              cost: estimatedCost,
+              timestamp: Date.now(),
+            });
+
+            // If we have a routing decision, record it too for correlation
+            if (routing) {
+              await tokenTracker.recordRoutingDecision(input.sessionID, routing);
+            }
+          }
         }
       } catch (err) {
         // best-effort: never crash a real session
