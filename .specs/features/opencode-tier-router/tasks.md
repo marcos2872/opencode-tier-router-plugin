@@ -200,13 +200,13 @@ T5, T6 → T7
 - Skill: NONE
 
 **Done when**:
-- [ ] `createCapTracker()` returns an object with `record(sessionId, tool, args)` and `getBanner(sessionId, tool, args)` methods
-- [ ] Cap counter increments per read-only tool call (grep/read/glob/ls); resets per session
-- [ ] Banner format matches spec: `[cap: N/MAX]` below cap, `[⚠ CAP WARNING: N remaining]` approaching, `[⚠ CAP REACHED (N/MAX)]` at cap
-- [ ] Redundancy detection creates a deterministic fingerprint of each tool call (e.g., `"read:/path/to/file"`, `"grep:pattern:path"`)
-- [ ] Same fingerprint within session → `[⚠ REDUNDANT: this is the same X you ran at call #N]`
-- [ ] Different tools or different args → no redundancy
-- [ ] Gate check passes: `npx vitest run`
+- [x] `createCapTracker()` returns an object with `record(sessionId, tool, args)` and `getBanner(sessionId, tool, args)` methods
+- [x] Cap counter increments per read-only tool call (grep/read/glob/ls); resets per session
+- [x] Banner format matches spec: `[cap: N/MAX]` below cap, `[⚠ CAP WARNING: N remaining]` approaching, `[⚠ CAP REACHED (N/MAX)]` at cap
+- [x] Redundancy detection creates a deterministic fingerprint of each tool call (e.g., `"read:/path/to/file"`, `"grep:pattern:path"`)
+- [x] Same fingerprint within session → `[⚠ REDUNDANT: this is the same X you ran at call #N]`
+- [x] Different tools or different args → no redundancy
+- [x] Gate check passes: `npx vitest run`
 
 **Tests**: unit (coverage: counter increments; banners at each level; redundancy fingerprints match; same grep different args = not redundant; session isolation)
 **Gate**: quick
@@ -226,11 +226,11 @@ T5, T6 → T7
 - Skill: NONE
 
 **Done when**:
-- [ ] `NARRATION_PATTERNS` array contains regexes for: "Still writing/implementing/working on the X", "Now I'll write/implement/add the X", "Let me write/implement/add the X", "I'll now write/implement the X", "Going to write/implement the X"
-- [ ] `detectNarration(text)` returns `null` for clean text
-- [ ] `detectNarration(text)` returns matched pattern string for text containing narration
-- [ ] False positives minimized — the word "writing" in "reading and writing files" should NOT match
-- [ ] Gate check passes: `npx vitest run`
+- [x] `NARRATION_PATTERNS` array contains regexes for: "Still writing/implementing/working on the X", "Now I'll write/implement/add the X", "Let me write/implement/add the X", "I'll now write/implement the X", "Going to write/implement the X"
+- [x] `detectNarration(text)` returns `null` for clean text
+- [x] `detectNarration(text)` returns matched pattern string for text containing narration
+- [x] False positives minimized — the word "writing" in "reading and writing files" should NOT match
+- [x] Gate check passes: `npx vitest run`
 
 **Tests**: unit (coverage: each NARRATION_PATTERN matches; clean text returns null; partial matches don't trigger; known false positives pass through)
 **Gate**: quick
