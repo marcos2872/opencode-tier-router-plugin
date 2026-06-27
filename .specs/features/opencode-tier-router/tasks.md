@@ -250,20 +250,20 @@ T5, T6 → T7
 - Skill: NONE
 
 **Done when**:
-- [ ] Plugin exports default factory function `(ctx: PluginInput) => Plugin`
-- [ ] `config` hook registers three subagent agents (fast/medium/heavy) with models from tiers.json
-- [ ] `config` hook registers commands `/tiers`, `/budget`, and `/router` with descriptions and templates
-- [ ] `experimental.chat.system.transform` hook injects delegation protocol from protocol.ts — skips injection for subagent sessions AND when router is disabled
-- [ ] `tool.execute.after` hook calls capTracker.record() and appends banners to read-only tool results — short-circuits when router disabled
-- [ ] `experimental.text.complete` hook calls detectNarration() and appends `[⚠ narration detected: "..."]` on match — short-circuits when router disabled
-- [ ] `command.execute.before` hook dispatches:
+- [x] Plugin exports default factory function `(ctx: PluginInput) => Plugin`
+- [x] `config` hook registers three subagent agents (fast/medium/heavy) with models from tiers.json
+- [x] `config` hook registers commands `/tiers`, `/budget`, and `/router` with descriptions and templates
+- [x] `experimental.chat.system.transform` hook injects delegation protocol from protocol.ts — skips injection for subagent sessions AND when router is disabled
+- [x] `tool.execute.after` hook calls capTracker.record() and appends banners to read-only tool results — short-circuits when router disabled
+- [x] `experimental.text.complete` hook calls detectNarration() and appends `[⚠ narration detected: "..."]` on match — short-circuits when router disabled
+- [x] `command.execute.before` hook dispatches:
   - `/tiers` — shows active config
   - `/budget` — switches mode, persists via config.saveMode()
   - `/router` — shows status (on/off); `/router on` re-enables; `/router off` disables all routing (hooks short-circuit with no side effects)
-- [ ] Router state (on/off) is a simple boolean in the plugin closure, no persistence needed — starts ON by default
-- [ ] All hooks wrapped in try/catch with `// best-effort: never crash a real session`
-- [ ] Build gate passes: `npx tsc --noEmit`
-- [ ] `npx vitest run` passes (existing tests from prior tasks)
+- [x] Router state (on/off) is a simple boolean in the plugin closure, no persistence needed — starts ON by default
+- [x] All hooks wrapped in try/catch with `// best-effort: never crash a real session`
+- [x] Build gate passes: `npx tsc --noEmit`
+- [x] `npx vitest run` passes (existing tests from prior tasks)
 
 **Tests**: none (integration-level — needs OpenCode runtime)
 **Gate**: build
