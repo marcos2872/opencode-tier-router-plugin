@@ -42,7 +42,13 @@ export class OrphanBuffer {
 
   /**
    * Add an orphaned record to the buffer.
-   * Key: `sessionId:timestamp` (unique per event within session).
+   *
+   * @param record - Token record waiting for a routing decision.
+   * @returns Nothing.
+   * @example
+   * ```ts
+   * orphanBuffer.add(record);
+   * ```
    */
   add(record: TokenRecord): void {
     const key = `${record.sessionId}:${record.timestamp}`;
@@ -56,6 +62,10 @@ export class OrphanBuffer {
    *
    * Strategy: Use oldest orphan for this session (FIFO fairness).
    * This ensures events are correlated in temporal order.
+   *
+   * @param sessionId - OpenCode session ID to match.
+   * @param routingDecision - Routing decision used to fill the returned record.
+   * @returns the updated record (with tier filled in) if found, else undefined.
    */
   tryCorrelate(sessionId: string, routingDecision: RoutingDecision): TokenRecord | undefined {
     // Find the oldest orphan for this session
@@ -89,6 +99,12 @@ export class OrphanBuffer {
    * Get all orphans that have exceeded the max wait time (5s).
    * These will be saved with delegatedTier='unknown'.
    * Removes them from buffer.
+   *
+   * @returns Expired token records, in FIFO buffer order.
+   * @example
+   * ```ts
+   * const expired = orphanBuffer.getExpired();
+   * ```
    */
   getExpired(): TokenRecord[] {
     const now = Date.now();
@@ -106,6 +122,8 @@ export class OrphanBuffer {
 
   /**
    * Current buffer size (for monitoring/testing).
+   *
+   * @returns Number of buffered orphan records.
    */
   size(): number {
     return this.buffer.size;
@@ -113,6 +131,13 @@ export class OrphanBuffer {
 
   /**
    * Start periodic cleanup of expired orphan records.
+   *
+   * @param callback - Callback invoked with expired orphan records.
+   * @returns Nothing.
+   * @example
+   * ```ts
+   * orphanBuffer.startCleanup(expired => processExpiredOrphans(expired));
+   * ```
    */
   startCleanup(callback: (expired: TokenRecord[]) => void): void {
     this.stopCleanup();
@@ -124,6 +149,8 @@ export class OrphanBuffer {
 
   /**
    * Stop periodic cleanup of expired orphan records.
+   *
+   * @returns Nothing.
    */
   stopCleanup(): void {
     if (this.cleanupInterval) {
@@ -134,6 +161,8 @@ export class OrphanBuffer {
 
   /**
    * Clear all buffered entries (for testing/cleanup).
+   *
+   * @returns Nothing.
    */
   clear(): void {
     this.buffer.clear();
@@ -141,6 +170,12 @@ export class OrphanBuffer {
 
   /**
    * Get all entries (for testing/inspection).
+   *
+   * @returns All buffered entries with keys, records, and current age.
+   * @example
+   * ```ts
+   * const entries = orphanBuffer.getAll();
+   * ```
    */
   getAll(): Array<{ key: string; record: TokenRecord; age: number }> {
     const now = Date.now();

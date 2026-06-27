@@ -142,6 +142,12 @@ const FALLBACK_CONFIG: RouterConfig = {
   },
 };
 
+/**
+ * Extract readable text from OpenCode message parts.
+ *
+ * @param parts - Message parts to inspect.
+ * @returns Concatenated text from all text parts, or an empty string.
+ */
 function messageText(parts: Array<{ type?: string; text?: string }>): string {
   return parts
     .filter((part) => part?.type === 'text' && typeof part.text === 'string')
@@ -150,6 +156,12 @@ function messageText(parts: Array<{ type?: string; text?: string }>): string {
     .trim();
 }
 
+/**
+ * Detect whether a task is both fast and trivial enough to allow direct execution.
+ *
+ * @param text - User task text to evaluate.
+ * @returns `true` when the task is short, fast-keyworded, and not multi-step.
+ */
 function isTrivialFastTask(text: string): boolean {
   const compact = text.toLowerCase().trim();
   if (compact.length === 0 || compact.length > 120) return false;
@@ -158,18 +170,48 @@ function isTrivialFastTask(text: string): boolean {
   return trivialHint.test(compact) && !multiStepHint.test(compact);
 }
 
+/**
+ * Narrow a string to the set of known tier names.
+ *
+ * @param name - Candidate tier name.
+ * @returns `true` when the value is `fast`, `medium`, or `heavy`.
+ */
 function isTierName(name: string): name is TierName {
   return (TIER_NAMES as readonly string[]).includes(name);
 }
 
+/**
+ * Check whether tool output contains usage or response data.
+ *
+ * @param out - Raw tool output object.
+ * @returns `true` when the object exposes `usage` or `output`.
+ */
 function isToolOutputWithUsage(out: unknown): out is ToolExecuteOutput {
   return out !== null && typeof out === 'object' && ('usage' in out || 'output' in out);
 }
 
+/**
+ * Return the global OpenCode config directory.
+ *
+ * @returns The directory containing the global OpenCode config.
+ */
 function globalConfigDir(): string {
   return join(homedir(), '.config', 'opencode');
 }
 
+/**
+ * Load router config for a project, using defaults when config is missing.
+ *
+ * The helper returns fallback config silently for missing `tiers.json` and
+ * logs warnings for other failures so the plugin remains best-effort.
+ *
+ * @param projectDir - Directory containing the OpenCode project.
+ * @returns Router config, fallback config on missing or failed load.
+ * @example
+ * ```ts
+ * const cfg = await loadConfig(process.cwd());
+ * ```
+ */
 async function loadConfig(projectDir: string): Promise<RouterConfig> {
   try {
     return await loadTiers(projectDir, globalConfigDir());
@@ -191,6 +233,17 @@ async function loadConfig(projectDir: string): Promise<RouterConfig> {
   }
 }
 
+/**
+ * Create a text command output part for OpenCode command hooks.
+ *
+ * @param sessionID - Session ID that should receive the text.
+ * @param text - Text to place in the command output part.
+ * @returns A new text `TextPart` for command output.
+ * @example
+ * ```ts
+ * const part = makeTextPart('sess-123', 'router enabled');
+ * ```
+ */
 function makeTextPart(sessionID: string, text: string): TextPart {
   const id = `cmd-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   return {
@@ -202,6 +255,20 @@ function makeTextPart(sessionID: string, text: string): TextPart {
   };
 }
 
+/**
+ * Create the OpenCode tier routing plugin.
+ *
+ * The plugin wires configuration, message routing, system prompt injection,
+ * permission denial, token tracking, narration detection, and token commands.
+ * All hooks run best-effort and never throw into the host session.
+ *
+ * @param ctx - OpenCode plugin context.
+ * @returns Plugin definition object.
+ * @example
+ * ```ts
+ * const plugin = tierRouterPlugin;
+ * ```
+ */
 const tierRouterPlugin: Plugin = async (ctx) => {
   const capTracker = createCapTracker();
   const subagentSessions = new Set<string>();
@@ -213,6 +280,13 @@ const tierRouterPlugin: Plugin = async (ctx) => {
 
   // Initialize TokenTracker for FASE3 commands
   let tokenTracker: TokenTracker | null = null;
+  /**
+   * Initialize the token tracker for this plugin instance.
+   *
+   * The helper creates shared storage, parser, aggregator, formatter, and
+   * session cache components using project-local config and returns immediately
+   * after logging any initialization failure.
+   */
   const initializeTokenTracker = async () => {
     try {
       const cfg = await loadConfig(ctx.directory);
@@ -228,6 +302,12 @@ const tierRouterPlugin: Plugin = async (ctx) => {
   };
 
   return {
+    /**
+     * Configure OpenCode agents, modes, and commands for tier routing.
+     *
+     * @param input - Plugin config input to enrich.
+     * @returns Nothing.
+     */
     config: async (input: Config) => {
       try {
         const cfg = await loadConfig(ctx.directory);
@@ -305,6 +385,13 @@ const tierRouterPlugin: Plugin = async (ctx) => {
       }
     },
 
+    /**
+     * Classify incoming chat messages and track routing decisions.
+     *
+     * @param input - Chat message hook input.
+     * @param output - Chat message hook output.
+     * @returns Nothing.
+     */
     'chat.message': async (input, output) => {
       try {
         if (input.agent && isTierName(input.agent)) {
@@ -373,6 +460,13 @@ const tierRouterPlugin: Plugin = async (ctx) => {
       }
     },
 
+    /**
+     * Inject delegation protocol and hard-block hints into the system prompt.
+     *
+     * @param input - System transform hook input.
+     * @param output - System transform hook output.
+     * @returns Nothing.
+     */
     'experimental.chat.system.transform': async (input, output) => {
       try {
         if (!enabled) return;
@@ -404,6 +498,13 @@ const tierRouterPlugin: Plugin = async (ctx) => {
       }
     },
 
+    /**
+     * Deny direct execution permissions when a hard-block is active.
+     *
+     * @param input - Permission ask hook input.
+     * @param output - Permission ask hook output.
+     * @returns Nothing.
+     */
     'permission.ask': async (input, output) => {
       try {
         if (!enabled) return;
@@ -421,6 +522,13 @@ const tierRouterPlugin: Plugin = async (ctx) => {
       }
     },
 
+    /**
+     * Capture token usage after tool execution and update cap banners.
+     *
+     * @param input - Tool execution hook input.
+     * @param output - Tool execution hook output.
+     * @returns Nothing.
+     */
     'tool.execute.after': async (input, output) => {
       try {
         if (!enabled) return;
@@ -499,6 +607,13 @@ const tierRouterPlugin: Plugin = async (ctx) => {
       }
     },
 
+    /**
+     * Detect narration in text completion output.
+     *
+     * @param _input - Text completion hook input, ignored by this hook.
+     * @param output - Text completion hook output to mutate.
+     * @returns Nothing.
+     */
     'experimental.text.complete': async (_input, output) => {
       try {
         if (!enabled) return;
@@ -513,6 +628,13 @@ const tierRouterPlugin: Plugin = async (ctx) => {
       }
     },
 
+    /**
+     * Handle router and token tracking commands before they reach OpenCode.
+     *
+     * @param input - Command execution hook input.
+     * @param output - Command execution hook output.
+     * @returns Nothing.
+     */
     'command.execute.before': async (input, output) => {
       try {
         const command = input.command.replace(/^\//, '').toLowerCase();

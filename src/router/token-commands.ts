@@ -17,11 +17,20 @@ import type { TokenTracker } from './token-tracker.js';
 export type TokenCommand = 'token-report' | 'token-history' | 'token-compare';
 
 /**
- * Execute a token command via the tracker
+ * Execute a token command via the tracker.
  *
  * RTT-T9: /token-report <sessionId>
  * RTT-T10: /token-history
  * RTT-T11: /token-compare <sessionId> <tier>
+ *
+ * @param tracker - Token tracker instance, or `null`/`undefined` to return no result.
+ * @param command - Command name, optionally prefixed with `/`.
+ * @param args - Command arguments string.
+ * @returns Command output, or `null` when the command is unknown or unavailable.
+ * @example
+ * ```ts
+ * const result = await executeTokenCommand(tracker, 'token-report', 'sess-abc123');
+ * ```
  */
 export async function executeTokenCommand(
   tracker: TokenTracker | null | undefined,
@@ -78,7 +87,10 @@ export async function executeTokenCommand(
 }
 
 /**
- * Check if a command is a token command
+ * Check if a command is a token tracking command.
+ *
+ * @param command - Command name, optionally prefixed with `/`.
+ * @returns `true` when the command is a supported token command.
  */
 export function isTokenCommand(command: string): boolean {
   const cmd = command.toLowerCase().replace(/^\//, '').trim();
@@ -86,7 +98,13 @@ export function isTokenCommand(command: string): boolean {
 }
 
 /**
- * Get help text for token commands
+ * Get help text for token tracking commands.
+ *
+ * @returns Multi-line help text describing each token command.
+ * @example
+ * ```ts
+ * const help = getTokenCommandsHelp();
+ * ```
  */
 export function getTokenCommandsHelp(): string {
   return `

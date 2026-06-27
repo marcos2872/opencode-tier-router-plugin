@@ -24,11 +24,33 @@ import { OrphanBuffer } from './orphan-buffer.js';
  *
  * Adds metadata needed to restore and understand persisted sessions.
  */
+/**
+ * Persisted token tracking session saved to disk.
+ */
 export interface PersistedTokenSession {
-  version: string; // "1.0" for future compatibility
+  /**
+   * Persistence format version.
+   */
+  version: string;
+
+  /**
+   * OpenCode session ID represented by this record.
+   */
   sessionId: string;
+
+  /**
+   * Number of routing decisions correlated with this session.
+   */
   delegationCount: number;
-  savedAt: number; // timestamp
+
+  /**
+   * Unix timestamp when the session was saved.
+   */
+  savedAt: number;
+
+  /**
+   * Aggregated metrics for this session.
+   */
   summary: SessionTokenSummary;
 }
 
@@ -187,6 +209,16 @@ export class TokenTracker {
   private sessionRecords: Map<string, TokenRecord[]> = new Map();
   private delegationCounts: Map<string, number> = new Map();
 
+  /**
+   * Create a token tracker using shared storage, parsing, aggregation, and formatting components.
+   *
+   * @param storage - Token metrics storage adapter.
+   * @param eventParser - Parser for tool execution token events.
+   * @param aggregator - Aggregator for session metrics.
+   * @param formatter - Formatter for reports and history output.
+   * @param config - Router config used for thresholds and cost ratios.
+   * @param storageDir - Directory used for persisted token metric files.
+   */
   constructor(
     private readonly storage: MetricsStorage,
     private readonly eventParser: TokenEventParser,
@@ -211,8 +243,29 @@ export class TokenTracker {
   }
 
   /**
-   * Record a token usage event, optionally with routing decision.
-   * Automatically handles eviction, persistence, and orphan correlation.
+   * Record a token usage event, optionally with the routing decision that selected the tier.
+   *
+   * The method parses the event, stores it in memory, correlates orphaned events,
+   * updates session aggregation, handles LRU/TTL eviction, and expires orphaned
+   * records after the retry window.
+   *
+   * @param event - Parsed token record or step-finish event to record.
+   * @param routing - Routing decision used for correlation.
+   * @returns Nothing; failures are logged and swallowed for best-effort operation.
+   * @example
+   * ```ts
+   * await tracker.recordEvent({
+   *   sessionId: 'sess-1',
+   *   timestamp: Date.now(),
+   *   actualTokens: { input: 100, output: 50, reasoning: 0, cache: { read: 0, write: 0 } },
+   *   realCost: 0.00025,
+   *   delegatedTier: 'medium',
+   *   modelUsed: 'unknown',
+   *   tierAccuracy: 'UNKNOWN',
+   *   estimationError: { input: 0, output: 0 },
+   *   totalTokensUsed: 150,
+   * });
+   * ```
    */
   async recordEvent(event: TokenRecord, routing?: RoutingDecision): Promise<void>;
   async recordEvent(event: StepFinishEvent, routing?: RoutingDecision): Promise<void>;
@@ -270,10 +323,6 @@ export class TokenTracker {
     }
   }
 
-  /**
-   * Record a step-finish event with real token usage.
-   * Called after model response with input/output tokens and cost.
-   */
   private isStepFinishEvent(event: StepFinishEvent | null | undefined): event is StepFinishEvent {
     return !!event &&
       typeof event === 'object' &&
@@ -306,6 +355,21 @@ export class TokenTracker {
     };
   }
 
+  /**
+   * Record a step-finish event with real token usage.
+   *
+   * @param event - Step-finish event containing session ID, tokens, and cost.
+   * @returns Nothing; invalid events are ignored and failures are swallowed.
+   * @example
+   * ```ts
+   * await tracker.recordStepFinish({
+   *   sessionID: 'sess-1',
+   *   timestamp: Date.now(),
+   *   cost: 0.00025,
+   *   tokens: { input: 100, output: 50, reasoning: 0, cache: { read: 0, write: 0 } },
+   * });
+   * ```
+   */
   async recordStepFinish(event: StepFinishEvent): Promise<void> {
     if (!this.isStepFinishEvent(event)) return;
 
@@ -313,8 +377,15 @@ export class TokenTracker {
   }
 
   /**
-   * Record a routing decision for a session.
-   * Stores which tier was selected and enables correlation with subsequent events.
+   * Record a routing decision for a session and correlate pending orphaned events.
+   *
+   * @param sessionId - OpenCode session ID that selected the tier.
+   * @param routingDecision - Tier and cost ratio selected for correlation.
+   * @returns Nothing; failures are logged and swallowed for best-effort operation.
+   * @example
+   * ```ts
+   * await tracker.recordRoutingDecision('sess-1', { tier: 'medium', costRatio: 5 });
+   * ```
    */
   async recordRoutingDecision(sessionId: string, routingDecision: RoutingDecision): Promise<void> {
     try {
@@ -362,8 +433,17 @@ export class TokenTracker {
   }
 
   /**
-   * Get formatted report for a session.
-   * RTT-T9: Checks cache first, then disk
+   * Get a formatted Markdown report for one token tracking session.
+   *
+   * The report is read from in-memory cache first and then from persisted disk
+   * data. Missing sessions return a concise not-found message.
+   *
+   * @param sessionId - OpenCode session ID.
+   * @returns Markdown report text, or a not-found message when no data exists.
+   * @example
+   * ```ts
+   * const report = await tracker.getSessionReport('sess-abc123');
+   * ```
    */
   async getSessionReport(sessionId: string): Promise<string> {
     try {
@@ -385,7 +465,16 @@ export class TokenTracker {
   }
 
   /**
-   * List all persisted sessions from disk.
+   * List all persisted token tracking sessions from disk.
+   *
+   * Malformed JSON files are skipped and storage errors are logged without
+   * throwing into the command layer.
+   *
+   * @returns Persisted token sessions, in an empty array when none exist.
+   * @example
+   * ```ts
+   * const sessions = await tracker.listSessions();
+   * ```
    */
   async listSessions(): Promise<PersistedTokenSession[]> {
     try {
@@ -415,8 +504,18 @@ export class TokenTracker {
   }
 
   /**
-   * Get formatted comparison for a session vs hypothetical tier.
-   * RTT-T11: Checks cache first, then disk
+   * Get formatted cost comparison for a session versus a hypothetical tier.
+   *
+   * The comparison is read from in-memory cache first and then from persisted
+   * disk data. Missing sessions return a concise not-found message.
+   *
+   * @param sessionId - OpenCode session ID.
+   * @param tier - Hypothetical tier to compare against.
+   * @returns Comparison text, or a not-found message when no data exists.
+   * @example
+   * ```ts
+   * const comparison = await tracker.getComparison('sess-abc123', 'heavy');
+   * ```
    */
   async getComparison(sessionId: string, tier: 'fast' | 'medium' | 'heavy'): Promise<string> {
     try {
@@ -438,7 +537,13 @@ export class TokenTracker {
   }
 
   /**
-   * Format history of all persisted sessions.
+   * Format history for all persisted sessions plus recent in-memory sessions.
+   *
+   * @returns Markdown history text, or an error message when formatting fails.
+   * @example
+   * ```ts
+   * const history = await tracker.getHistory();
+   * ```
    */
   async getHistory(): Promise<string> {
     try {
@@ -471,8 +576,14 @@ export class TokenTracker {
   }
 
   /**
-   * Get aggregated summary for a session (in-memory or from disk).
-   * RTT-T6: getSummary() aggregates metrics.
+   * Get aggregated metrics for a session from memory or disk.
+   *
+   * @param sessionId - OpenCode session ID.
+   * @returns Aggregated session metrics, or `null` when no data exists or loading fails.
+   * @example
+   * ```ts
+   * const summary = await tracker.getSummary('sess-abc123');
+   * ```
    */
   async getSummary(sessionId: string): Promise<SessionTokenSummary | null> {
     try {
@@ -492,7 +603,13 @@ export class TokenTracker {
 
   /**
    * Explicitly persist token metrics for a session to disk.
-   * RTT-T7: persistTokenMetrics() saves aggregated metrics.
+   *
+   * @param sessionId - OpenCode session ID.
+   * @returns Nothing; missing data logs a warning and failures are swallowed.
+   * @example
+   * ```ts
+   * await tracker.persistTokenMetrics('sess-abc123');
+   * ```
    */
   async persistTokenMetrics(sessionId: string): Promise<void> {
     try {
@@ -511,8 +628,14 @@ export class TokenTracker {
   }
 
   /**
-   * Load persisted token metrics from disk for a session.
-   * RTT-T7: loadPersistedTokenMetrics() restores from disk.
+   * Load persisted token metrics for a session from the newest matching disk file.
+   *
+   * @param sessionId - OpenCode session ID.
+   * @returns Aggregated persisted summary, or `null` when no matching file exists or loading fails.
+   * @example
+   * ```ts
+   * const persisted = await tracker.loadPersistedTokenMetrics('sess-abc123');
+   * ```
    */
   async loadPersistedTokenMetrics(sessionId: string): Promise<SessionTokenSummary | null> {
     try {
@@ -618,7 +741,13 @@ export class TokenTracker {
   }
 
   /**
-   * Stop cleanup timers and clear all in-memory data.
+   * Stop orphan cleanup timers and clear all in-memory data.
+   *
+   * @returns Nothing.
+   * @example
+   * ```ts
+   * tracker.dispose();
+   * ```
    */
   dispose(): void {
     this.orphanBuffer.stopCleanup();
@@ -626,7 +755,13 @@ export class TokenTracker {
   }
 
   /**
-   * Clear all in-memory data (for testing).
+   * Clear in-memory sessions, records, delegation counts, and orphan buffer.
+   *
+   * @returns Nothing.
+   * @example
+   * ```ts
+   * tracker.clear();
+   * ```
    */
   clear(): void {
     this.cache.clear();

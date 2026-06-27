@@ -9,40 +9,119 @@
 import type { TokenRecord, TokenUsage } from './token-event-parser.js';
 import type { RouterConfig, TierName } from './config.js';
 
+/**
+ * Tier accuracy grade calculated from token usage and config thresholds.
+ */
 export type TierAccuracy = 'OPTIMAL' | 'RIGHT' | 'ACCEPTABLE' | 'SUBOPTIMAL' | 'OVERSHOT' | 'UNKNOWN';
 
+/**
+ * Accuracy breakdown by grade, expressed as percentages.
+ */
 export interface AccuracyBreakdown {
-  optimal: number;      // percentage
-  right: number;        // percentage
-  acceptable: number;   // percentage
-  suboptimal: number;   // percentage
-  overshot: number;     // percentage
+  /**
+   * Percentage of records classified as optimal.
+   */
+  optimal: number;
+
+  /**
+   * Percentage of records classified as right-tier fits.
+   */
+  right: number;
+
+  /**
+   * Percentage of records classified as acceptable overages or small tasks.
+   */
+  acceptable: number;
+
+  /**
+   * Percentage of records classified as under-provisioned tiers.
+   */
+  suboptimal: number;
+
+  /**
+   * Percentage of records classified as overshot tiers.
+   */
+  overshot: number;
 }
 
+/**
+ * Aggregated metrics for one token tracking session.
+ */
 export interface SessionTokenSummary {
+  /**
+   * OpenCode session ID.
+   */
   sessionId: string;
+
+  /**
+   * Token records included in this summary.
+   */
   records: TokenRecord[];
+
+  /**
+   * Earliest captured step timestamp in the session.
+   */
   startTime: number;
+
+  /**
+   * Latest captured step timestamp in the session.
+   */
   endTime: number;
 
-  // Real token aggregates
+  /**
+   * Total input tokens.
+   */
   totalInputTokens: number;
+
+  /**
+   * Total output tokens.
+   */
   totalOutputTokens: number;
+
+  /**
+   * Total reasoning tokens.
+   */
   totalReasoningTokens: number;
+
+  /**
+   * Total cache read tokens.
+   */
   totalCacheCost: number;
+
+  /**
+   * Total actual cost.
+   */
   totalCostReal: number;
 
-  // Accuracy analysis
+  /**
+   * Accuracy breakdown by grade.
+   */
   accuracyBreakdown: AccuracyBreakdown;
 
-  // Estimation quality
-  averageInputEstimationError: number;   // percentage
-  averageOutputEstimationError: number;  // percentage
+  /**
+   * Average input token estimation error percentage.
+   */
+  averageInputEstimationError: number;
 
-  // Comparison to baselines
-  costSavedVsDefault: number;    // vs medium (5x)
-  costSavedVsHeavy: number;      // vs heavy (20x)
-  averageActualCostRatio: number; // observed multiplier
+  /**
+   * Average output token estimation error percentage.
+   */
+  averageOutputEstimationError: number;
+
+  /**
+   * Cost saved compared with the medium/default baseline.
+   */
+  costSavedVsDefault: number;
+
+  /**
+   * Cost saved compared with the heavy baseline.
+   */
+  costSavedVsHeavy: number;
+
+  /**
+   * Average observed cost ratio for delegated tiers.
+   */
+  averageActualCostRatio: number;
 }
 
 /**
@@ -52,20 +131,29 @@ export interface SessionTokenSummary {
  * Allows testing with mock implementations.
  */
 export interface MetricsAggregator {
-  /**
-   * Calculate tier accuracy based on actual token usage and delegated tier.
-   * Uses thresholds from config.
-   */
-  calculateTierAccuracy(
+   /**
+    * Calculate tier accuracy based on actual token usage and delegated tier.
+    * Uses thresholds from config.
+    *
+    * @param totalTokens - Total token count to classify.
+    * @param tier - Tier to classify.
+    * @param cfg - Router config containing tier thresholds.
+    * @returns Tier accuracy grade.
+    */
+   calculateTierAccuracy(
     totalTokens: number,
     tier: 'fast' | 'medium' | 'heavy' | 'unknown',
     cfg: RouterConfig,
   ): TierAccuracy;
 
-  /**
-   * Aggregate all records from a session into a summary with metrics.
-   */
-  aggregateSessionMetrics(records: TokenRecord[], cfg: RouterConfig): SessionTokenSummary;
+   /**
+    * Aggregate all records from a session into a summary with metrics.
+    *
+    * @param records - Token records to aggregate.
+    * @param cfg - Router config containing tier cost ratios.
+    * @returns Aggregated session summary.
+    */
+   aggregateSessionMetrics(records: TokenRecord[], cfg: RouterConfig): SessionTokenSummary;
 }
 
 /**
@@ -74,6 +162,18 @@ export interface MetricsAggregator {
  * Reference implementation: standard aggregation and accuracy calculation.
  */
 export class DefaultMetricsAggregator implements MetricsAggregator {
+  /**
+   * Calculate tier accuracy based on total tokens and configured thresholds.
+   *
+   * @param totalTokens - Total token count to classify.
+   * @param tier - Tier to classify.
+   * @param cfg - Router config containing tier thresholds.
+   * @returns Tier accuracy grade.
+   * @example
+   * ```ts
+   * const accuracy = aggregator.calculateTierAccuracy(5000, 'medium', config);
+   * ```
+   */
   calculateTierAccuracy(
     totalTokens: number,
     tier: 'fast' | 'medium' | 'heavy' | 'unknown',
@@ -102,6 +202,17 @@ export class DefaultMetricsAggregator implements MetricsAggregator {
     }
   }
 
+  /**
+   * Aggregate token records into a session summary with cost and accuracy metrics.
+   *
+   * @param records - Token records to aggregate.
+   * @param cfg - Router config containing tier cost ratios.
+   * @returns Aggregated session summary.
+   * @example
+   * ```ts
+   * const summary = aggregator.aggregateSessionMetrics(records, config);
+   * ```
+   */
   aggregateSessionMetrics(records: TokenRecord[], cfg: RouterConfig): SessionTokenSummary {
     if (records.length === 0) {
       return {
