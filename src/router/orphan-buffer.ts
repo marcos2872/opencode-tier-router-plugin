@@ -18,6 +18,7 @@
  * - size() returns current buffer size (for monitoring)
  */
 
+import { calculateCost } from './cost-calculator.js';
 import type { TokenRecord, RoutingDecision } from './token-event-parser.js';
 
 interface OrphanEntry {
@@ -77,9 +78,7 @@ export class OrphanBuffer {
       ...oldestRecord,
       delegatedTier: routingDecision.tier,
       estimatedTokens: routingDecision.estimated,
-      estimatedCost: routingDecision.estimated && routingDecision.costRatio
-        ? (routingDecision.costRatio * (routingDecision.estimated.input + routingDecision.estimated.output)) / 1000
-        : undefined,
+      estimatedCost: routingDecision.estimated && calculateCost(routingDecision.estimated, { costRatio: routingDecision.costRatio }),
     };
 
     this.buffer.delete(oldestKey);

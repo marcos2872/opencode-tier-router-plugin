@@ -1,3 +1,5 @@
+import { calculateCost } from './cost-calculator.js';
+
 /**
  * Token Event Parser — Domain Layer
  *
@@ -84,9 +86,7 @@ export class DefaultTokenEventParser implements TokenEventParser {
       delegatedTier: routingDecision?.tier ?? 'unknown',
       modelUsed: 'unknown', // will be enriched from context if needed
       estimatedTokens: routingDecision?.estimated,
-      estimatedCost: routingDecision?.estimated && routingDecision.costRatio
-        ? (routingDecision.costRatio * (routingDecision.estimated.input + routingDecision.estimated.output)) / 1000
-        : undefined,
+      estimatedCost: routingDecision?.estimated && calculateCost(routingDecision.estimated, { costRatio: routingDecision.costRatio }),
       tierAccuracy: 'UNKNOWN', // will be calculated by aggregator
       estimationError: { input: 0, output: 0 }, // will be calculated by aggregator
       totalTokensUsed,
