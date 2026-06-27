@@ -70,6 +70,12 @@ describe('buildDelegationProtocol', () => {
     expect(buildDelegationProtocol({ ...validConfig, mode: 'quality' })).toContain('quality-first');
     expect(buildDelegationProtocol({ ...validConfig, mode: 'deep' })).toContain('depth-first');
   });
+
+  it('includes the trivial direct-execution rule', () => {
+    const protocol = buildDelegationProtocol(validConfig);
+    expect(protocol).toContain('trivial requests');
+    expect(protocol).toContain('execute directly');
+  });
 });
 
 describe('classifyTask', () => {
