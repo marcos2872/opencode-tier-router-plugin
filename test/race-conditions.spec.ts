@@ -10,6 +10,30 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { OrphanBuffer } from '../src/router/orphan-buffer.js';
 import type { TokenRecord, RoutingDecision } from '../src/router/token-event-parser.js';
 
+function createTokenRecord(
+  sessionId: string,
+  timestamp: number,
+  inputTokens: number = 100,
+  outputTokens: number = 50,
+): TokenRecord {
+  return {
+    sessionId,
+    timestamp,
+    actualTokens: {
+      input: inputTokens,
+      output: outputTokens,
+      reasoning: 10,
+      cache: { read: 5, write: 0 },
+    },
+    realCost: 0.5,
+    delegatedTier: 'unknown',
+    modelUsed: 'unknown',
+    tierAccuracy: 'UNKNOWN',
+    estimationError: { input: 0, output: 0 },
+    totalTokensUsed: inputTokens + outputTokens + 10 + 5,
+  };
+}
+
 describe('Race Conditions', () => {
   describe('OrphanBuffer concurrent access', () => {
     let buffer: OrphanBuffer;
@@ -25,12 +49,7 @@ describe('Race Conditions', () => {
     it('should handle concurrent add calls without data corruption', () => {
       const records: TokenRecord[] = [];
       for (let i = 0; i < 10; i++) {
-        records.push({
-          sessionId: 'session-1',
-          inputTokens: i * 100,
-          outputTokens: i * 50,
-          timestamp: Date.now() + i,
-        });
+        records.push(createTokenRecord('session-1', Date.now() + i, i * 100, i * 50));
       }
 
       // Add 10 records (concurrently via Promise.all)
@@ -46,12 +65,7 @@ describe('Race Conditions', () => {
     it('should correlate orphans without race conditions', () => {
       const records: TokenRecord[] = [];
       for (let i = 0; i < 5; i++) {
-        records.push({
-          sessionId: 'session-race',
-          inputTokens: 100,
-          outputTokens: 50,
-          timestamp: Date.now() + i,
-        });
+        records.push(createTokenRecord('session-race', Date.now() + i));
       }
 
       // Add records
@@ -81,12 +95,7 @@ describe('Race Conditions', () => {
 
       // Add records at current time
       for (let i = 0; i < 5; i++) {
-        buffer.add({
-          sessionId: `session-${i}`,
-          inputTokens: 100,
-          outputTokens: 50,
-          timestamp: Date.now() + i,
-        });
+        buffer.add(createTokenRecord(`session-${i}`, Date.now() + i));
       }
 
       // Advance time past MAX_WAIT_MS (5s)
@@ -108,12 +117,7 @@ describe('Race Conditions', () => {
 
     it('should not double-correlate the same orphan', () => {
       // Add one orphan
-      buffer.add({
-        sessionId: 'session-double',
-        inputTokens: 100,
-        outputTokens: 50,
-        timestamp: Date.now(),
-      });
+      buffer.add(createTokenRecord('session-double', Date.now()));
 
       const routing: RoutingDecision = {
         tier: 'medium',
@@ -219,12 +223,7 @@ describe('Race Conditions', () => {
       const MAX_CACHE = 3;
 
       // Simulate: messages arrive before routing decisions
-      orphan.add({
-        sessionId: 'session-orphan',
-        inputTokens: 50,
-        outputTokens: 25,
-        timestamp: Date.now(),
-      });
+      orphan.add(createTokenRecord('session-orphan', Date.now(), 50, 25));
 
       // Advance time so orphan expires
       vi.advanceTimersByTime(6000);
