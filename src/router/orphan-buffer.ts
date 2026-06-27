@@ -1,21 +1,19 @@
 /**
- * OrphanBuffer — ✅ ERRO-002 CORRIGIDO
+ * Correção de condição de corrida: um evento step-finish chega antes que a decisão de roteamento seja armazenada.
  *
- * Race condition fix: A step-finish event arrives before the routing decision is stored.
- * 
- * Problem: Plugin hook order is not guaranteed. Example:
- *   1. chat.message hook fires → event arrives → no routing decision yet in memory
- *   2. routing decision is stored seconds later
- *   Result: Event is recorded with delegatedTier='unknown' 
+ * Problema: A ordem dos ganchos do plugin não é garantida. Exemplo:
+ *   1. o gancho chat.message dispara → o evento chega → ainda não há decisão de roteamento na memória
+ *   2. a decisão de roteamento é armazenada alguns segundos depois
+ *   Resultado: o evento é registrado com delegatedTier='unknown'
  *
- * Solution: Buffer orphan events for up to 5 seconds with retry logic.
- * After 5s, assign to 'unknown' tier and persist immediately.
+ * Solução: Bufferiza eventos órfãos por até 5 segundos com lógica de retentativa.
+ * Após 5s, atribui à camada 'unknown' e persiste imediatamente.
  *
- * Implementation:
- * - Store events with timestamp and attempt count
- * - tryCorrelate(sessionId, decision) returns oldest orphan if found
- * - getExpired() returns all orphans exceeding MAX_WAIT_MS
- * - size() returns current buffer size (for monitoring)
+ * Implementação:
+ * - Armazena eventos com timestamp e contagem de tentativas
+ * - tryCorrelate(sessionId, decision) retorna o órfão mais antigo se encontrado
+ * - getExpired() retorna todos os órfãos que excederam MAX_WAIT_MS
+ * - size() retorna o tamanho atual do buffer (para monitoramento)
  */
 
 import { calculateCost } from './cost-calculator.js';
@@ -34,10 +32,10 @@ interface OrphanEntry {
 }
 
 /**
- * OrphanBuffer — Temporary storage for events awaiting routing decisions
+ * OrphanBuffer — Armazenamento temporário para eventos aguardando decisões de roteamento
  *
- * Thread-safe in Node.js (single-threaded event loop).
- * Memory bounded: max ~100 orphans × 200 bytes = 20KB.
+ * Seguro para threads em Node.js (loop de eventos com thread único).
+ * Memória limitada: max ~100 órfãos × 200 bytes = 20KB.
  */
 export class OrphanBuffer {
   private buffer: Map<string, OrphanEntry> = new Map();
@@ -47,10 +45,10 @@ export class OrphanBuffer {
   private readonly MAX_WAIT_MS = ORPHAN_MAX_WAIT_MS; // 5s total wait before marking as unknown
 
   /**
-   * Add an orphaned record to the buffer.
+   * Adiciona um registro órfão ao buffer.
    *
-   * @param record - Token record waiting for a routing decision.
-   * @returns Nothing.
+   * @param record - Registro de token aguardando uma decisão de roteamento.
+   * @returns Nada.
    * @example
    * ```ts
    * orphanBuffer.add(record);
@@ -62,16 +60,16 @@ export class OrphanBuffer {
   }
 
   /**
-   * Try to correlate an orphan with a routing decision.
-   * Returns the updated record (with tier filled in) if found, else undefined.
-   * Removes the correlated entry from buffer.
+   * Tenta correlacionar um órfão com uma decisão de roteamento.
+   * Retorna o registro atualizado (com a camada preenchida) se encontrado, caso contrário undefined.
+   * Remove a entrada correlacionada do buffer.
    *
-   * Strategy: Use oldest orphan for this session (FIFO fairness).
-   * This ensures events are correlated in temporal order.
+   * Estratégia: Usa o órfão mais antigo para esta sessão (equidade FIFO).
+   * Isso garante que os eventos sejam correlacionados em ordem temporal.
    *
-   * @param sessionId - OpenCode session ID to match.
-   * @param routingDecision - Routing decision used to fill the returned record.
-   * @returns the updated record (with tier filled in) if found, else undefined.
+   * @param sessionId - Identificador da sessão do OpenCode para corresponder.
+   * @param routingDecision - Decisão de roteamento usada para preencher o registro retornado.
+   * @returns Registro atualizado (com a camada preenchida) se encontrado, caso contrário undefined.
    */
   tryCorrelate(sessionId: string, routingDecision: RoutingDecision): TokenRecord | undefined {
     // Find the oldest orphan for this session
@@ -102,11 +100,11 @@ export class OrphanBuffer {
   }
 
   /**
-   * Get all orphans that have exceeded the max wait time (5s).
-   * These will be saved with delegatedTier='unknown'.
-   * Removes them from buffer.
+   * Obtém todos os órfãos que excederam o tempo máximo de espera (5s).
+   * Eles serão salvos com delegatedTier='unknown'.
+   * Remove-os do buffer.
    *
-   * @returns Expired token records, in FIFO buffer order.
+   * @returns Registros de token expirados, em ordem FIFO do buffer.
    * @example
    * ```ts
    * const expired = orphanBuffer.getExpired();
@@ -127,19 +125,19 @@ export class OrphanBuffer {
   }
 
   /**
-   * Current buffer size (for monitoring/testing).
+   * Tamanho atual do buffer (para monitoramento/testes).
    *
-   * @returns Number of buffered orphan records.
+   * @returns Número de registros órfãos bufferizados.
    */
   size(): number {
     return this.buffer.size;
   }
 
   /**
-   * Start periodic cleanup of expired orphan records.
+   * Inicia limpeza periódica de registros órfãos expirados.
    *
-   * @param callback - Callback invoked with expired orphan records.
-   * @returns Nothing.
+   * @param callback - Função invocada com registros órfãos expirados.
+   * @returns Nada.
    * @example
    * ```ts
    * orphanBuffer.startCleanup(expired => processExpiredOrphans(expired));
@@ -154,9 +152,9 @@ export class OrphanBuffer {
   }
 
   /**
-   * Stop periodic cleanup of expired orphan records.
+   * Para a limpeza periódica de registros órfãos expirados.
    *
-   * @returns Nothing.
+   * @returns Nada.
    */
   stopCleanup(): void {
     if (this.cleanupInterval) {
@@ -166,18 +164,18 @@ export class OrphanBuffer {
   }
 
   /**
-   * Clear all buffered entries (for testing/cleanup).
+   * Limpa todas as entradas bufferizadas (para testes/limpeza).
    *
-   * @returns Nothing.
+   * @returns Nada.
    */
   clear(): void {
     this.buffer.clear();
   }
 
   /**
-   * Get all entries (for testing/inspection).
+   * Obtém todas as entradas (para testes/investigação).
    *
-   * @returns All buffered entries with keys, records, and current age.
+   * @returns Todas as entradas bufferizadas com chaves, registros e idade atual.
    * @example
    * ```ts
    * const entries = orphanBuffer.getAll();

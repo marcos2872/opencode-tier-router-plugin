@@ -1,15 +1,15 @@
 /**
- * Token Tracker — Application/Orchestration Layer
+ * Rastreador de Tokens — Camada de aplicação/orquestração
  *
- * Responsibility: Orchestrate all token tracking components
- * - Maintain in-memory session cache (LRU + TTL)
- * - Correlate events with routing decisions (✅ ERRO-002 fix: OrphanBuffer)
- * - Persist sessions to disk on eviction (✅ ERRO-004 fix: LRU + TTL)
- * - Apply config thresholds to accuracy calculation (✅ ERRO-003 fix)
- * - Clean up old files automatically (✅ ERRO-005 fix)
+ * Responsabilidade: Orquestrar todos os componentes de rastreamento de tokens
+ * - Manter cache de sessões em memória (LRU + TTL)
+ * - Correlacionar eventos com decisões de roteamento (✅ ERRO-002 correção: OrphanBuffer)
+ * - Persistir sessões em disco ao serem evitadas (✅ ERRO-004 correção: LRU + TTL)
+ * - Aplicar limites de configuração ao cálculo de acurácia (✅ ERRO-003 correção)
+ * - Limpar arquivos antigos automaticamente (✅ ERRO-005 correção)
  *
- * ✅ SOLID: Depends on interfaces (MetricsStorage, MetricsAggregator, MetricsFormatter)
- * Zero business logic here — just orchestration
+ * ✅ SOLID: Depende de interfaces (MetricsStorage, MetricsAggregator, MetricsFormatter)
+ * Sem lógica de negócio aqui — apenas orquestração
  */
 
 import type { MetricsStorage } from './metrics-storage.js';
@@ -28,50 +28,50 @@ import {
 import { safeJsonParse } from '../utils/safe-json.js';
 
 /**
- * PersistedTokenSession — Format for saving to disk
+ * PersistedTokenSession — Formato para salvar em disco
  *
- * Adds metadata needed to restore and understand persisted sessions.
+ * Adiciona metadados necessários para restaurar e entender sessões persistidas.
  */
 /**
- * Persisted token tracking session saved to disk.
+ * Sessão de rastreamento de tokens persistida em disco.
  */
 export interface PersistedTokenSession {
   /**
-   * Persistence format version.
+   * Versão do formato de persistência.
    */
   version: string;
 
   /**
-   * OpenCode session ID represented by this record.
+   * Identificador da sessão do OpenCode representado por este registro.
    */
   sessionId: string;
 
   /**
-   * Number of routing decisions correlated with this session.
+   * Número de decisões de roteamento correlacionadas com esta sessão.
    */
   delegationCount: number;
 
   /**
-   * Unix timestamp when the session was saved.
+   * Marca de tempo Unix em que a sessão foi salva.
    */
   savedAt: number;
 
   /**
-   * Aggregated metrics for this session.
+   * Métricas agregadas para esta sessão.
    */
   summary: SessionTokenSummary;
 }
 
 /**
- * SessionCache — In-memory LRU cache with TTL
+ * SessionCache — Cache LRU em memória com TTL
  *
- * Stores active sessions. When evicted (LRU or TTL), sessions are persisted to disk.
+ * Armazena sessões ativas. Quando evitadas (LRU ou TTL), sessões são persistidas em disco.
  */
 class SessionCache {
   /**
-   * Internal storage using Map which preserves insertion order.
-   * Map.delete(key) + Map.set(key, value) moves an entry to the end in O(1).
-   * The first entry in iteration order is the least recently used (LRU).
+   * Armazenamento interno usando Map, que preserva a ordem de inserção.
+   * Map.delete(key) + Map.set(key, value) move uma entrada para o fim em O(1).
+   * A primeira entrada na ordem de iteração é a menos recentemente usada (LRU).
    */
   private cache: Map<string, { summary: SessionTokenSummary; lastAccess: number; delegationCount: number }> =
     new Map();
@@ -110,13 +110,13 @@ class SessionCache {
   }
 
   /**
-   * Get sessions that should be evicted:
-   * - Exceeded TTL
-   * - Over capacity (LRU)
+   * Obtém sessões que devem ser evitadas:
+   * - Excedeu TTL
+   * - Acima da capacidade (LRU)
    *
-   * Uses Map's native insertion order for O(1) LRU tracking:
-   * - First entries in iteration are oldest (LRU)
-   * - touchLRU moves entry to end via delete+set
+   * Usa a ordem nativa de inserção do Map para rastreamento LRU em O(1):
+   * - As primeiras entradas na iteração são as mais antigas (LRU)
+   * - touchLRU move a entrada para o fim via delete+set
    */
   getEvictionCandidates(options?: { skipLock?: boolean }): { sessionId: string; summary: SessionTokenSummary; delegationCount: number }[] {
     const shouldSkipLock = options?.skipLock ?? false;
@@ -206,8 +206,8 @@ class SessionCache {
   }
 
   /**
-   * Touch LRU by moving an entry to the end of the Map.
-   * O(1) — Map.delete + Map.set preserves native insertion order.
+   * Toca LRU movendo uma entrada para o fim do Map.
+   * O(1) — Map.delete + Map.set preserva a ordem nativa de inserção.
    */
   private touchLRU(sessionId: string): void {
     const entry = this.cache.get(sessionId);
@@ -219,13 +219,13 @@ class SessionCache {
 }
 
 /**
- * TokenTracker — Main orchestrator
+ * TokenTracker — Orquestrador principal
  *
- * Public API:
- * - recordEvent(event, routing?) — Record a token usage event
- * - getSessionReport(sessionId) — Get formatted report for a session
- * - listSessions() — List all persisted sessions
- * - getComparison(sessionId, tier) — Compare routing vs hypothetical tier
+ * API pública:
+ * - recordEvent(event, routing?) — Registrar evento de uso de token
+ * - getSessionReport(sessionId) — Obtém relatório formatado para uma sessão
+ * - listSessions() — Lista todas as sessões persistidas
+ * - getComparison(sessionId, tier) — Compara roteamento contra camada hipotética
  */
 export class TokenTracker {
   private cache: SessionCache;
@@ -234,14 +234,14 @@ export class TokenTracker {
   private delegationCounts: Map<string, number> = new Map();
 
   /**
-   * Create a token tracker using shared storage, parsing, aggregation, and formatting components.
+   * Cria um rastreador de tokens usando componentes compartilhados de armazenamento, análise, agregação e formatação.
    *
-   * @param storage - Token metrics storage adapter.
-   * @param eventParser - Parser for tool execution token events.
-   * @param aggregator - Aggregator for session metrics.
-   * @param formatter - Formatter for reports and history output.
-   * @param config - Router config used for thresholds and cost ratios.
-   * @param storageDir - Directory used for persisted token metric files.
+   * @param storage - Adaptador de armazenamento de métricas de token.
+   * @param eventParser - Analisador de eventos de tokens de execução de ferramenta.
+   * @param aggregator - Agregador de métricas da sessão.
+   * @param formatter - Formatador de relatórios e saída de histórico.
+   * @param config - Configuração de roteador usada para limites e razões de custo.
+   * @param storageDir - Diretório usado para arquivos de métricas de token persistidas.
    */
   constructor(
     private readonly storage: MetricsStorage,
@@ -267,15 +267,15 @@ export class TokenTracker {
   }
 
   /**
-   * Record a token usage event, optionally with the routing decision that selected the tier.
+   * Registra um evento de uso de token, opcionalmente com a decisão de roteamento que selecionou a camada.
    *
-   * The method parses the event, stores it in memory, correlates orphaned events,
-   * updates session aggregation, handles LRU/TTL eviction, and expires orphaned
-   * records after the retry window.
+   * O método analisa o evento, armazena-o em memória, correlaciona eventos órfãos,
+   * atualiza a agregação da sessão, lida com evicção LRU/TTL e expira registros órfãos
+   * depois da janela de retentativa.
    *
-   * @param event - Parsed token record or step-finish event to record.
-   * @param routing - Routing decision used for correlation.
-   * @returns Nothing; failures are logged and swallowed for best-effort operation.
+   * @param event - Registro de token analisado ou evento step-finish a ser registrado.
+   * @param routing - Decisão de roteamento usada para correlação.
+   * @returns Nada; falhas são registradas no log e absorvidas para operação de melhor esforço.
    * @example
    * ```ts
    * await tracker.recordEvent({
@@ -380,10 +380,10 @@ export class TokenTracker {
   }
 
   /**
-   * Record a step-finish event with real token usage.
+   * Registra um evento step-finish com uso real de tokens.
    *
-   * @param event - Step-finish event containing session ID, tokens, and cost.
-   * @returns Nothing; invalid events are ignored and failures are swallowed.
+   * @param event - Evento step-finish contendo ID de sessão, tokens e custo.
+   * @returns Nada; eventos inválidos são ignorados e falhas são absorvidas.
    * @example
    * ```ts
    * await tracker.recordStepFinish({
@@ -401,11 +401,11 @@ export class TokenTracker {
   }
 
   /**
-   * Record a routing decision for a session and correlate pending orphaned events.
+   * Registra uma decisão de roteamento para uma sessão e correlaciona eventos órfãos pendentes.
    *
-   * @param sessionId - OpenCode session ID that selected the tier.
-   * @param routingDecision - Tier and cost ratio selected for correlation.
-   * @returns Nothing; failures are logged and swallowed for best-effort operation.
+   * @param sessionId - Identificador da sessão do OpenCode que selecionou a camada.
+   * @param routingDecision - Camada e razão de custo selecionadas para correlação.
+   * @returns Nada; falhas são registradas no log e absorvidas para operação de melhor esforço.
    * @example
    * ```ts
    * await tracker.recordRoutingDecision('sess-1', { tier: 'medium', costRatio: 5 });
@@ -457,13 +457,13 @@ export class TokenTracker {
   }
 
   /**
-   * Get a formatted Markdown report for one token tracking session.
+   * Obtém um relatório Markdown formatado para uma sessão de rastreamento de tokens.
    *
-   * The report is read from in-memory cache first and then from persisted disk
-   * data. Missing sessions return a concise not-found message.
+   * O relatório é lido primeiro do cache em memória e depois dos dados persistidos em disco.
+   * Sessões ausentes retornam uma mensagem concisa de não encontrado.
    *
-   * @param sessionId - OpenCode session ID.
-   * @returns Markdown report text, or a not-found message when no data exists.
+   * @param sessionId - Identificador da sessão do OpenCode.
+   * @returns Texto do relatório Markdown, ou uma mensagem de não encontrado quando não há dados.
    * @example
    * ```ts
    * const report = await tracker.getSessionReport('sess-abc123');
@@ -489,12 +489,12 @@ export class TokenTracker {
   }
 
   /**
-   * List all persisted token tracking sessions from disk.
+   * Lista todas as sessões de rastreamento de tokens persistidas em disco.
    *
-   * Malformed JSON files are skipped and storage errors are logged without
-   * throwing into the command layer.
+   * Arquivos JSON malformados são pulados e erros de armazenamento são registrados no log sem
+   * serem lançados para a camada de comando.
    *
-   * @returns Persisted token sessions, in an empty array when none exist.
+   * @returns Sessões de token persistidas, em um array vazio quando nenhuma existir.
    * @example
    * ```ts
    * const sessions = await tracker.listSessions();
@@ -526,14 +526,14 @@ export class TokenTracker {
   }
 
   /**
-   * Get formatted cost comparison for a session versus a hypothetical tier.
+   * Obtém comparação de custo formatada para uma sessão contra uma camada hipotética.
    *
-   * The comparison is read from in-memory cache first and then from persisted
-   * disk data. Missing sessions return a concise not-found message.
+   * A comparação é lida primeiro do cache em memória e depois dos dados persistidos
+   * em disco. Sessões ausentes retornam uma mensagem concisa de não encontrado.
    *
-   * @param sessionId - OpenCode session ID.
-   * @param tier - Hypothetical tier to compare against.
-   * @returns Comparison text, or a not-found message when no data exists.
+   * @param sessionId - Identificador da sessão do OpenCode.
+   * @param tier - Camada hipotética para comparar.
+   * @returns Texto da comparação, ou uma mensagem de não encontrado quando não há dados.
    * @example
    * ```ts
    * const comparison = await tracker.getComparison('sess-abc123', 'heavy');
@@ -559,9 +559,9 @@ export class TokenTracker {
   }
 
   /**
-   * Format history for all persisted sessions plus recent in-memory sessions.
+   * Formata histórico para todas as sessões persistidas mais sessões recentes em memória.
    *
-   * @returns Markdown history text, or an error message when formatting fails.
+   * @returns Texto de histórico Markdown, ou uma mensagem de erro quando a formatação falhar.
    * @example
    * ```ts
    * const history = await tracker.getHistory();
@@ -598,10 +598,10 @@ export class TokenTracker {
   }
 
   /**
-   * Get aggregated metrics for a session from memory or disk.
+   * Obtém métricas agregadas para uma sessão a partir de memória ou disco.
    *
-   * @param sessionId - OpenCode session ID.
-   * @returns Aggregated session metrics, or `null` when no data exists or loading fails.
+   * @param sessionId - Identificador da sessão do OpenCode.
+   * @returns Métricas agregadas da sessão, ou `null` quando não há dados ou o carregamento falha.
    * @example
    * ```ts
    * const summary = await tracker.getSummary('sess-abc123');
@@ -624,10 +624,10 @@ export class TokenTracker {
   }
 
   /**
-   * Explicitly persist token metrics for a session to disk.
+   * Persiste explicitamente métricas de token de uma sessão em disco.
    *
-   * @param sessionId - OpenCode session ID.
-   * @returns Nothing; missing data logs a warning and failures are swallowed.
+   * @param sessionId - Identificador da sessão do OpenCode.
+   * @returns Nada; dados ausentes registram um aviso e falhas são absorvidas.
    * @example
    * ```ts
    * await tracker.persistTokenMetrics('sess-abc123');
@@ -650,10 +650,10 @@ export class TokenTracker {
   }
 
   /**
-   * Load persisted token metrics for a session from the newest matching disk file.
+   * Carrega métricas de token persistidas de uma sessão a partir do arquivo de disco correspondente mais recente.
    *
-   * @param sessionId - OpenCode session ID.
-   * @returns Aggregated persisted summary, or `null` when no matching file exists or loading fails.
+   * @param sessionId - Identificador da sessão do OpenCode.
+   * @returns Resumo persistido agregado, ou `null` quando não existe arquivo correspondente ou o carregamento falha.
    * @example
    * ```ts
    * const persisted = await tracker.loadPersistedTokenMetrics('sess-abc123');
@@ -689,8 +689,8 @@ export class TokenTracker {
   }
 
   /**
-   * Handle session evictions (TTL + LRU).
-   * Persist evicted sessions to disk and apply cleanup.
+   * Lida com evicções de sessão (TTL + LRU).
+   * Persiste sessões evitadas em disco e aplica limpeza.
    */
   private async handleEvictions(): Promise<void> {
     const candidates = await this.cache.withEvictionLock(async () => {
@@ -714,7 +714,7 @@ export class TokenTracker {
   }
 
   /**
-   * Persist a session to disk.
+   * Persiste uma sessão em disco.
    */
   private async persistSession(
     sessionId: string,
@@ -739,8 +739,8 @@ export class TokenTracker {
   }
 
   /**
-   * Clean up old files if count exceeds maxHistoryFiles.
-   * Keeps newest files, deletes oldest.
+   * Limpa arquivos antigos se a contagem exceder maxHistoryFiles.
+   * Mantém os arquivos mais recentes e exclui os mais antigos.
    */
   private async cleanupOldFiles(): Promise<void> {
     try {
@@ -763,9 +763,9 @@ export class TokenTracker {
   }
 
   /**
-   * Stop orphan cleanup timers and clear all in-memory data.
+   * Para temporizadores de limpeza de órfãos e limpa todos os dados em memória.
    *
-   * @returns Nothing.
+   * @returns Nada.
    * @example
    * ```ts
    * tracker.dispose();
@@ -777,9 +777,9 @@ export class TokenTracker {
   }
 
   /**
-   * Clear in-memory sessions, records, delegation counts, and orphan buffer.
+   * Limpa sessões em memória, registros, contagens de delegação e buffer de órfãos.
    *
-   * @returns Nothing.
+   * @returns Nada.
    * @example
    * ```ts
    * tracker.clear();

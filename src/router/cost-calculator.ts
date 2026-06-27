@@ -2,8 +2,8 @@ import type { TokenRecord } from './token-event-parser.js';
 import type { TierConfig } from './config.js';
 
 /**
- * Calculate token cost based on tier's cost ratio.
- * Formula: (inputTokens + outputTokens) * tier.costRatio / 1000
+ * Calcula o custo do token com base na razão de custo da camada.
+ * Fórmula: (inputTokens + outputTokens) * tier.costRatio / 1000
  */
 export function calculateCost(
   tokens: { input?: number; output?: number },

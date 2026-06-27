@@ -1,10 +1,10 @@
 /**
- * Parse JSON string with size validation.
- * Prevents DoS attacks via oversized JSON payloads.
+ * Analisa uma string JSON com validação de tamanho.
+ * Previne ataques DoS por meio de cargas JSON acima do tamanho permitido.
  *
- * @param json - JSON string to parse
- * @param maxSize - Maximum allowed size in bytes (default: 1MB)
- * @returns Parsed value or null on failure
+ * @param json - Texto JSON a ser analisado
+ * @param maxSize - Tamanho máximo permitido em bytes (padrão: 1MB)
+ * @returns Valor parseado ou `null` em caso de falha
  */
 export function safeJsonParse<T>(json: string, maxSize: number = 1024 * 1024): T | null {
   if (json.length > maxSize) {

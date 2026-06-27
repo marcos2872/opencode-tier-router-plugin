@@ -1,32 +1,32 @@
 /**
- * Token Commands — Integration Layer
+ * Comandos de Token — Camada de integração
  *
- * Responsibility: Define and execute token tracking commands
- * - /token-report <sessionId> — Show metrics for a session
- * - /token-history — List all persisted sessions
- * - /token-compare <sessionId> <tier> — Estimate cost with different tier
+ * Responsabilidade: Definir e executar comandos de rastreamento de tokens
+ * - /token-report <sessionId> — Exibir métricas de uma sessão
+ * - /token-history — Listar todas as sessões persistidas
+ * - /token-compare <sessionId> <tier> — Estimar custo com outra camada
  *
- * RTT-T9, RTT-T10, RTT-T11: Command definitions and handlers
+ * RTT-T9, RTT-T10, RTT-T11: Definições e manipuladores de comandos
  */
 
 import type { TokenTracker } from './token-tracker.js';
 
 /**
- * Token command types
+ * Tipos de comando de token
  */
 export type TokenCommand = 'token-report' | 'token-history' | 'token-compare';
 
 /**
- * Execute a token command via the tracker.
+ * Executa um comando de token por meio do rastreador.
  *
  * RTT-T9: /token-report <sessionId>
  * RTT-T10: /token-history
  * RTT-T11: /token-compare <sessionId> <tier>
  *
- * @param tracker - Token tracker instance, or `null`/`undefined` to return no result.
- * @param command - Command name, optionally prefixed with `/`.
- * @param args - Command arguments string.
- * @returns Command output, or `null` when the command is unknown or unavailable.
+ * @param tracker - Instância do rastreador de tokens, ou `null`/`undefined` para retornar sem resultado.
+ * @param command - Nome do comando, opcionalmente prefixado com `/`.
+ * @param args - Texto de argumentos do comando.
+ * @returns Saída do comando, ou `null` quando o comando for desconhecido ou indisponível.
  * @example
  * ```ts
  * const result = await executeTokenCommand(tracker, 'token-report', 'sess-abc123');
@@ -87,10 +87,10 @@ export async function executeTokenCommand(
 }
 
 /**
- * Check if a command is a token tracking command.
+ * Verifica se um comando é um comando de rastreamento de tokens.
  *
- * @param command - Command name, optionally prefixed with `/`.
- * @returns `true` when the command is a supported token command.
+ * @param command - Nome do comando, opcionalmente prefixado com `/`.
+ * @returns `true` quando o comando for um comando de token suportado.
  */
 export function isTokenCommand(command: string): boolean {
   const cmd = command.toLowerCase().replace(/^\//, '').trim();
@@ -98,9 +98,9 @@ export function isTokenCommand(command: string): boolean {
 }
 
 /**
- * Get help text for token tracking commands.
+ * Obtém texto de ajuda para comandos de rastreamento de tokens.
  *
- * @returns Multi-line help text describing each token command.
+ * @returns Texto de ajuda em múltiplas linhas descrevendo cada comando de token.
  * @example
  * ```ts
  * const help = getTokenCommandsHelp();
