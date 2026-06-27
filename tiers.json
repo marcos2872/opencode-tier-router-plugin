@@ -45,7 +45,12 @@
       "list",
       "show",
       "read",
-      "explore"
+      "explore",
+      "buscar",
+      "procurar",
+      "ler",
+      "listar",
+      "mostrar"
     ],
     "medium": [
       "refactor",
@@ -57,7 +62,16 @@
       "change",
       "create",
       "edit",
-      "rename"
+      "rename",
+      "implementar",
+      "refatorar",
+      "adicionar",
+      "corrigir",
+      "atualizar",
+      "criar",
+      "editar",
+      "renomear",
+      "validar"
     ],
     "heavy": [
       "design",
@@ -67,7 +81,21 @@
       "explain",
       "reason",
       "analyze",
-      "optimize"
+      "optimize",
+      "quality",
+      "review",
+      "arquitetura",
+      "depurar",
+      "complexo",
+      "analisar",
+      "otimizar",
+      "qualidade",
+      "revisar",
+      "diagnosticar"
     ]
+  },
+  "enforcement": {
+    "mode": "advisory",
+    "trivialDirectAllowed": true
   }
 }

@@ -1,4 +1,5 @@
 import type { RouterConfig, TaskPatterns } from './config.js';
+import { classifyTask as classifyTaskFromPatterns } from './classifier.js';
 
 export function buildDelegationProtocol(cfg: RouterConfig): string {
   const activeMode = cfg.modes[cfg.mode];
@@ -20,6 +21,13 @@ export function buildDelegationProtocol(cfg: RouterConfig): string {
   };
 
   const emphasis = modeEmphasis[cfg.mode] ?? `mode ${cfg.mode}, default @${defaultTier}`;
+  const hardBlockOn = cfg.enforcement.mode === 'hard-block';
+  const trivialRule = cfg.enforcement.trivialDirectAllowed
+    ? 'Trivial requests may execute directly.'
+    : 'Trivial requests MUST also delegate.';
+  const enforcementRule = hardBlockOn
+    ? 'Enforcement: HARD-BLOCK enabled. Non-trivial requests MUST delegate to @fast/@medium/@heavy; direct execution is not allowed.'
+    : 'Enforcement: advisory-only. Prefer delegation; direct execution is allowed when needed.';
 
   return [
     '## Model Delegation Protocol',
@@ -27,31 +35,14 @@ export function buildDelegationProtocol(cfg: RouterConfig): string {
     `Default: @${defaultTier}`,
     `R: ${rulesLine}`,
     `Mode: ${cfg.mode} (${emphasis})`,
-    'Rule: Classify user intent by keywords. For trivial requests (≤1 read/grep/list, no follow-up) execute directly. Otherwise delegate to the cheapest matching tier. If no tier matches, use the default.',
+    'Rule: Classify user intent by keywords. For non-trivial requests, delegate to the cheapest matching tier. If no tier matches, use the default.',
+    `Rule: ${trivialRule}`,
+    `Rule: ${enforcementRule}`,
     'Rule: Respect [cap:N/MAX], [⚠ CAP WARNING], [⚠ CAP REACHED], and [⚠ REDUNDANT] banners; they signal read-limit fatigue and repeated work.',
-    'Cost signal: @fast≈1x, @medium≈5x, @heavy≈20x. Minimize cost while preserving task adequacy. Never hard-block; advisory only.',
+    'Cost signal: @fast≈1x, @medium≈5x, @heavy≈20x. Minimize cost while preserving task adequacy.',
   ].join('\n');
 }
 
 export function classifyTask(text: string, taskPatterns: TaskPatterns): 'fast' | 'medium' | 'heavy' | null {
-  const lower = text.toLowerCase();
-  const tiers: Array<'fast' | 'medium' | 'heavy'> = ['fast', 'medium', 'heavy'];
-
-  for (const tier of tiers) {
-    const patterns = taskPatterns[tier];
-    if (!patterns) continue;
-    for (const pattern of patterns) {
-      if (matchesWordStart(lower, pattern)) {
-        return tier;
-      }
-    }
-  }
-
-  return null;
-}
-
-function matchesWordStart(text: string, pattern: string): boolean {
-  const escaped = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const regex = new RegExp(`\\b${escaped}`, 'i');
-  return regex.test(text);
+  return classifyTaskFromPatterns(text, taskPatterns);
 }

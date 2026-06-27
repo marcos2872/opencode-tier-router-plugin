@@ -4,6 +4,7 @@ import type { Plugin, Config } from '@opencode-ai/plugin';
 import type { TextPart } from '@opencode-ai/sdk';
 import { loadTiers, saveMode, ConfigError, type RouterConfig } from './router/config.js';
 import { buildDelegationProtocol } from './router/protocol.js';
+import { classifyTask } from './router/classifier.js';
 import { createCapTracker } from './router/caps.js';
 import { detectNarration } from './narration.js';
 
@@ -36,11 +37,70 @@ const FALLBACK_CONFIG: RouterConfig = {
     },
   },
   taskPatterns: {
-    fast: ['find', 'grep', 'search', 'where', 'locate', 'list', 'show', 'read', 'explore'],
-    medium: ['refactor', 'implement', 'add', 'write', 'fix', 'update', 'change', 'create', 'edit', 'rename'],
-    heavy: ['design', 'architecture', 'debug', 'complex', 'explain', 'reason', 'analyze', 'optimize'],
+    fast: ['find', 'grep', 'search', 'where', 'locate', 'list', 'show', 'read', 'explore', 'buscar', 'procurar', 'ler', 'listar', 'mostrar'],
+    medium: [
+      'refactor',
+      'implement',
+      'add',
+      'write',
+      'fix',
+      'update',
+      'change',
+      'create',
+      'edit',
+      'rename',
+      'implementar',
+      'refatorar',
+      'adicionar',
+      'corrigir',
+      'atualizar',
+      'criar',
+      'editar',
+      'renomear',
+      'validar',
+    ],
+    heavy: [
+      'design',
+      'architecture',
+      'debug',
+      'complex',
+      'explain',
+      'reason',
+      'analyze',
+      'optimize',
+      'quality',
+      'review',
+      'arquitetura',
+      'depurar',
+      'complexo',
+      'analisar',
+      'otimizar',
+      'qualidade',
+      'revisar',
+      'diagnosticar',
+    ],
+  },
+  enforcement: {
+    mode: 'advisory',
+    trivialDirectAllowed: true,
   },
 };
+
+function messageText(parts: Array<{ type?: string; text?: string }>): string {
+  return parts
+    .filter((part) => part?.type === 'text' && typeof part.text === 'string')
+    .map((part) => part.text ?? '')
+    .join('\n')
+    .trim();
+}
+
+function isTrivialFastTask(text: string): boolean {
+  const compact = text.toLowerCase().trim();
+  if (compact.length === 0 || compact.length > 120) return false;
+  const trivialHint = /\b(find|grep|search|where|locate|list|show|read|explore|buscar|procurar|ler|listar|mostrar)\b/i;
+  const multiStepHint = /\b(and then|depois|em seguida|follow-up|implement|refactor|design|architecture|debug|analyze|implementar|refatorar|arquitetura|depurar|analisar)\b/i;
+  return trivialHint.test(compact) && !multiStepHint.test(compact);
+}
 
 function isTierName(name: string): name is TierName {
   return (TIER_NAMES as readonly string[]).includes(name);
@@ -85,6 +145,7 @@ function makeTextPart(sessionID: string, text: string): TextPart {
 const tierRouterPlugin: Plugin = async (ctx) => {
   const capTracker = createCapTracker();
   const subagentSessions = new Set<string>();
+  const hardBlockedSessions = new Map<string, TierName>();
   let enabled = true;
 
   return {
@@ -126,11 +187,43 @@ const tierRouterPlugin: Plugin = async (ctx) => {
       }
     },
 
-    'chat.message': async (input) => {
+    'chat.message': async (input, output) => {
       try {
         if (input.agent && isTierName(input.agent)) {
           subagentSessions.add(input.sessionID);
+          hardBlockedSessions.delete(input.sessionID);
+          return;
         }
+
+        if (!enabled) {
+          hardBlockedSessions.delete(input.sessionID);
+          return;
+        }
+
+        const cfg = await loadConfig(ctx.directory);
+        if (cfg.enforcement.mode !== 'hard-block') {
+          hardBlockedSessions.delete(input.sessionID);
+          return;
+        }
+
+        const summaryText = `${output.message.summary?.title ?? ''}\n${output.message.summary?.body ?? ''}`.trim();
+        const text = summaryText || messageText((output.parts ?? []) as Array<{ type?: string; text?: string }>);
+        const explicitClassification = classifyTask(text, cfg.taskPatterns);
+        const defaultTier = cfg.modes[cfg.mode]?.defaultTier;
+        const fallbackTier = defaultTier && isTierName(defaultTier) ? defaultTier : null;
+        const classification = explicitClassification ?? (text.length > 0 ? fallbackTier : null);
+
+        if (!classification) {
+          hardBlockedSessions.delete(input.sessionID);
+          return;
+        }
+
+        if (classification === 'fast' && cfg.enforcement.trivialDirectAllowed && isTrivialFastTask(text)) {
+          hardBlockedSessions.delete(input.sessionID);
+          return;
+        }
+
+        hardBlockedSessions.set(input.sessionID, classification);
       } catch (err) {
         // best-effort: never crash a real session
         console.warn('[opencode-tier-router] chat.message hook failed:', err instanceof Error ? err.message : String(err));
@@ -146,9 +239,33 @@ const tierRouterPlugin: Plugin = async (ctx) => {
         const protocol = buildDelegationProtocol(cfg);
         output.system = output.system ?? [];
         output.system.push(protocol);
+
+        const tier = input.sessionID ? hardBlockedSessions.get(input.sessionID) : undefined;
+        if (cfg.enforcement.mode === 'hard-block' && tier) {
+          output.system.push(
+            `HARD-BLOCK: This request MUST be delegated to @${tier}. Do not execute tools directly in this session. Attempt delegation now. If direct execution is blocked, immediately delegate to @${tier}.`,
+          );
+        }
       } catch (err) {
         // best-effort: never crash a real session
         console.warn('[opencode-tier-router] system.transform hook failed:', err instanceof Error ? err.message : String(err));
+      }
+    },
+
+    'permission.ask': async (input, output) => {
+      try {
+        if (!enabled) return;
+        if (!input.sessionID || subagentSessions.has(input.sessionID)) return;
+
+        const tier = hardBlockedSessions.get(input.sessionID);
+        if (!tier) return;
+
+        if (input.type === 'bash' || input.type === 'edit' || input.type === 'webfetch') {
+          output.status = 'deny';
+        }
+      } catch (err) {
+        // best-effort: never crash a real session
+        console.warn('[opencode-tier-router] permission.ask hook failed:', err instanceof Error ? err.message : String(err));
       }
     },
 
@@ -206,6 +323,7 @@ const tierRouterPlugin: Plugin = async (ctx) => {
           const cfg = await loadConfig(ctx.directory);
           const lines = [
             `Mode: ${cfg.mode} (${cfg.modes[cfg.mode]?.description ?? ''})`,
+            `Enforcement: ${cfg.enforcement.mode} (trivial direct allowed: ${cfg.enforcement.trivialDirectAllowed ? 'yes' : 'no'})`,
             'Tiers:',
           ];
           for (const tier of TIER_NAMES) {
@@ -244,6 +362,7 @@ const tierRouterPlugin: Plugin = async (ctx) => {
         console.warn('[opencode-tier-router] command.execute.before hook failed:', err instanceof Error ? err.message : String(err));
       }
     },
+
   };
 };
 

@@ -20,6 +20,10 @@ const validConfig: RouterConfig = {
     medium: ['refactor', 'implement', 'fix'],
     heavy: ['design', 'architecture', 'debug'],
   },
+  enforcement: {
+    mode: 'advisory',
+    trivialDirectAllowed: true,
+  },
 };
 
 describe('buildDelegationProtocol', () => {
@@ -73,8 +77,18 @@ describe('buildDelegationProtocol', () => {
 
   it('includes the trivial direct-execution rule', () => {
     const protocol = buildDelegationProtocol(validConfig);
-    expect(protocol).toContain('trivial requests');
-    expect(protocol).toContain('execute directly');
+    expect(protocol).toContain('Trivial requests may execute directly.');
+    expect(protocol).toContain('advisory-only');
+  });
+
+  it('includes hard-block rule when enforcement mode is hard-block', () => {
+    const protocol = buildDelegationProtocol({
+      ...validConfig,
+      enforcement: { mode: 'hard-block', trivialDirectAllowed: true },
+    });
+
+    expect(protocol).toContain('HARD-BLOCK enabled');
+    expect(protocol).toContain('MUST delegate');
   });
 });
 

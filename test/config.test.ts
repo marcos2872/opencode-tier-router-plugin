@@ -45,6 +45,10 @@ const validConfig: RouterConfig = {
     medium: ['refactor', 'implement'],
     heavy: ['design', 'architecture'],
   },
+  enforcement: {
+    mode: 'advisory',
+    trivialDirectAllowed: true,
+  },
 };
 
 describe('resolveTiersPath', () => {

@@ -18,11 +18,17 @@ export interface TaskPatterns {
   heavy: string[];
 }
 
+export interface EnforcementConfig {
+  mode: 'advisory' | 'hard-block';
+  trivialDirectAllowed: boolean;
+}
+
 export interface RouterConfig {
   mode: string;
   tiers: Record<string, TierConfig>;
   modes: Record<string, ModeConfig>;
   taskPatterns: TaskPatterns;
+  enforcement: EnforcementConfig;
 }
 
 export interface ActiveTiers {
@@ -63,9 +69,67 @@ const DEFAULT_CONFIG: RouterConfig = {
     },
   },
   taskPatterns: {
-    fast: ['find', 'grep', 'search', 'where', 'locate', 'list', 'show', 'read', 'explore'],
-    medium: ['refactor', 'implement', 'add', 'write', 'fix', 'update', 'change', 'create', 'edit', 'rename'],
-    heavy: ['design', 'architecture', 'debug', 'complex', 'explain', 'reason', 'analyze', 'optimize'],
+    fast: [
+      'find',
+      'grep',
+      'search',
+      'where',
+      'locate',
+      'list',
+      'show',
+      'read',
+      'explore',
+      'buscar',
+      'procurar',
+      'ler',
+      'listar',
+      'mostrar',
+    ],
+    medium: [
+      'refactor',
+      'implement',
+      'add',
+      'write',
+      'fix',
+      'update',
+      'change',
+      'create',
+      'edit',
+      'rename',
+      'implementar',
+      'refatorar',
+      'adicionar',
+      'corrigir',
+      'atualizar',
+      'criar',
+      'editar',
+      'renomear',
+      'validar',
+    ],
+    heavy: [
+      'design',
+      'architecture',
+      'debug',
+      'complex',
+      'explain',
+      'reason',
+      'analyze',
+      'optimize',
+      'quality',
+      'review',
+      'arquitetura',
+      'depurar',
+      'complexo',
+      'analisar',
+      'otimizar',
+      'qualidade',
+      'revisar',
+      'diagnosticar',
+    ],
+  },
+  enforcement: {
+    mode: 'advisory',
+    trivialDirectAllowed: true,
   },
 };
 
@@ -115,6 +179,18 @@ export function validateConfig(config: unknown): asserts config is RouterConfig 
   }
 
   const cfg = config as Partial<RouterConfig>;
+
+  if (!cfg.enforcement || typeof cfg.enforcement !== 'object') {
+    cfg.enforcement = structuredClone(DEFAULT_CONFIG.enforcement);
+  }
+
+  const enforcement = cfg.enforcement as Partial<EnforcementConfig>;
+  if (enforcement.mode !== 'advisory' && enforcement.mode !== 'hard-block') {
+    throw new ConfigError('enforcement.mode must be "advisory" or "hard-block"');
+  }
+  if (typeof enforcement.trivialDirectAllowed !== 'boolean') {
+    throw new ConfigError('enforcement.trivialDirectAllowed must be boolean');
+  }
 
   if (typeof cfg.mode !== 'string' || cfg.mode.length === 0) {
     throw new ConfigError('mode must be a non-empty string');

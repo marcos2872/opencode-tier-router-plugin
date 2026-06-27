@@ -282,4 +282,95 @@ describe('tierRouterPlugin', () => {
 
     expect(out.output).toContain('[cap: 4/8]');
   });
+
+  it('hard-block denies direct tool permissions for non-trivial classified requests', async () => {
+    await writeTiers(projectDir, {
+      enforcement: {
+        mode: 'hard-block',
+        trivialDirectAllowed: true,
+      },
+    });
+
+    const plugin = await tierRouterPlugin(makeCtx(projectDir));
+    await plugin['chat.message']?.(
+      { sessionID: 'main-hard' },
+      {
+        message: {
+          role: 'user',
+          id: 'm-hard',
+          sessionID: 'main-hard',
+          time: { created: 0 },
+          agent: 'build',
+          model: { providerID: 'github-copilot', modelID: 'gpt-5.3-codex' },
+          summary: { title: 'analyze code quality thoroughly', diffs: [] },
+        },
+        parts: [{ type: 'text', text: 'analyze code quality thoroughly' } as unknown as TextPart],
+      },
+    );
+
+    const askOut: { status: 'ask' | 'deny' | 'allow' } = { status: 'ask' };
+    await plugin['permission.ask']?.(
+      {
+        id: 'p1',
+        type: 'bash',
+        sessionID: 'main-hard',
+        messageID: 'm-hard',
+        title: 'run command',
+        metadata: {},
+        time: { created: 0 },
+      },
+      askOut,
+    );
+
+    expect(askOut.status).toBe('deny');
+
+    const systemOut = { system: [] as string[] };
+    await plugin['experimental.chat.system.transform']?.(
+      { sessionID: 'main-hard', model: {} as unknown as Parameters<NonNullable<typeof plugin['experimental.chat.system.transform']>>[0]['model'] },
+      systemOut,
+    );
+    expect(systemOut.system.join('\n')).toContain('HARD-BLOCK');
+  });
+
+  it('hard-block still allows trivial fast requests when configured', async () => {
+    await writeTiers(projectDir, {
+      enforcement: {
+        mode: 'hard-block',
+        trivialDirectAllowed: true,
+      },
+    });
+
+    const plugin = await tierRouterPlugin(makeCtx(projectDir));
+    await plugin['chat.message']?.(
+      { sessionID: 'main-trivial' },
+      {
+        message: {
+          role: 'user',
+          id: 'm-trivial',
+          sessionID: 'main-trivial',
+          time: { created: 0 },
+          agent: 'build',
+          model: { providerID: 'github-copilot', modelID: 'gpt-5.3-codex' },
+          summary: { title: 'find login function', diffs: [] },
+        },
+        parts: [{ type: 'text', text: 'find login function' } as unknown as TextPart],
+      },
+    );
+
+    const askOut: { status: 'ask' | 'deny' | 'allow' } = { status: 'ask' };
+    await plugin['permission.ask']?.(
+      {
+        id: 'p2',
+        type: 'bash',
+        sessionID: 'main-trivial',
+        messageID: 'm-trivial',
+        title: 'run command',
+        metadata: {},
+        time: { created: 0 },
+      },
+      askOut,
+    );
+
+    expect(askOut.status).toBe('ask');
+  });
 });
