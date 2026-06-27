@@ -115,7 +115,7 @@
   },
   "enforcement": {
     "mode": "hard-block",
-    "trivialDirectAllowed": true
+    "trivialDirectAllowed": false
   },
   "routing": {
     "strategy": "llm",

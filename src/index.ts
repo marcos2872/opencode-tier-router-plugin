@@ -110,7 +110,7 @@ const FALLBACK_CONFIG: RouterConfig = {
   },
   enforcement: {
     mode: 'hard-block',
-    trivialDirectAllowed: true,
+    trivialDirectAllowed: false, // ✅ SEMPRE delegar, NUNCA executar diretamente
   },
   routing: {
     strategy: 'keyword',

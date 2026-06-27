@@ -176,7 +176,7 @@ const DEFAULT_CONFIG: RouterConfig = {
   },
   enforcement: {
     mode: 'hard-block',
-    trivialDirectAllowed: true,
+    trivialDirectAllowed: false, // ✅ CRITICAL: Always delegate, never allow direct execution
   },
   routing: {
     strategy: 'keyword',
