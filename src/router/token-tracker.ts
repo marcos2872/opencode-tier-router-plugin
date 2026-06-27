@@ -199,9 +199,11 @@ export class TokenTracker {
         this.delegationCounts.set(sessionId, 0);
       }
 
-      // If routing decision is provided, add to records
+      // Always add record to session records
+      records.push(record);
+
+      // If routing decision is provided, increment delegation count
       if (routing) {
-        records.push(record);
         this.delegationCounts.set(sessionId, (this.delegationCounts.get(sessionId) ?? 0) + 1);
 
         // Try to correlate any orphans for this session
@@ -210,7 +212,7 @@ export class TokenTracker {
           records.push(orphaned);
         }
       } else {
-        // No routing decision yet — buffer as orphan
+        // No routing decision yet — also buffer as orphan for later correlation
         this.orphanBuffer.add(record);
       }
 
@@ -366,8 +368,28 @@ export class TokenTracker {
    */
   async getHistory(): Promise<string> {
     try {
-      const sessions = await this.listSessions();
-      return this.formatter.formatHistory(sessions);
+      // Get persisted sessions from disk
+      const persistedSessions = await this.listSessions();
+
+      // Also include in-memory sessions that haven't been persisted yet
+      const allSessions: PersistedTokenSession[] = [...persistedSessions];
+      
+      // Add in-memory sessions (convert cache to PersistedTokenSession format)
+      // This is useful for testing and development
+      for (const sessionId of this.sessionRecords.keys()) {
+        const cached = this.cache.get(sessionId);
+        if (cached && !persistedSessions.some(s => s.sessionId === sessionId)) {
+          allSessions.push({
+            version: '1.0',
+            sessionId,
+            delegationCount: this.delegationCounts.get(sessionId) ?? 0,
+            savedAt: Date.now(),
+            summary: cached,
+          });
+        }
+      }
+
+      return this.formatter.formatHistory(allSessions);
     } catch (err) {
       console.error('[TokenTracker] Failed to get history:', err);
       return 'Error generating history';
