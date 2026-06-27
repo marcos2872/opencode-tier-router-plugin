@@ -372,13 +372,30 @@ describe('TokenTracker', () => {
     );
   });
 
+  const createTokenRecord = (
+    sessionId: string,
+    input: number,
+    output: number,
+    reasoning = 10,
+    cacheRead = 5,
+    cacheWrite = 0,
+    cost = 0.5,
+    timestamp = 1000,
+    delegatedTier: TokenRecord['delegatedTier'] = 'unknown',
+  ): TokenRecord => ({
+    sessionId,
+    timestamp,
+    actualTokens: { input, output, reasoning, cache: { read: cacheRead, write: cacheWrite } },
+    realCost: cost,
+    delegatedTier,
+    modelUsed: 'unknown',
+    tierAccuracy: 'UNKNOWN',
+    estimationError: { input: 0, output: 0 },
+    totalTokensUsed: input + output + reasoning + cacheRead,
+  });
+
   it('records events with routing decisions', async () => {
-    const event = {
-      sessionID: 'session-xyz',
-      tokens: { input: 100, output: 50, reasoning: 10, cache: { read: 5, write: 0 } },
-      cost: 0.5,
-      timestamp: 1000,
-    };
+    const event = createTokenRecord('session-xyz', 100, 50);
 
     const routing: RoutingDecision = {
       tier: 'fast',
@@ -395,22 +412,12 @@ describe('TokenTracker', () => {
 
   it('handles orphan events via buffer', async () => {
     // Event without routing decision (orphaned)
-    const event1 = {
-      sessionID: 'session-orphan',
-      tokens: { input: 100, output: 50, reasoning: 10, cache: { read: 5, write: 0 } },
-      cost: 0.5,
-      timestamp: 1000,
-    };
+    const event1 = createTokenRecord('session-orphan', 100, 50, 10, 5, 0, 0.5, 1000);
 
     await tracker.recordEvent(event1);
 
     // Later, routing decision arrives for same session
-    const event2 = {
-      sessionID: 'session-orphan',
-      tokens: { input: 200, output: 100, reasoning: 20, cache: { read: 10, write: 0 } },
-      cost: 1.0,
-      timestamp: 2000,
-    };
+    const event2 = createTokenRecord('session-orphan', 200, 100, 20, 10, 0, 1.0, 2000);
 
     const routing: RoutingDecision = {
       tier: 'medium',
@@ -424,6 +431,20 @@ describe('TokenTracker', () => {
     expect(report).toContain('session-orphan');
   });
 
+  it('records step-finish events from raw token usage', async () => {
+    await tracker.recordStepFinish({
+      sessionID: 'session-step-finish',
+      tokens: { input: 100, output: 50, reasoning: 10, cache: { read: 5, write: 0 } },
+      cost: 0.5,
+      timestamp: 1000,
+    });
+
+    const report = await tracker.getSessionReport('session-step-finish');
+
+    expect(report).toContain('Total tokens: 160');
+    expect(report).toContain('Cache read: 5');
+  });
+
   it('persists and evicts sessions via LRU', async () => {
     // Create 6 sessions (exceeds maxSessionsMemory=5)
     for (let i = 1; i <= 6; i++) {
@@ -434,12 +455,7 @@ describe('TokenTracker', () => {
       };
 
       await tracker.recordEvent(
-        {
-          sessionID: `session-${i}`,
-          tokens: { input: 100, output: 50, reasoning: 10, cache: { read: 5, write: 0 } },
-          cost: 0.5,
-          timestamp: 1000 * i,
-        },
+        createTokenRecord(`session-${i}`, 100, 50, 10, 5, 0, 0.5, 1000 * i, 'fast'),
         routing,
       );
     }
@@ -462,12 +478,7 @@ describe('TokenTracker', () => {
     };
 
     await tracker.recordEvent(
-      {
-        sessionID: 'session-compare',
-        tokens: { input: 100, output: 50, reasoning: 10, cache: { read: 5, write: 0 } },
-        cost: 0.5,
-        timestamp: 1000,
-      },
+      createTokenRecord('session-compare', 100, 50, 10, 5, 0, 0.5, 1000),
       routing,
     );
 
@@ -484,12 +495,7 @@ describe('TokenTracker', () => {
     };
 
     await tracker.recordEvent(
-      {
-        sessionID: 'session-hist',
-        tokens: { input: 100, output: 50, reasoning: 10, cache: { read: 5, write: 0 } },
-        cost: 0.5,
-        timestamp: 1000,
-      },
+      createTokenRecord('session-hist', 100, 50, 10, 5, 0, 0.5, 1000),
       routing,
     );
 

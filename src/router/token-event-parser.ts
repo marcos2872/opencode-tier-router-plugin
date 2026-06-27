@@ -42,7 +42,7 @@ export interface TokenRecord {
 }
 
 export interface StepFinishEvent {
-  type: 'step-finish';
+  type?: 'step-finish';
   sessionID: string;
   timestamp?: number;
   cost: number;

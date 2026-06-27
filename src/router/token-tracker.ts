@@ -15,7 +15,7 @@
 import type { MetricsStorage } from './metrics-storage.js';
 import type { MetricsAggregator, SessionTokenSummary } from './metrics-aggregator.js';
 import type { MetricsFormatter } from './metrics-formatter.js';
-import type { TokenEventParser, TokenRecord, RoutingDecision } from './token-event-parser.js';
+import type { TokenEventParser, TokenRecord, RoutingDecision, StepFinishEvent, TokenUsage } from './token-event-parser.js';
 import type { RouterConfig } from './config.js';
 import { OrphanBuffer } from './orphan-buffer.js';
 
@@ -177,15 +177,17 @@ export class TokenTracker {
    * Record a token usage event, optionally with routing decision.
    * Automatically handles eviction, persistence, and orphan correlation.
    */
-  async recordEvent(event: { sessionID: string; tokens: any; cost: number; timestamp?: number }, routing?: RoutingDecision): Promise<void> {
+  async recordEvent(event: TokenRecord, routing?: RoutingDecision): Promise<void>;
+  async recordEvent(event: StepFinishEvent, routing?: RoutingDecision): Promise<void>;
+  async recordEvent(event: TokenRecord | StepFinishEvent, routing?: RoutingDecision): Promise<void> {
     try {
-      // Parse event
+      const isTokenRecord = 'sessionId' in event;
       const record = this.eventParser.parse(
         {
           type: 'step-finish',
-          sessionID: event.sessionID,
-          tokens: event.tokens,
-          cost: event.cost,
+          sessionID: isTokenRecord ? event.sessionId : event.sessionID,
+          tokens: isTokenRecord ? event.actualTokens : event.tokens,
+          cost: isTokenRecord ? event.realCost : event.cost,
           timestamp: event.timestamp,
         },
         routing,
@@ -242,18 +244,42 @@ export class TokenTracker {
    * Record a step-finish event with real token usage.
    * Called after model response with input/output tokens and cost.
    */
-  async recordStepFinish(event: {
-    sessionID: string;
-    tokens: {
-      input: number;
-      output: number;
-      reasoning?: number;
-      cache?: { read?: number; write?: number };
+  private isStepFinishEvent(event: StepFinishEvent | null | undefined): event is StepFinishEvent {
+    return !!event &&
+      typeof event === 'object' &&
+      typeof event.sessionID === 'string' &&
+      typeof event.tokens?.input === 'number' &&
+      typeof event.tokens?.output === 'number';
+  }
+
+  private toTokenRecord(event: StepFinishEvent): TokenRecord {
+    const tokens: TokenUsage = {
+      input: event.tokens.input,
+      output: event.tokens.output,
+      reasoning: event.tokens.reasoning ?? 0,
+      cache: {
+        read: event.tokens.cache?.read ?? 0,
+        write: event.tokens.cache?.write ?? 0,
+      },
     };
-    cost: number;
-    timestamp?: number;
-  }): Promise<void> {
-    await this.recordEvent(event);
+
+    return {
+      sessionId: event.sessionID,
+      timestamp: event.timestamp ?? Date.now(),
+      actualTokens: tokens,
+      realCost: event.cost,
+      delegatedTier: 'unknown',
+      modelUsed: 'unknown',
+      tierAccuracy: 'UNKNOWN',
+      estimationError: { input: 0, output: 0 },
+      totalTokensUsed: tokens.input + tokens.output + tokens.reasoning + tokens.cache.read,
+    };
+  }
+
+  async recordStepFinish(event: StepFinishEvent): Promise<void> {
+    if (!this.isStepFinishEvent(event)) return;
+
+    await this.recordEvent(this.toTokenRecord(event));
   }
 
   /**

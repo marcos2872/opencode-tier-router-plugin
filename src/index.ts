@@ -475,6 +475,7 @@ const tierRouterPlugin: Plugin = async (ctx) => {
 
             // Record the event
             await tokenTracker.recordStepFinish({
+              type: 'step-finish',
               sessionID: input.sessionID,
               tokens: {
                 input: inputTokens,
