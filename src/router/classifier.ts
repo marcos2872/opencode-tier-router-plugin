@@ -1,5 +1,7 @@
 import type { TaskPatterns } from './config.js';
 
+const regexCache = new Map<string, RegExp>();
+
 /**
  * Classify a task text into the first matching OpenCode tier.
  *
@@ -47,6 +49,11 @@ export function classifyTask(
  */
 function matchesWordStart(text: string, pattern: string): boolean {
   const escaped = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const regex = new RegExp(`\\b${escaped}`, 'i');
+  const cacheKey = `\\b${escaped}`;
+  let regex = regexCache.get(cacheKey);
+  if (!regex) {
+    regex = new RegExp(cacheKey, 'i');
+    regexCache.set(cacheKey, regex);
+  }
   return regex.test(text);
 }

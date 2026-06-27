@@ -142,6 +142,9 @@ const FALLBACK_CONFIG: RouterConfig = {
   },
 };
 
+const TRIVIAL_HINT_RE = /\b(find|grep|search|where|locate|list|show|read|explore|buscar|procurar|ler|listar|mostrar)\b/i;
+const MULTI_STEP_HINT_RE = /\b(and then|depois|em seguida|follow-up|implement|refactor|design|architecture|debug|analyze|implementar|refatorar|arquitetura|depurar|analisar)\b/i;
+
 /**
  * Extract readable text from OpenCode message parts.
  *
