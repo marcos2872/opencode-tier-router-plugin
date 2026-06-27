@@ -137,20 +137,30 @@ function classifyByLexicon(text: string): TierName | null {
   return 'fast';
 }
 
+/**
+ * Type guard to validate that an unknown value is an OpenCode client
+ * with a session.prompt function.
+ */
+function isOpenCodeClient(client: unknown): client is { session: { prompt: Function } } {
+  return client !== null &&
+    typeof client === 'object' &&
+    'session' in client &&
+    client.session !== null &&
+    typeof client.session === 'object' &&
+    'prompt' in client.session &&
+    typeof (client.session as Record<string, unknown>).prompt === 'function';
+}
+
 async function classifyByLLM(
   text: string,
   cfg: RouterConfig,
   client: unknown,
 ): Promise<TierName | null> {
-  if (!client || typeof client !== 'object') return null;
+  if (!isOpenCodeClient(client)) return null;
 
-  const api = client as {
-    session?: {
-      prompt?: (args: unknown) => Promise<unknown>;
-    };
-  };
+  const api = client;
 
-  if (!api.session?.prompt) return null;
+  if (!api.session.prompt) return null;
 
   const model = cfg.routing.selectorModel;
   const timeoutMs = cfg.routing.selectorTimeoutMs;
