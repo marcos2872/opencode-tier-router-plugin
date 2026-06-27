@@ -13,9 +13,9 @@ type TierName = (typeof TIER_NAMES)[number];
 const FALLBACK_CONFIG: RouterConfig = {
   mode: 'normal',
   tiers: {
-    fast: { model: 'github-copilot/claude-haiku-4-5', costRatio: 1, cap: 8 },
-    medium: { model: 'github-copilot/claude-sonnet-4-5', costRatio: 5, cap: 12 },
-    heavy: { model: 'github-copilot/claude-opus-4-8', costRatio: 20, cap: 20 },
+    fast: { model: 'github-copilot/claude-haiku-4.5', costRatio: 1, cap: 8 },
+    medium: { model: 'github-copilot/gpt-5.3-codex', costRatio: 5, cap: 12 },
+    heavy: { model: 'github-copilot/claude-sonnet-4.5', costRatio: 20, cap: 20 },
   },
   modes: {
     normal: {

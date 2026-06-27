@@ -103,7 +103,7 @@ T5, T6 → T7
 - [x] `package.json` created with `"type": "module"`, `"peerDependencies": { "@opencode-ai/plugin": ">=1.0.0" }`, devDeps `typescript`, `vitest`, `@types/node`
 - [x] `tsconfig.json` created with `"module": "preserve"`, `"strict": true`, `"outDir": "dist"`
 - [x] `tiers.json` created with three tiers (fast/medium/heavy), four modes (normal/budget/quality/deep), and taskPatterns matching spec.md
-- [x] Default models in tiers.json: @fast=`github-copilot/claude-haiku-4-5`, @medium=`github-copilot/claude-sonnet-4-5`, @heavy=`github-copilot/claude-opus-4-8`
+- [x] Default models in tiers.json: @fast=`github-copilot/claude-haiku-4.5`, @medium=`github-copilot/gpt-5.3-codex`, @heavy=`github-copilot/claude-sonnet-4.5`
 - [x] `npm run typecheck` passes
 
 **Tests**: none (config files only)

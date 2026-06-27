@@ -31,9 +31,9 @@ async function writeTiers(dir: string, overrides: Record<string, unknown> = {}):
   const base = {
     mode: 'normal',
     tiers: {
-      fast: { model: 'github-copilot/claude-haiku-4-5', costRatio: 1, cap: 8 },
-      medium: { model: 'github-copilot/claude-sonnet-4-5', costRatio: 5, cap: 12 },
-      heavy: { model: 'github-copilot/claude-opus-4-8', costRatio: 20, cap: 20 },
+      fast: { model: 'github-copilot/claude-haiku-4.5', costRatio: 1, cap: 8 },
+      medium: { model: 'github-copilot/gpt-5.3-codex', costRatio: 5, cap: 12 },
+      heavy: { model: 'github-copilot/claude-sonnet-4.5', costRatio: 20, cap: 20 },
     },
     modes: {
       normal: { description: 'Balanced', defaultTier: 'medium' },
@@ -88,15 +88,15 @@ describe('tierRouterPlugin', () => {
     await plugin.config?.(config);
 
     expect(config.agent?.fast).toMatchObject({
-      model: 'github-copilot/claude-haiku-4-5',
+      model: 'github-copilot/claude-haiku-4.5',
       mode: 'subagent',
     });
     expect(config.agent?.medium).toMatchObject({
-      model: 'github-copilot/claude-sonnet-4-5',
+      model: 'github-copilot/gpt-5.3-codex',
       mode: 'subagent',
     });
     expect(config.agent?.heavy).toMatchObject({
-      model: 'github-copilot/claude-opus-4-8',
+      model: 'github-copilot/claude-sonnet-4.5',
       mode: 'subagent',
     });
   });
@@ -105,7 +105,7 @@ describe('tierRouterPlugin', () => {
     await writeTiers(projectDir, {
       tiers: {
         fast: { model: 'invalid-no-slash', costRatio: 1, cap: 8 },
-        medium: { model: 'github-copilot/claude-sonnet-4-5', costRatio: 5, cap: 12 },
+        medium: { model: 'github-copilot/gpt-5.3-codex', costRatio: 5, cap: 12 },
         heavy: { model: 'also-invalid/', costRatio: 20, cap: 20 },
       },
     });
@@ -125,7 +125,7 @@ describe('tierRouterPlugin', () => {
     expect(config.agent?.fast).toBeUndefined();
     expect(config.agent?.heavy).toBeUndefined();
     expect(config.agent?.medium).toMatchObject({
-      model: 'github-copilot/claude-sonnet-4-5',
+      model: 'github-copilot/gpt-5.3-codex',
       mode: 'subagent',
     });
     expect(warnings.some((w) => w.includes('@fast'))).toBe(true);
@@ -141,7 +141,7 @@ describe('tierRouterPlugin', () => {
     const text = textOf(output.parts);
     expect(text).toContain('Mode: normal');
     expect(text).toContain('@fast:');
-    expect(text).toContain('github-copilot/claude-haiku-4-5');
+    expect(text).toContain('github-copilot/claude-haiku-4.5');
   });
 
   it('/budget lists modes with active one highlighted', async () => {
