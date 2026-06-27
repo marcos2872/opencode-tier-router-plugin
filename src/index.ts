@@ -154,13 +154,12 @@ async function loadConfig(projectDir: string): Promise<RouterConfig> {
  * Cria o plugin de roteamento de tiers do OpenCode.
  *
  * O plugin conecta configuração, roteamento de mensagens, injeção de prompt do sistema,
- * negação de permissão, rastreamento de tokens, detecção de narração e comandos de tokens.
+ * negação de permissão, detecção de narração e comandos.
  * Todos os hooks rodam com melhor esforço e nunca lançam exceções para a sessão do host.
  */
 const tierRouterPlugin: Plugin = async (ctx) => {
   const cfg = await loadConfig(ctx.directory);
   const orchestrator = new PluginOrchestrator(ctx, cfg);
-  await orchestrator.initialize();
 
   return {
     config: (input: Config) => orchestrator.handleConfig(input),

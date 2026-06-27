@@ -2,36 +2,21 @@
  * PluginOrchestrator — Camada de orquestração de hooks
  *
  * Responsabilidade: Conectar todos os hooks do plugin e gerenciar estado compartilhado.
- * Extraído de index.ts para respeitar SRP (index.ts agora é apenas um wrapper fino).
  *
  * Estado gerenciado aqui:
  * - capTracker, subagentSessions, hardBlockedSessions
  * - preferredTierSessions, selectionSourceSessions
- * - ciclo de vida do TokenTracker
  */
 
-import { join } from 'node:path';
 import type { Config } from '@opencode-ai/plugin';
 import type { TextPart } from '@opencode-ai/sdk';
-import { loadTiers, saveMode, type RouterConfig } from './router/config.js';
+import { type RouterConfig, saveMode } from './router/config.js';
 import { buildDelegationProtocol } from './router/protocol.js';
 import { selectTierByStrategy, type SelectionSource } from './router/selector.js';
 import { createCapTracker } from './router/caps.js';
 import { detectNarration } from './narration.js';
 import { assertEnforcement, reportEnforcement } from './router/enforcement-validator.js';
-import { TokenTracker } from './router/token-tracker.js';
-import { FilesystemStorage } from './router/filesystem-storage.js';
-import { DefaultTokenEventParser } from './router/token-event-parser.js';
-import { DefaultMetricsAggregator } from './router/metrics-aggregator.js';
-import { MarkdownMetricsFormatter } from './router/metrics-formatter.js';
-import { executeTokenCommand, isTokenCommand } from './router/token-commands.js';
-import {
-  COST_DIVISOR,
-  DEFAULT_INPUT_COST_PER_1K,
-  DEFAULT_OUTPUT_COST_PER_1K,
-  TRIVIAL_TASK_MAX_LENGTH,
-} from './constants.js';
-import { safeJsonParse } from './utils/safe-json.js';
+import { TRIVIAL_TASK_MAX_LENGTH } from './constants.js';
 
 const TIER_NAMES = ['fast', 'medium', 'heavy'] as const;
 type TierName = (typeof TIER_NAMES)[number];
@@ -47,47 +32,16 @@ const TRIVIAL_HINT_RE =
 const MULTI_STEP_HINT_RE =
   /\b(and then|depois|em seguida|follow-up|implement|refactor|design|architecture|debug|analyze|implementar|refatorar|arquitetura|depurar|analisar)\b/i;
 
-interface ToolExecuteOutput {
-  usage?: {
-    inputTokens?: number;
-    outputTokens?: number;
-    reasoningTokens?: number;
-    cacheReadTokens?: number;
-    cacheWriteTokens?: number;
-    input?: number;
-    output?: number;
-    reasoning?: number;
-    cache?: { read?: number; write?: number };
-  };
-  output?: string;
-}
-
-/**
- * Restringe uma string ao conjunto de nomes de tier conhecidos.
- */
 function isTierName(name: string): name is TierName {
   return (TIER_NAMES as readonly string[]).includes(name);
 }
 
-/**
- * Verifica se a saída da ferramenta contém dados de uso ou de resposta.
- */
-function isToolOutputWithUsage(out: unknown): out is ToolExecuteOutput {
-  return out !== null && typeof out === 'object' && ('usage' in out || 'output' in out);
-}
-
-/**
- * Detecta se uma tarefa é rápida e trivial o bastante para permitir execução direta.
- */
 function isTrivialFastTask(text: string): boolean {
   const compact = text.toLowerCase().trim();
   if (compact.length === 0 || compact.length > TRIVIAL_TASK_MAX_LENGTH) return false;
   return TRIVIAL_HINT_RE.test(compact) && !MULTI_STEP_HINT_RE.test(compact);
 }
 
-/**
- * Extrai texto legível das partes de mensagem do OpenCode.
- */
 function messageText(parts: Array<{ type?: string; text?: string }>): string {
   return parts
     .filter((part) => part?.type === 'text' && typeof part.text === 'string')
@@ -96,9 +50,6 @@ function messageText(parts: Array<{ type?: string; text?: string }>): string {
     .trim();
 }
 
-/**
- * Cria uma parte de saída de comando de texto para hooks de comando do OpenCode.
- */
 function makeTextPart(sessionID: string, text: string): TextPart {
   const id = `cmd-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   return {
@@ -110,62 +61,29 @@ function makeTextPart(sessionID: string, text: string): TextPart {
   };
 }
 
-/**
- * PluginOrchestrator — Hub central para todos os handlers de hooks do plugin.
- *
- * Encapsula estado compartilhado de sessões, ciclo de vida do TokenTracker e
- * delega para os módulos de roteamento apropriados. Todos os métodos rodam com
- * melhor esforço e nunca lançam exceções para a sessão do host do OpenCode.
- */
 export class PluginOrchestrator {
   private capTracker = createCapTracker();
   private subagentSessions = new Set<string>();
+  private subagentTierMap = new Map<string, TierName>();
   private hardBlockedSessions = new Map<string, TierName>();
   private hardBlockReasons = new Map<string, string>();
   private preferredTierSessions = new Map<string, TierName>();
   private selectionSourceSessions = new Map<string, SelectionSource>();
   private enabled = true;
-  private tokenTracker: TokenTracker | null = null;
 
   constructor(
     private readonly ctx: { directory: string; client?: unknown },
     private readonly config: RouterConfig,
   ) {}
 
-  /**
-   * Inicializa o rastreador de tokens para esta instância do plugin.
-   */
-  async initialize(): Promise<void> {
-    try {
-      const storage = new FilesystemStorage();
-      const parser = new DefaultTokenEventParser();
-      const aggregator = new DefaultMetricsAggregator();
-      const formatter = new MarkdownMetricsFormatter();
-      const storageDir = join(this.ctx.directory, '.opencode', 'token-metrics');
-      this.tokenTracker = new TokenTracker(storage, parser, aggregator, formatter, this.config, storageDir);
-    } catch (err) {
-      console.error('[opencode-tier-router] Failed to initialize token tracker:', err);
-    }
-  }
-
-  /**
-   * Carrega a configuração do roteador para um projeto, usando padrões quando a configuração estiver ausente.
-   */
   private async loadConfig(): Promise<RouterConfig> {
-    // Provided via constructor from outer context
     return this.config;
   }
 
-  // ─── Hook Handlers ──────────────────────────────────────────
-
-  /**
-   * Configura agentes, modos e comandos do OpenCode para roteamento de tiers.
-   */
   async handleConfig(input: Config): Promise<void> {
     try {
       const cfg = await this.loadConfig();
 
-      // Validate enforcement rules at initialization
       try {
         assertEnforcement(cfg);
         console.log('[opencode-tier-router] Enforcement validation passed');
@@ -191,7 +109,6 @@ export class PluginOrchestrator {
         };
       }
 
-      // Align OpenCode built-in agent names with tier models
       for (const [agentName, tier] of Object.entries(AGENT_TIER_MAP)) {
         const model = cfg.tiers[tier]?.model;
         if (!model || !/^[^/]+\/[^/]+$/.test(model)) continue;
@@ -215,26 +132,11 @@ export class PluginOrchestrator {
         template: '/router [on|off]',
         description: 'Enable or disable tier routing',
       };
-      input.command['token-report'] = {
-        template: '/token-report <sessionId>',
-        description: 'Show real token metrics for a session',
-      };
-      input.command['token-history'] = {
-        template: '/token-history',
-        description: 'List all persisted token tracking sessions',
-      };
-      input.command['token-compare'] = {
-        template: '/token-compare <sessionId> <tier>',
-        description: 'Estimate cost if session were delegated to different tier',
-      };
     } catch (err) {
       console.warn('[opencode-tier-router] config hook failed:', err instanceof Error ? err.message : String(err));
     }
   }
 
-  /**
-   * Classifica mensagens de chat recebidas e rastreia decisões de roteamento.
-   */
   async handleChatMessage(
     input: { agent?: string; sessionID: string },
     output: { message: { summary?: { title?: string; body?: string } }; parts?: unknown[] },
@@ -242,6 +144,7 @@ export class PluginOrchestrator {
     try {
       if (input.agent && isTierName(input.agent)) {
         this.subagentSessions.add(input.sessionID);
+        this.subagentTierMap.set(input.sessionID, input.agent);
         this.hardBlockedSessions.delete(input.sessionID);
         this.hardBlockReasons.delete(input.sessionID);
         this.preferredTierSessions.delete(input.sessionID);
@@ -308,9 +211,6 @@ export class PluginOrchestrator {
     }
   }
 
-  /**
-   * Injeta protocolo de delegação e dicas de hard-block no prompt do sistema.
-   */
   async handleSystemTransform(input: { sessionID?: string }, output: { system?: string[] }): Promise<void> {
     try {
       if (!this.enabled) return;
@@ -344,9 +244,6 @@ export class PluginOrchestrator {
     }
   }
 
-  /**
-   * Recusa permissões de execução direta quando um hard-block estiver ativo.
-   */
   async handlePermissionAsk(input: { sessionID?: string; type?: string }, output: { status?: string }): Promise<void> {
     try {
       if (!this.enabled) return;
@@ -366,75 +263,19 @@ export class PluginOrchestrator {
     }
   }
 
-  /**
-   * Captura uso de tokens após a execução de uma ferramenta e atualiza avisos de limite.
-   */
   async handleToolExecuteAfter(
     input: { sessionID?: string; tool: string; args?: Record<string, unknown> },
-    output: ToolExecuteOutput & { output?: string },
+    output: { output?: string; metadata?: Record<string, unknown> },
   ): Promise<void> {
     try {
       if (!this.enabled) return;
       if (!input.sessionID) return;
 
-      // Record cap tracking (existing behavior)
       if (this.subagentSessions.has(input.sessionID)) {
         this.capTracker.record(input.sessionID, input.tool, input.args ?? {});
         const banner = this.capTracker.getBanner(input.sessionID, input.tool, input.args ?? {});
         if (banner) {
           output.output = (output.output ?? '') + `\n${banner}`;
-        }
-      }
-
-      // Record token usage for tracking
-      if (this.tokenTracker) {
-        let out: ToolExecuteOutput;
-        if (isToolOutputWithUsage(output)) {
-          out = output;
-        } else {
-          out = {};
-        }
-        let usage = out.usage;
-        if (!usage && out.output) {
-          const parsed = safeJsonParse<{ usage?: ToolExecuteOutput['usage'] }>(out.output);
-          usage = parsed?.usage || usage;
-        }
-
-        if (usage) {
-          const inputTokens = usage.inputTokens ?? usage.input ?? 0;
-          const outputTokens = usage.outputTokens ?? usage.output ?? 0;
-          const reasoningTokens = usage.reasoningTokens ?? usage.reasoning ?? 0;
-          const cacheRead = usage.cacheReadTokens ?? usage.cache?.read ?? 0;
-          const cacheWrite = usage.cacheWriteTokens ?? usage.cache?.write ?? 0;
-
-          const estimatedCost =
-            (inputTokens * DEFAULT_INPUT_COST_PER_1K + outputTokens * DEFAULT_OUTPUT_COST_PER_1K) / COST_DIVISOR;
-
-          const tier = this.preferredTierSessions.get(input.sessionID);
-          const cfg = await this.loadConfig();
-          const routing = tier
-            ? {
-                tier,
-                costRatio: cfg.tiers[tier]?.costRatio ?? 1,
-              }
-            : undefined;
-
-          await this.tokenTracker.recordStepFinish({
-            type: 'step-finish',
-            sessionID: input.sessionID,
-            tokens: {
-              input: inputTokens,
-              output: outputTokens,
-              reasoning: reasoningTokens,
-              cache: { read: cacheRead, write: cacheWrite },
-            },
-            cost: estimatedCost,
-            timestamp: Date.now(),
-          });
-
-          if (routing) {
-            await this.tokenTracker.recordRoutingDecision(input.sessionID, routing);
-          }
         }
       }
     } catch (err) {
@@ -445,9 +286,6 @@ export class PluginOrchestrator {
     }
   }
 
-  /**
-   * Detecta narração na saída de conclusão de texto.
-   */
   async handleTextComplete(_input: unknown, output: { text: string }): Promise<void> {
     try {
       if (!this.enabled) return;
@@ -464,9 +302,6 @@ export class PluginOrchestrator {
     }
   }
 
-  /**
-   * Lida com comandos de roteador e rastreamento de tokens antes que eles alcancem o OpenCode.
-   */
   async handleCommandExecuteBefore(
     input: { sessionID: string; command: string; arguments: string },
     output: { parts?: TextPart[] },
@@ -474,15 +309,6 @@ export class PluginOrchestrator {
     try {
       const command = input.command.replace(/^\//, '').toLowerCase();
       const args = input.arguments.trim();
-
-      // Handle token tracking commands
-      if (isTokenCommand(command) && this.tokenTracker) {
-        const result = await executeTokenCommand(this.tokenTracker, command, args);
-        if (result !== null) {
-          output.parts = [makeTextPart(input.sessionID, result)];
-          return;
-        }
-      }
 
       if (command === 'router') {
         if (args === 'on') {

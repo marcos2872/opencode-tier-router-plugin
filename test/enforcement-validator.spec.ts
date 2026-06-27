@@ -63,13 +63,6 @@ const VALID_CONFIG: RouterConfig = {
     selectorTimeoutMs: 1200,
     selectorMaxTokens: 16,
   },
-  tokenTracking: {
-    enabled: true,
-    maxHistoryFiles: 50,
-    maxHistoryDays: 30,
-    sessionTTLMinutes: 30,
-    maxSessionsMemory: 100,
-  },
 };
 
 // ============================================================================
@@ -360,30 +353,6 @@ describe('Enforcement Validator - Reporting', () => {
 
     expect(report).toContain('❌ INVALID');
     expect(report).toContain('ERRORS');
-  });
-});
-
-// ============================================================================
-// Tests: Token Tracking Recommendations
-// ============================================================================
-
-describe('Enforcement Validator - Token Tracking', () => {
-  it('recommends enabling token tracking', () => {
-    const noTracking: RouterConfig = {
-      ...VALID_CONFIG,
-      tokenTracking: { enabled: false },
-    };
-
-    const validation = validateEnforcement(noTracking);
-
-    expect(validation.recommendations.some((r) => r.includes('tokenTracking'))).toBe(true);
-  });
-
-  it('passes when token tracking is enabled', () => {
-    const validation = validateEnforcement(VALID_CONFIG);
-
-    expect(validation.isValid).toBe(true);
-    expect(validation.recommendations.some((r) => r.includes('tokenTracking'))).toBe(false);
   });
 });
 

@@ -9,11 +9,7 @@ import {
   DEFAULT_TIER_CAP,
   FAST_TIER_MAX_TOKENS,
   HEAVY_TIER_MIN_TOKENS,
-  LRU_MAX_SESSIONS,
-  MAX_HISTORY_DAYS,
-  MAX_HISTORY_FILES,
   MEDIUM_TIER_MAX_TOKENS,
-  SESSION_TTL_MINUTES,
 } from '../constants.js';
 
 /**
@@ -137,36 +133,6 @@ export interface RoutingConfig {
 }
 
 /**
- * Configuração de rastreamento de tokens.
- */
-export interface TokenTrackingConfig {
-  /**
-   * Indica se o rastreamento de tokens está habilitado quando presente.
-   */
-  enabled?: boolean;
-
-  /**
-   * Número máximo de arquivos de métricas de tokens persistidos para reter.
-   */
-  maxHistoryFiles?: number;
-
-  /**
-   * Número máximo de dias para reter registros históricos de tokens.
-   */
-  maxHistoryDays?: number;
-
-  /**
-   * TTL da sessão em minutos antes da expiração.
-   */
-  sessionTTLMinutes?: number;
-
-  /**
-   * Número máximo de sessões mantidas em memória antes da evicção LRU.
-   */
-  maxSessionsMemory?: number;
-}
-
-/**
  * Configuração completa do router.
  */
 export interface RouterConfig {
@@ -199,11 +165,6 @@ export interface RouterConfig {
    * Configuração da estratégia de roteamento.
    */
   routing: RoutingConfig;
-
-  /**
-   * Configuração opcional de rastreamento de tokens.
-   */
-  tokenTracking?: TokenTrackingConfig;
 }
 
 /**
@@ -355,13 +316,6 @@ const DEFAULT_CONFIG: RouterConfig = {
     selectorModel: 'github-copilot/claude-haiku-4.5',
     selectorTimeoutMs: 1200,
     selectorMaxTokens: 16,
-  },
-  tokenTracking: {
-    enabled: true,
-    maxHistoryFiles: MAX_HISTORY_FILES, // ✅ ERRO-005: Bounded disk (50 files max)
-    maxHistoryDays: MAX_HISTORY_DAYS,
-    sessionTTLMinutes: SESSION_TTL_MINUTES, // ✅ ERRO-004: 30-min TTL
-    maxSessionsMemory: LRU_MAX_SESSIONS, // ✅ ERRO-004: Max 100 sessions in memory
   },
 };
 
@@ -566,41 +520,6 @@ export function validateConfig(config: unknown): asserts config is RouterConfig 
       if (typeof pattern !== 'string' || pattern.length === 0) {
         throw new ConfigError(`taskPatterns for tier "${tierName}" must contain non-empty strings`);
       }
-    }
-  }
-
-  // ✅ ERRO-003, ERRO-004, ERRO-005: Validate tokenTracking if present
-  if (cfg.tokenTracking) {
-    if (typeof cfg.tokenTracking !== 'object') {
-      throw new ConfigError('tokenTracking must be an object');
-    }
-    const tt = cfg.tokenTracking as Partial<TokenTrackingConfig>;
-    if (tt.enabled !== undefined && typeof tt.enabled !== 'boolean') {
-      throw new ConfigError('tokenTracking.enabled must be boolean');
-    }
-    if (
-      tt.maxHistoryFiles !== undefined &&
-      (typeof tt.maxHistoryFiles !== 'number' || !Number.isFinite(tt.maxHistoryFiles) || tt.maxHistoryFiles < 1)
-    ) {
-      throw new ConfigError('tokenTracking.maxHistoryFiles must be a positive number');
-    }
-    if (
-      tt.maxHistoryDays !== undefined &&
-      (typeof tt.maxHistoryDays !== 'number' || !Number.isFinite(tt.maxHistoryDays) || tt.maxHistoryDays < 1)
-    ) {
-      throw new ConfigError('tokenTracking.maxHistoryDays must be a positive number');
-    }
-    if (
-      tt.sessionTTLMinutes !== undefined &&
-      (typeof tt.sessionTTLMinutes !== 'number' || !Number.isFinite(tt.sessionTTLMinutes) || tt.sessionTTLMinutes < 1)
-    ) {
-      throw new ConfigError('tokenTracking.sessionTTLMinutes must be a positive number');
-    }
-    if (
-      tt.maxSessionsMemory !== undefined &&
-      (typeof tt.maxSessionsMemory !== 'number' || !Number.isFinite(tt.maxSessionsMemory) || tt.maxSessionsMemory < 1)
-    ) {
-      throw new ConfigError('tokenTracking.maxSessionsMemory must be a positive number');
     }
   }
 }

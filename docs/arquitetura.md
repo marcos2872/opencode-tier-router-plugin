@@ -104,20 +104,6 @@ As decisões arquiteturais estão documentadas em `.specs/STATE.md`. Resumo das 
 
 ---
 
-### AD-006: Real Token Tracking + Critical Fixes
-
-**Decisão**: Captura real de tokens via `tool.execute.after`, não estimativas heurísticas. Pipeline com 5 correções críticas de design.
-
-**Razão**:
-- Estimativas heurísticas são imprecisas para análise de custo real
-- Arquitetura original tinha 5 falhas críticas: SRP, temporal coupling, hardcoded thresholds, data loss, unbounded disk
-
-**Trade-off**:
-- Pipeline mais complexo (OrphanBuffer, SessionCache, disk persistence)
-- Dados precisos para tomada de decisão
-
-**Referência**: src/router/token-tracker.ts, src/router/token-event-parser.ts, src/router/orphan-buffer.ts
-
 ---
 
 ## Componentes e Responsabilidades
@@ -128,7 +114,7 @@ As decisões arquiteturais estão documentadas em `.specs/STATE.md`. Resumo das 
 graph TD
     subgraph OpenCode["OpenCode Host"]
         subgraph Plugin["opencode-tier-router-plugin (Plugin)"]
-            Index["src/index.ts<br/>━━━━━━━━━━━━━━━<br/>• Hooks: config, chat.message,<br/>  system.transform, permission.ask,<br/>  tool.execute.before/after<br/>• Comandos: /tiers, /budget, /router,<br/>  /token-report, /token-history,<br/>  /token-compare<br/>• Estado: config, capTracker, routerOn"]
+            Index["src/index.ts<br/>━━━━━━━━━━━━━━━<br/>• Hooks: config, chat.message,<br/>  system.transform, permission.ask,<br/>  tool.execute.before/after<br/>• Comandos: /tiers, /budget, /router<br/>• Estado: config, capTracker, routerOn"]
 
             Orchestrator["src/plugin-orchestrator.ts<br/>━━━━━━━━━━━━━━━<br/>• Hook orchestration<br/>• Chat message handling<br/>• Subagent session tracking"]
 
@@ -144,31 +130,9 @@ graph TD
 
             Narration["narration.ts<br/>━━━━━━━━━━━━━━━<br/>• detectNarration<br/>• heuristic analysis"]
 
-            CostCalc["router/cost-calculator.ts<br/>━━━━━━━━━━━━━━━<br/>• calculateCost<br/>• formatCost<br/>• tier ratio calc"]
+
 
             EnfValidator["router/enforcement-validator.ts<br/>━━━━━━━━━━━━━━━<br/>• validateEnforcement<br/>• assertEnforcement<br/>• reportEnforcement"]
-
-            subgraph TokenTracking["Token Tracking"]
-                TokenTracker["router/token-tracker.ts<br/>━━━━━━━━━━━━━━━<br/>• recordStepFinish<br/>• getSummary<br/>• persistTokenMetrics"]
-
-                TokenParser["router/token-event-parser.ts<br/>━━━━━━━━━━━━━━━<br/>• parseTokenUsage<br/>• TokenEventParser<br/>• DefaultTokenEventParser"]
-
-                OrphanBuf["router/orphan-buffer.ts<br/>━━━━━━━━━━━━━━━<br/>• Event correlation<br/>• 5s retry<br/>• FIFO matching"]
-
-                TokenCmds["router/token-commands.ts<br/>━━━━━━━━━━━━━━━<br/>• /token-report<br/>• /token-history<br/>• /token-compare"]
-            end
-
-            subgraph Metrics["Metrics"]
-                Aggregator["router/metrics-aggregator.ts<br/>━━━━━━━━━━━━━━━<br/>• session aggregation<br/>• tier accuracy"]
-
-                StorageInt["router/metrics-storage.ts<br/>━━━━━━━━━━━━━━━<br/>• Storage interface"]
-
-                FsStorage["router/filesystem-storage.ts<br/>━━━━━━━━━━━━━━━<br/>• JSON persistence<br/>• LRU + TTL + FIFO"]
-
-                MemStorage["router/in-memory-storage.ts<br/>━━━━━━━━━━━━━━━<br/>• SessionCache<br/>• 100 LRU / 30min TTL"]
-
-                Formatter["router/metrics-formatter.ts<br/>━━━━━━━━━━━━━━━<br/>• Markdown reports<br/>• Session reports"]
-            end
 
             Utils["utils/safe-json.ts<br/>━━━━━━━━━━━━━━━<br/>• Safe JSON parse<br/>• Size limits"]
 
@@ -176,30 +140,24 @@ graph TD
         end
     end
 
-    TiersJSON["tiers.json<br/>━━━━━━━━━━━━━━━<br/>• tiers (fast/medium/heavy)<br/>• modes (normal/budget/quality/deep)<br/>• taskPatterns<br/>• enforcement<br/>• routing<br/>• tokenTracking"]
+    TiersJSON["tiers.json<br/>━━━━━━━━━━━━━━━<br/>• tiers (fast/medium/heavy)<br/>• modes (normal/budget/quality/deep)<br/>• taskPatterns<br/>• enforcement<br/>• routing"]
 
     Subagents["Subagents<br/>━━━━━━━━━━━━━━━<br/>• @fast (opencode/big-pickle)<br/>• @medium (llama.cpp/Nex-N2-mini)<br/>• @heavy (llama.cpp/Nex-N2-mini)"]
-
-    Disk["Disk persistence<br/>━━━━━━━━━━━━━━━<br/>• token-*.json<br/>• LRU eviction<br/>• max 50 files / 30 days"]
-
     Config --> TiersJSON
     Protocol --> Subagents
-    FsStorage --> Disk
 
     style Index fill:#e1f5ff
     style Protocol fill:#fff4e1
     style Selector fill:#ffe1ff
     style TiersJSON fill:#e1ffe1
     style Subagents fill:#ffe1e1
-    style TokenTracking fill:#f0e6ff
-    style Metrics fill:#e6f7ff
 ```
 
 ### 1. `src/index.ts` — Plugin Entry Point
 
 **Responsabilidades**:
 - Registrar hooks do plugin: `config`, `chat.message`, `chat.system.transform`, `permission.ask`, `tool.execute.before`, `tool.execute.after`, `command.execute.before`
-- Implementar comandos do plugin: `/tiers`, `/budget`, `/router`, `/token-report`, `/token-history`, `/token-compare`
+- Implementar comandos do plugin: `/tiers`, `/budget`, `/router`
 - Manter estado global do plugin (config, cap tracker, router on/off)
 - Mapear agentes nativos OpenCode para tiers (`explore → @fast`, `build → @medium`, etc.)
 
@@ -212,8 +170,7 @@ graph TD
 | `chat.system.transform` | Injeta protocolo de delegação no system prompt |
 | `permission.ask` | Controla enforcement (hard-block vs advisory) |
 | `tool.execute.before` | Rastreia caps antes de execução |
-| `tool.execute.after` | Captura tokens reais e atualiza caps |
-| `command.execute.before` | Intercepta comandos `/token-*` |
+| `tool.execute.after` | Atualiza caps e limites após execução |
 
 **Referência**: src/index.ts
 
@@ -233,7 +190,6 @@ graph TD
 | `handleChatMessage` | Processa mensagem e determina tier |
 | `handleSystemTransform` | Aplica transformações no system prompt |
 | `handlePermissionAsk` | Gerencia permissões com base no enforcement |
-| `handleToolExecuteAfter` | Captura uso de tokens pós-execução |
 
 **Referência**: src/plugin-orchestrator.ts
 
@@ -348,15 +304,6 @@ Cost signal: @fast≈1x, @medium≈5x, @heavy≈20x. Minimize cost while preserv
 
 ---
 
-### 9. `src/router/cost-calculator.ts` — Cálculo de Custo
-
-**Responsabilidades**:
-- Calcular custo de tokens com base no tier e ratios configurados
-- Formatar valores de custo para exibição
-- Centralizar lógica de custo (eliminando duplicação)
-
-**Referência**: src/router/cost-calculator.ts
-
 ---
 
 ### 10. `src/router/enforcement-validator.ts` — Validação de Enforcement
@@ -368,88 +315,6 @@ Cost signal: @fast≈1x, @medium≈5x, @heavy≈20x. Minimize cost while preserv
 - `reportEnforcement`: gera relatório de violações
 
 **Referência**: src/router/enforcement-validator.ts
-
----
-
-### 11. Token Tracking (src/router/token-*.ts)
-
-#### `token-tracker.ts`
-API pública de rastreamento de tokens:
-
-| Método | O que faz |
-|--------|-----------|
-| `recordStepFinish(sessionId, tokens)` | Registra uso real de tokens |
-| `recordRoutingDecision(sessionId, tier)` | Vincula decisão de roteamento |
-| `getSummary(sessionId)` | Obtém métricas da sessão |
-| `persistTokenMetrics(sessionId)` | Persiste manualmente ao disco |
-| `loadPersistedTokenMetrics(sessionId)` | Carrega sessão persistida |
-| `getHistory()` | Lista todas as sessões |
-| `getSessionReport(sessionId)` | Relatório detalhado em Markdown |
-| `getComparison(sessionId)` | Compara custo real vs. hipotético |
-
-**Referência**: src/router/token-tracker.ts
-
-#### `token-event-parser.ts`
-Extrai e parseia eventos de token das respostas da ferramenta:
-
-```typescript
-interface TokenRecord {
-  inputTokens: number
-  outputTokens: number
-  cacheTokens?: number
-  reasoningTokens?: number
-  tier?: string
-  toolName?: string
-  timestamp?: number
-}
-```
-
-**Referência**: src/router/token-event-parser.ts
-
-#### `token-commands.ts`
-Camada de execução de comandos `/token-*`:
-
-| Comando | Descrição |
-|---------|-----------|
-| `/token-report <sessionId>` | Exibe métricas de uma sessão |
-| `/token-history` | Lista todas as sessões persistidas |
-| `/token-compare <sessionId> <tier>` | Estima custo com outro tier |
-
-**Referência**: src/router/token-commands.ts
-
-#### `orphan-buffer.ts`
-Correlação de eventos com retry (5s) e matching FIFO:
-- Gerencia race conditions entre `recordStepFinish` e `recordRoutingDecision`
-- Buffer de eventos órfãos com TTL
-
-**Referência**: src/router/orphan-buffer.ts
-
----
-
-### 12. Metrics & Storage (src/router/metrics-*.ts)
-
-| Módulo | Função |
-|--------|--------|
-| `metrics-aggregator.ts` | Agrega sessões e calcula acurácia de tier |
-| `metrics-storage.ts` | Interface de armazenamento (adapter pattern) |
-| `filesystem-storage.ts` | Persistência em disco: JSON + LRU + TTL + FIFO cleanup |
-| `in-memory-storage.ts` | Cache em memória (SessionCache, 100 LRU, 30min TTL) |
-| `metrics-formatter.ts` | Geração de relatórios Markdown |
-
-**Formato de persistência** (v1.0):
-
-```json
-{
-  "version": "1.0",
-  "sessionId": "abc123-def456",
-  "createdAt": "2026-06-27T10:00:00Z",
-  "records": [...],
-  "routingDecisions": [...],
-  "tierAccuracy": 0.85
-}
-```
-
----
 
 ### 13. Utilitários
 
@@ -501,10 +366,7 @@ flowchart TD
     CapTracker --> ToolExec[Execução da Tool<br/>read/grep/bash...]
 
     ToolExec --> ToolAfter[Hook: tool.execute.after]
-    ToolAfter --> TokenCapture[token-event-parser.ts<br/>Extrai inputTokens/outputTokens]
-    TokenCapture --> CostCalc[cost-calculator.ts<br/>Calcula custo real]
-    CostCalc --> Record[token-tracker.ts<br/>recordStepFinish]
-    Record --> Banners{Gera Banners}
+    ToolAfter --> Banners{Gera Banners}
 
     Banners -->|5/12| CapNormal[cap:5/12]
     Banners -->|11/12| CapWarning[⚠ CAP WARNING: 1 remaining]
@@ -522,9 +384,6 @@ flowchart TD
     style Orchestrator fill:#fff4e1
     style Block fill:#ffe1e1
     style Output fill:#e1ffe1
-    style TokenCapture fill:#f0e6ff
-    style CostCalc fill:#f0e6ff
-    style Record fill:#f0e6ff
 ```
 
 ### Detalhamento Passo a Passo
@@ -580,11 +439,8 @@ Se enforcement for `hard-block`:
 - Se permitido: delega para o tier correto
 
 #### 6. Hook `tool.execute.after` (src/plugin-orchestrator.ts)
-
-1. `token-event-parser.ts` extrai tokens reais do output da ferramenta
-2. `cost-calculator.ts` calcula custo com base no tier ratio
-3. `token-tracker.ts` registra via `recordStepFinish`
-4. Cap tracker injeta banners conforme limite
+1. Cap tracker atualiza limites após execução
+2. Injeta banners conforme limite
 
 ---
 
@@ -645,13 +501,6 @@ Se enforcement for `hard-block`:
     "selectorTimeoutMs": 1200,
     "selectorMaxTokens": 16
   },
-  "tokenTracking": {
-    "enabled": true,
-    "maxHistoryFiles": 50,
-    "maxHistoryDays": 30,
-    "sessionTTLMinutes": 30,
-    "maxSessionsMemory": 100
-  }
 }
 ```
 
@@ -685,21 +534,10 @@ Controla estratégia de seleção de tier.
 
 | Campo | Tipo | Descrição |
 |-------|------|-----------|
-| `strategy` | string | `"keyword"` (padrão) ou `"llm"` |
+| `strategy` | string | `"keyword"` ou `"llm"` |
 | `selectorModel` | string | Modelo usado para seleção quando `strategy="llm"` |
 | `selectorTimeoutMs` | number | Timeout da chamada LLM selector |
 | `selectorMaxTokens` | number | Limite de tokens na resposta do selector |
-
-#### `tokenTracking` (object)
-Controla persistência e limites de token tracking.
-
-| Campo | Tipo | Descrição |
-|-------|------|-----------|
-| `enabled` | boolean | Liga/desliga captura de tokens |
-| `maxHistoryFiles` | number | Máximo de arquivos de histórico em disco |
-| `maxHistoryDays` | number | Dias de retenção do histórico |
-| `sessionTTLMinutes` | number | TTL da sessão em cache |
-| `maxSessionsMemory` | number | Máximo de sessões em memória |
 
 ---
 
@@ -756,18 +594,6 @@ Controla persistência e limites de token tracking.
 - Sessão OpenCode **não** crasha
 
 **Referência**: todo hook em src/index.ts e src/plugin-orchestrator.ts
-
-### 6. Eventos órfãos (token tracking)
-
-**Cenário**: `recordStepFinish` chega antes de `recordRoutingDecision`.
-
-**Comportamento**:
-- OrphanBuffer mantém eventos em buffer FIFO por até 5s
-- Quando `recordRoutingDecision` chega, correlaciona eventos pendentes
-- Se timeout expirar, evento é processado sem correlação de tier
-- Dados não são perdidos
-
-**Referência**: src/router/orphan-buffer.ts
 
 ---
 
@@ -836,7 +662,6 @@ Controla persistência e limites de token tracking.
 | Protocol injection (system prompt) | ~210 tokens |
 | Cap banners por mensagem | ~5-15 tokens |
 | Selector LLM call (se `strategy=llm`) | ~50 tokens prompt + 16 tokens response |
-| Token tracking metadata | ~0 (extraído do output existente) |
 
 **Total estimado por mensagem**: 220-240 tokens (com keyword strategy), 270-300 tokens (com LLM strategy).
 
@@ -849,9 +674,6 @@ Controla persistência e limites de token tracking.
 | `/tiers` | Exibe configuração ativa |
 | `/budget` | Lista modos ou troca modo |
 | `/router on\|off` | Liga/desliga o plugin |
-| `/token-report <sessionId>` | Exibe métricas de uma sessão |
-| `/token-history` | Lista todas as sessões persistidas |
-| `/token-compare <sessionId> <tier>` | Compara custo real vs. hipotético em outro tier |
 
 ---
 

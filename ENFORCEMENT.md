@@ -141,7 +141,6 @@ mode: normal
 | Cost não crescente | ❌ CRITICAL | Economia falsa |
 | `costRatio <= 0` | ❌ CRITICAL | Cálculo de cost quebrado |
 | Poucos padrões de tarefa | ⚠️ WARNING | Rota cai em default arriscado |
-| Token tracking desabilitado | 💡 RECOMENDAÇÃO | Sem auditoria de cost |
 
 ---
 
@@ -180,13 +179,6 @@ mode: normal
     "selectorModel": "opencode/big-pickle",
     "selectorTimeoutMs": 1200,
     "selectorMaxTokens": 16
-  },
-  "tokenTracking": {
-    "enabled": true,
-    "maxHistoryFiles": 50,
-    "maxHistoryDays": 30,
-    "sessionTTLMinutes": 30,
-    "maxSessionsMemory": 100
   }
 }
 ```
@@ -321,7 +313,6 @@ Antes de fazer deploy:
 - [ ] Todos 3 tiers têm modelos válidos ✅
 - [ ] Cost hierarchy: 1 < 5 < 20 ✅
 - [ ] Task patterns têm ≥3/≥5/≥5 itens ✅
-- [ ] Token tracking enabled ✅
 - [ ] `reportEnforcement()` mostra "✅ VALID" ✅
 - [ ] Todos os testes passam ✅
 

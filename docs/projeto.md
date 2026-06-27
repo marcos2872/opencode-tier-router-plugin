@@ -2,17 +2,16 @@
 
 ## Visão Geral
 
-O **opencode-tier-router-plugin** é um plugin para OpenCode que implementa **roteamento inteligente de tarefas** para diferentes tiers de modelos de linguagem (`@fast`, `@medium`, `@heavy`) com o objetivo de **reduzir custos operacionais mantendo a qualidade das respostas**.
+O **opencode-tier-router-plugin** é um plugin para OpenCode que implementa **roteamento inteligente de tarefas** para diferentes tiers de modelos de linguagem (`@fast`, `@medium`, `@heavy`) com o objetivo de manter a qualidade das respostas e usar o modelo mais adequado para cada tipo de trabalho.
 
-O plugin classifica automaticamente o tipo de tarefa solicitada pelo usuário e direciona para o modelo mais adequado e econômico, sem necessidade de infraestrutura externa (proxies, agentes dedicados ou routers separados).
+O plugin classifica automaticamente o tipo de tarefa solicitada pelo usuário e direciona para o modelo mais adequado, sem necessidade de infraestrutura externa (proxies, agentes dedicados ou routers separados).
 
 ## Objetivo
 
 - **Reduzir custo**: até 83% de redução em cenários reais (referência: paper Agent-as-a-Router)
 - **Manter qualidade**: tarefas simples usam modelos rápidos/baratos; tarefas complexas usam modelos poderosos
 - **Zero fricção**: integração nativa via plugin OpenCode, sem infraestrutura adicional
-- **Transparência**: protocolo de delegação visível no system prompt (~210 tokens)
-- **Rastreamento real**: captura de tokens via `tool.execute.after`, não estimativas heurísticas
+- **Transparência**: protocolo de delegação visível no system prompt
 
 ## Stack Tecnológica
 
@@ -31,7 +30,7 @@ O plugin classifica automaticamente o tipo de tarefa solicitada pelo usuário e 
 opencode-tier-router-plugin/
 ├── .agents/                   # Skills TLC (tlc-spec-driven)
 ├── .specs/                    # Especificações e decisões arquiteturais
-│   ├── STATE.md               # Decisões ativas (AD-001 a AD-006)
+│   ├── STATE.md               # Decisões ativas
 │   └── features/              # Features planejadas/implementadas
 ├── dist/                      # Saída do build (dist/index.js)
 ├── docs/                      # Documentação técnica
@@ -46,23 +45,13 @@ opencode-tier-router-plugin/
 │   │   ├── caps.ts            # Rastreamento de caps e detecção de redundância
 │   │   ├── classifier.ts      # Classificação de tarefas por keywords
 │   │   ├── config.ts          # Load/validate/save de tiers.json
-│   │   ├── cost-calculator.ts # Cálculo centralizado de custo de tokens
 │   │   ├── enforcement-validator.ts # Validação e bloqueio de enforcement
-│   │   ├── filesystem-storage.ts    # Persistência em disco (JSON + LRU + TTL)
-│   │   ├── in-memory-storage.ts     # Cache em memória (100 LRU, 30min TTL)
-│   │   ├── metrics-aggregator.ts    # Agregação de sessões e acurácia de tier
-│   │   ├── metrics-formatter.ts     # Geração de relatórios Markdown
-│   │   ├── metrics-storage.ts       # Interface de armazenamento (adapter)
-│   │   ├── orphan-buffer.ts         # Correlação de eventos (5s retry, FIFO)
-│   │   ├── protocol.ts        # Construção do protocolo de delegação (~210 tokens)
-│   │   ├── selector.ts        # Seleção de tier (keyword ou LLM) com fallback
-│   │   ├── token-commands.ts  # Execução de comandos /token-*
-│   │   ├── token-event-parser.ts    # Extração e parsing de eventos de token
-│   │   └── token-tracker.ts   # API pública de rastreamento de tokens
+│   │   ├── protocol.ts        # Construção do protocolo de delegação
+│   │   └── selector.ts        # Seleção de tier (keyword ou LLM) com fallback
 │   └── utils/
 │       └── safe-json.ts       # Parsing JSON seguro com limite de tamanho
-├── test/                      # Testes unitários (300+ testes)
-├── tiers.json                 # Configuração principal (tiers, modos, enforcement, tokenTracking)
+├── test/                      # Testes unitários
+├── tiers.json                 # Configuração principal (tiers, modos, enforcement, routing)
 ├── package.json               # Dependências e scripts
 ├── tsconfig.json              # Config TypeScript (src)
 └── tsconfig.test.json         # Config TypeScript (test)
@@ -80,7 +69,7 @@ opencode-tier-router-plugin/
    - Determina o tier adequado (`@fast`, `@medium`, `@heavy`)
 
 3. **Transformação do system prompt** (hook `chat.system.transform`):
-   - Injeta o protocolo de delegação (~210 tokens) no system prompt
+   - Injeta o protocolo de delegação no system prompt
    - Protocolo informa ao modelo orquestrador:
      - Tiers disponíveis e seus custos relativos
      - Regras de classificação (keywords por tier)
@@ -95,23 +84,14 @@ opencode-tier-router-plugin/
    - Se `enforcement.mode = "advisory"`:
      - Apenas orienta, não bloqueia
 
-5. **Monitoramento** (hooks `tool.execute.before/after`):
+5. **Controle de caps** (hooks `tool.execute.before/after`):
    - Rastreia caps de leitura e detecta redundância
    - Injeta banners `[cap:N/MAX]`, `[⚠ CAP WARNING]`, `[⚠ CAP REACHED]`
 
-6. **Token Tracking** (hook `tool.execute.after`):
-   - `token-event-parser.ts` extrai tokens reais do output da ferramenta
-   - `cost-calculator.ts` calcula custo com base no tier
-   - `token-tracker.ts` registra via `recordStepFinish`
-   - OrphanBuffer correlaciona eventos com decisões de roteamento
-
-7. **Comandos disponíveis**:
+6. **Comandos disponíveis**:
    - `/tiers` — exibe configuração ativa
    - `/budget` — lista modos ou troca modo
    - `/router on|off` — liga/desliga o plugin
-   - `/token-report <sessionId>` — métricas de uma sessão
-   - `/token-history` — lista sessões persistidas
-   - `/token-compare <sessionId> <tier>` — custo hipotético em outro tier
 
 ## Configuração (`tiers.json`)
 
@@ -151,13 +131,6 @@ O arquivo `tiers.json` controla todo o comportamento do plugin. Resolução em c
     "selectorModel": "opencode/big-pickle",
     "selectorTimeoutMs": 1200,
     "selectorMaxTokens": 16
-  },
-  "tokenTracking": {
-    "enabled": true,
-    "maxHistoryFiles": 50,
-    "maxHistoryDays": 30,
-    "sessionTTLMinutes": 30,
-    "maxSessionsMemory": 100
   }
 }
 ```
@@ -255,57 +228,6 @@ O plugin mapeia automaticamente agentes nativos do OpenCode para tiers:
 
 Ver src/index.ts.
 
-## Token Tracking
-
-O plugin captura uso real de tokens via hook `tool.execute.after`, não estimativas.
-
-### Event Format
-
-```typescript
-interface TokenRecord {
-  inputTokens: number
-  outputTokens: number
-  cacheTokens?: number
-  reasoningTokens?: number
-  tier?: string
-  toolName?: string
-  timestamp?: number
-}
-```
-
-### API Pública
-
-```typescript
-recordStepFinish(sessionId: string, tokens: TokenRecord): Promise<void>
-recordRoutingDecision(sessionId: string, tier: string): Promise<void>
-getSummary(sessionId: string): Promise<SessionMetrics | null>
-persistTokenMetrics(sessionId: string): Promise<boolean>
-getHistory(): Promise<SessionMetrics[]>
-getSessionReport(sessionId: string): Promise<string>
-getComparison(sessionId: string): Promise<string>
-```
-
-### Persistência (v1.0)
-
-```json
-{
-  "version": "1.0",
-  "sessionId": "abc123-def456",
-  "createdAt": "2026-06-27T10:00:00Z",
-  "records": [...],
-  "routingDecisions": [...],
-  "tierAccuracy": 0.85
-}
-```
-
-### Comandos
-
-| Comando | Descrição |
-|---------|-----------|
-| `/token-report <sessionId>` | Exibe métricas detalhadas da sessão |
-| `/token-history` | Lista todas as sessões persistidas |
-| `/token-compare <sessionId> <tier>` | Compara custo real vs. hipotético em outro tier |
-
 ## Exemplos de Uso
 
 ### Tarefa fast (busca simples)
@@ -344,14 +266,12 @@ analyze code quality and propose architecture changes
 | Delega mas mantém modelo errado | Tier configurado incorretamente | Verificar `/tiers` e ajustar `tiers.<tier>.model` |
 | Aviso de `tiers.json` ausente | Arquivo não existe no projeto nem no global | Criar `tiers.json` no projeto ou em `~/.config/opencode/` |
 | Hard-block bloqueia tudo | `trivialDirectAllowed=false` impede execução direta | Configurar `trivialDirectAllowed: true` se desejar |
-| Eventos órfãos no token tracking | Race condition entre hooks | OrphanBuffer lida automaticamente com 5s de retry |
-| Relatório de sessão vazio | Sessão não encontrada ou expirou | Verificar com `/token-history` o sessionId correto |
 
 ## Links Relacionados
 
 - [Arquitetura](./arquitetura.md) — decisões arquiteturais e componentes internos
 - [AGENTS.md](../AGENTS.md) — workflow de desenvolvimento TLC
-- [STATE.md](../.specs/STATE.md) — decisões ativas (AD-001 a AD-006)
+- [STATE.md](../.specs/STATE.md) — decisões ativas
 - [README.md](../README.md) — overview rápido e instalação
 
 ## Licença

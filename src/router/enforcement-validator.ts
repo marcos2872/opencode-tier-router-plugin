@@ -116,11 +116,6 @@ export function validateEnforcement(cfg: RouterConfig): EnforcementValidation {
     errors.push(`❌ Cost hierarchy violated: @medium (${mediumCost}x) should be < @heavy (${heavyCost}x)`);
   }
 
-  // ⚠️ Token tracking should be enabled for compliance
-  if (!cfg.tokenTracking?.enabled) {
-    recommendations.push(`💡 Enable tokenTracking for full cost tracking and compliance auditing`);
-  }
-
   const isValid = errors.length === 0;
   return { isValid, errors, warnings, recommendations };
 }
