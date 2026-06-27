@@ -41,6 +41,7 @@ class SessionCache {
   private cache: Map<string, { summary: SessionTokenSummary; lastAccess: number; delegationCount: number }> =
     new Map();
   private accessOrder: string[] = []; // Track LRU order
+  private isEvictionLocked = false;
 
   constructor(
     private readonly maxSessions: number,
@@ -77,42 +78,71 @@ class SessionCache {
    * - Exceeded TTL
    * - Over capacity (LRU)
    */
-  getEvictionCandidates(): { sessionId: string; summary: SessionTokenSummary; delegationCount: number }[] {
+  getEvictionCandidates(options?: { skipLock?: boolean }): { sessionId: string; summary: SessionTokenSummary; delegationCount: number }[] {
+    const shouldSkipLock = options?.skipLock ?? false;
+    const wasLocked = this.isEvictionLocked;
+    if (!shouldSkipLock && this.isEvictionLocked) return [];
+
+    this.isEvictionLocked = true;
+    try {
+      return this.collectEvictionCandidates();
+    } finally {
+      if (!wasLocked) this.isEvictionLocked = false;
+    }
+  }
+
+  async withEvictionLock<T>(callback: () => Promise<T>): Promise<T | undefined> {
+    if (this.isEvictionLocked) return undefined;
+
+    this.isEvictionLocked = true;
+    try {
+      return await callback();
+    } finally {
+      this.isEvictionLocked = false;
+    }
+  }
+
+  private collectEvictionCandidates(): { sessionId: string; summary: SessionTokenSummary; delegationCount: number }[] {
     const now = Date.now();
     const ttlMs = this.ttlMinutes * 60 * 1000;
     const candidates: { sessionId: string; summary: SessionTokenSummary; delegationCount: number }[] = [];
+    const evictedSessionIds = new Set(candidates.map(c => c.sessionId));
 
     // TTL-based eviction
-    for (const [sessionId, entry] of this.cache.entries()) {
+    for (const [sessionId, entry] of Array.from(this.cache.entries())) {
+      if (!this.cache.has(sessionId)) continue;
       if (now - entry.lastAccess >= ttlMs) {
         candidates.push({
           sessionId,
           summary: entry.summary,
           delegationCount: entry.delegationCount,
         });
+        evictedSessionIds.add(sessionId);
       }
     }
 
     // LRU-based eviction (if over capacity)
     if (this.cache.size + candidates.length > this.maxSessions) {
-      const toEvict = this.cache.size + candidates.length - this.maxSessions;
-      for (let i = 0; i < toEvict && this.accessOrder.length > 0; i++) {
-        const sessionId = this.accessOrder.shift()!;
-        if (!candidates.some(c => c.sessionId === sessionId)) {
-          const entry = this.cache.get(sessionId);
-          if (entry) {
-            candidates.push({
-              sessionId,
-              summary: entry.summary,
-              delegationCount: entry.delegationCount,
-            });
-          }
-        }
+      const toEvict = Math.max(0, this.cache.size + candidates.length - this.maxSessions);
+      for (const sessionId of Array.from(this.accessOrder)) {
+        if (evictedSessionIds.size >= toEvict) break;
+        if (evictedSessionIds.has(sessionId)) continue;
+
+        const entry = this.cache.get(sessionId);
+        if (!entry) continue;
+
+        candidates.push({
+          sessionId,
+          summary: entry.summary,
+          delegationCount: entry.delegationCount,
+        });
+        evictedSessionIds.add(sessionId);
       }
     }
 
     // Remove from cache
     for (const candidate of candidates) {
+      if (!this.cache.has(candidate.sessionId)) continue;
       this.cache.delete(candidate.sessionId);
       this.accessOrder = this.accessOrder.filter(s => s !== candidate.sessionId);
     }
@@ -518,13 +548,21 @@ export class TokenTracker {
    * Persist evicted sessions to disk and apply cleanup.
    */
   private async handleEvictions(): Promise<void> {
-    const candidates = this.cache.getEvictionCandidates();
+    const candidates = await this.cache.withEvictionLock(async () => {
+      const candidates = this.cache.getEvictionCandidates({ skipLock: true });
 
-    for (const candidate of candidates) {
-      await this.persistSession(candidate.sessionId, candidate.summary, candidate.delegationCount);
-      this.sessionRecords.delete(candidate.sessionId);
-      this.delegationCounts.delete(candidate.sessionId);
-    }
+      for (const candidate of candidates) {
+        await this.persistSession(candidate.sessionId, candidate.summary, candidate.delegationCount);
+        if (this.sessionRecords.has(candidate.sessionId)) {
+          this.sessionRecords.delete(candidate.sessionId);
+          this.delegationCounts.delete(candidate.sessionId);
+        }
+      }
+
+      return candidates;
+    });
+
+    if (candidates === undefined) return;
 
     // Clean up old files if needed
     await this.cleanupOldFiles();

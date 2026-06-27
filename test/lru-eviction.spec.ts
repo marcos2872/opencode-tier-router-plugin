@@ -12,14 +12,15 @@
  * 4. Memory bounded: designed to prevent unbounded growth
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
-import type { RoutingDecision } from '../src/router/token-event-parser.js';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type { RoutingDecision, TokenRecord } from '../src/router/token-event-parser.js';
 import { TokenTracker } from '../src/router/token-tracker.js';
 import { DefaultTokenEventParser } from '../src/router/token-event-parser.js';
 import { DefaultMetricsAggregator } from '../src/router/metrics-aggregator.js';
 import { MarkdownMetricsFormatter } from '../src/router/metrics-formatter.js';
 import { InMemoryStorage } from '../src/router/in-memory-storage.js';
 import type { RouterConfig } from '../src/router/config.js';
+import type { SessionTokenSummary } from '../src/router/metrics-aggregator.js';
 
 // ============================================================================
 // Test Fixtures
@@ -60,6 +61,42 @@ const mockConfig: RouterConfig = {
   },
 };
 
+const createStepFinishEvent = (sessionId: string) => ({
+  sessionID: sessionId,
+  tokens: { input: 100, output: 50, reasoning: 10, cache: { read: 5, write: 0 } },
+  cost: 0.5,
+});
+
+const createRoutingDecision = (): RoutingDecision => ({
+  tier: 'fast',
+  costRatio: 1,
+  estimated: { input: 90, output: 45 },
+});
+
+const createSummary = (sessionId: string): SessionTokenSummary => ({
+  sessionId,
+  records: [],
+  startTime: 1,
+  endTime: 1,
+  totalInputTokens: 0,
+  totalOutputTokens: 0,
+  totalReasoningTokens: 0,
+  totalCacheCost: 0,
+  totalCostReal: 0,
+  accuracyBreakdown: {
+    optimal: 0,
+    right: 0,
+    acceptable: 0,
+    suboptimal: 0,
+    overshot: 0,
+  },
+  averageInputEstimationError: 0,
+  averageOutputEstimationError: 0,
+  costSavedVsDefault: 0,
+  costSavedVsHeavy: 0,
+  averageActualCostRatio: 0,
+});
+
 // ============================================================================
 // Tests: TokenTracker Memory Management
 // ============================================================================
@@ -78,6 +115,133 @@ describe('TokenTracker - Memory Management (FASE0-T4)', () => {
       mockConfig,
       '.token-tracking',
     );
+  });
+
+  it('deduplicates concurrent LRU eviction candidates without corrupting order', async () => {
+    const smallMemConfig: RouterConfig = {
+      ...mockConfig,
+      tokenTracking: {
+        ...mockConfig.tokenTracking,
+        maxSessionsMemory: 2,
+      },
+    };
+    const smallTracker = new TokenTracker(
+      storage,
+      new DefaultTokenEventParser(),
+      new DefaultMetricsAggregator(),
+      new MarkdownMetricsFormatter(),
+      smallMemConfig,
+      '.token-tracking',
+    );
+
+    const cache = smallTracker['cache'] as {
+      set: (sessionId: string, summary: SessionTokenSummary, delegationCount: number) => void;
+      getEvictionCandidates: () => { sessionId: string }[];
+      size: () => number;
+    };
+    cache.set('session-1', createSummary('session-1'), 0);
+    cache.set('session-2', createSummary('session-2'), 0);
+    cache.set('session-3', createSummary('session-3'), 0);
+
+    const first = cache.getEvictionCandidates();
+    const second = cache.getEvictionCandidates();
+    const candidates = [...first, ...second];
+    const sessionIds = candidates.map(candidate => candidate.sessionId);
+
+    expect(first).toHaveLength(1);
+    expect(second).toHaveLength(0);
+    expect(new Set(sessionIds).size).toBe(sessionIds.length);
+    expect(cache.size()).toBe(2);
+  });
+
+  it('blocks a second eviction while one eviction is active', async () => {
+    const smallMemConfig: RouterConfig = {
+      ...mockConfig,
+      tokenTracking: {
+        ...mockConfig.tokenTracking,
+        maxSessionsMemory: 2,
+      },
+    };
+    const smallTracker = new TokenTracker(
+      storage,
+      new DefaultTokenEventParser(),
+      new DefaultMetricsAggregator(),
+      new MarkdownMetricsFormatter(),
+      smallMemConfig,
+      '.token-tracking',
+    );
+
+    const cache = smallTracker['cache'] as {
+      set: (sessionId: string, summary: SessionTokenSummary, delegationCount: number) => void;
+      withEvictionLock: <T>(callback: () => Promise<T>) => Promise<T | undefined>;
+      getEvictionCandidates: (options?: { skipLock?: boolean }) => { sessionId: string }[];
+      size: () => number;
+    };
+    cache.set('session-1', createSummary('session-1'), 0);
+    cache.set('session-2', createSummary('session-2'), 0);
+    cache.set('session-3', createSummary('session-3'), 0);
+
+    let release!: () => void;
+    const first = cache.withEvictionLock(async () => {
+      const candidates = cache.getEvictionCandidates({ skipLock: true });
+      return new Promise<{ sessionId: string }[]>(resolve => {
+        release = () => resolve(candidates);
+      });
+    });
+    const second = await cache.withEvictionLock(async () => cache.getEvictionCandidates());
+
+    expect(second).toBeUndefined();
+    release();
+    const firstCandidates = (await first) ?? [];
+
+    expect(firstCandidates.map(candidate => candidate.sessionId)).toEqual(['session-1']);
+    expect(cache.size()).toBe(2);
+  });
+
+  it('keeps session records if they are recreated before eviction deletion', async () => {
+    const smallMemConfig: RouterConfig = {
+      ...mockConfig,
+      tokenTracking: {
+        ...mockConfig.tokenTracking,
+        maxSessionsMemory: 2,
+      },
+    };
+    const smallTracker = new TokenTracker(
+      storage,
+      new DefaultTokenEventParser(),
+      new DefaultMetricsAggregator(),
+      new MarkdownMetricsFormatter(),
+      smallMemConfig,
+      '.token-tracking',
+    );
+
+    const cache = smallTracker['cache'] as {
+      set: (sessionId: string, summary: SessionTokenSummary, delegationCount: number) => void;
+    };
+    const sessionRecords = smallTracker['sessionRecords'] as Map<string, TokenRecord[]>;
+    cache.set('session-1', createSummary('session-1'), 0);
+    cache.set('session-2', createSummary('session-2'), 0);
+    cache.set('session-3', createSummary('session-3'), 0);
+    sessionRecords.set('session-1', []);
+    sessionRecords.set('session-2', []);
+    sessionRecords.set('session-3', []);
+
+    const originalDelete = sessionRecords.delete.bind(sessionRecords);
+    const deleteSpy = vi.spyOn(sessionRecords, 'delete').mockImplementation(function deleteWithReadd(sessionId) {
+      if (sessionId === 'session-1') {
+        sessionRecords.set(sessionId, []);
+        return true;
+      }
+      return originalDelete(sessionId);
+    });
+    const handleEvictions = smallTracker['handleEvictions'].bind(smallTracker) as () => Promise<void>;
+
+    await handleEvictions();
+
+    expect(sessionRecords.has('session-1')).toBe(true);
+    expect(sessionRecords.has('session-2')).toBe(true);
+    expect(storage.getAllFiles().size).toBeGreaterThanOrEqual(1);
+    deleteSpy.mockRestore();
   });
 
   it('stores sessions in memory', async () => {
