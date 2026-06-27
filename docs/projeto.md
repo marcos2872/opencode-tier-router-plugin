@@ -12,6 +12,7 @@ O plugin classifica automaticamente o tipo de tarefa solicitada pelo usuário e 
 - **Manter qualidade**: tarefas simples usam modelos rápidos/baratos; tarefas complexas usam modelos poderosos
 - **Zero fricção**: integração nativa via plugin OpenCode, sem infraestrutura adicional
 - **Transparência**: protocolo de delegação visível no system prompt (~210 tokens)
+- **Rastreamento real**: captura de tokens via `tool.execute.after`, não estimativas heurísticas
 
 ## Stack Tecnológica
 
@@ -30,7 +31,7 @@ O plugin classifica automaticamente o tipo de tarefa solicitada pelo usuário e 
 opencode-tier-router/
 ├── .agents/                   # Skills TLC (tlc-spec-driven)
 ├── .specs/                    # Especificações e decisões arquiteturais
-│   ├── STATE.md               # Decisões ativas (AD-001 a AD-005)
+│   ├── STATE.md               # Decisões ativas (AD-001 a AD-006)
 │   └── features/              # Features planejadas/implementadas
 ├── dist/                      # Saída do build (dist/index.js)
 ├── docs/                      # Documentação técnica
@@ -38,15 +39,30 @@ opencode-tier-router/
 │   └── arquitetura.md         # Decisões e componentes arquiteturais
 ├── src/
 │   ├── index.ts               # Entry point: hooks e comandos do plugin
+│   ├── plugin-orchestrator.ts # Orquestração de hooks (SRP extraction)
 │   ├── narration.ts           # Detecção de narração vs. trabalho real
-│   └── router/                # Módulos core do roteamento
-│       ├── caps.ts            # Rastreamento de caps e detecção de redundância
-│       ├── classifier.ts      # Classificação de tarefas por keywords
-│       ├── config.ts          # Load/validate/save de tiers.json
-│       ├── protocol.ts        # Construção do protocolo de delegação (~210 tokens)
-│       └── selector.ts        # Seleção de tier (keyword ou LLM) com fallback
-├── test/                      # Testes unitários (*.test.ts)
-├── tiers.json                 # Configuração principal (tiers, modos, enforcement)
+│   ├── constants.ts           # Constantes nomeadas (FALLBACK_CONFIG, regex)
+│   ├── router/
+│   │   ├── caps.ts            # Rastreamento de caps e detecção de redundância
+│   │   ├── classifier.ts      # Classificação de tarefas por keywords
+│   │   ├── config.ts          # Load/validate/save de tiers.json
+│   │   ├── cost-calculator.ts # Cálculo centralizado de custo de tokens
+│   │   ├── enforcement-validator.ts # Validação e bloqueio de enforcement
+│   │   ├── filesystem-storage.ts    # Persistência em disco (JSON + LRU + TTL)
+│   │   ├── in-memory-storage.ts     # Cache em memória (100 LRU, 30min TTL)
+│   │   ├── metrics-aggregator.ts    # Agregação de sessões e acurácia de tier
+│   │   ├── metrics-formatter.ts     # Geração de relatórios Markdown
+│   │   ├── metrics-storage.ts       # Interface de armazenamento (adapter)
+│   │   ├── orphan-buffer.ts         # Correlação de eventos (5s retry, FIFO)
+│   │   ├── protocol.ts        # Construção do protocolo de delegação (~210 tokens)
+│   │   ├── selector.ts        # Seleção de tier (keyword ou LLM) com fallback
+│   │   ├── token-commands.ts  # Execução de comandos /token-*
+│   │   ├── token-event-parser.ts    # Extração e parsing de eventos de token
+│   │   └── token-tracker.ts   # API pública de rastreamento de tokens
+│   └── utils/
+│       └── safe-json.ts       # Parsing JSON seguro com limite de tamanho
+├── test/                      # Testes unitários (300+ testes)
+├── tiers.json                 # Configuração principal (tiers, modos, enforcement, tokenTracking)
 ├── package.json               # Dependências e scripts
 ├── tsconfig.json              # Config TypeScript (src)
 └── tsconfig.test.json         # Config TypeScript (test)
@@ -73,6 +89,7 @@ opencode-tier-router/
 
 4. **Controle de permissões** (hook `permission.ask`):
    - Se `enforcement.mode = "hard-block"`:
+     - `enforcement-validator.ts` valida se execução é permitida
      - Bloqueia execução direta de tools em tarefas não-triviais
      - Força delegação via `Task()` para o tier correto
    - Se `enforcement.mode = "advisory"`:
@@ -82,10 +99,19 @@ opencode-tier-router/
    - Rastreia caps de leitura e detecta redundância
    - Injeta banners `[cap:N/MAX]`, `[⚠ CAP WARNING]`, `[⚠ CAP REACHED]`
 
-6. **Comandos disponíveis**:
+6. **Token Tracking** (hook `tool.execute.after`):
+   - `token-event-parser.ts` extrai tokens reais do output da ferramenta
+   - `cost-calculator.ts` calcula custo com base no tier
+   - `token-tracker.ts` registra via `recordStepFinish`
+   - OrphanBuffer correlaciona eventos com decisões de roteamento
+
+7. **Comandos disponíveis**:
    - `/tiers` — exibe configuração ativa
    - `/budget` — lista modos ou troca modo
    - `/router on|off` — liga/desliga o plugin
+   - `/token-report <sessionId>` — métricas de uma sessão
+   - `/token-history` — lista sessões persistidas
+   - `/token-compare <sessionId> <tier>` — custo hipotético em outro tier
 
 ## Configuração (`tiers.json`)
 
@@ -93,7 +119,7 @@ O arquivo `tiers.json` controla todo o comportamento do plugin. Resolução em c
 
 1. `./tiers.json` (projeto local) — **prioridade máxima**
 2. `~/.config/opencode/tiers.json` (global)
-3. Defaults internos do plugin (FALLBACK_CONFIG em src/index.ts)
+3. Defaults internos do plugin (FALLBACK_CONFIG em src/constants.ts)
 
 ### Exemplo mínimo
 
@@ -101,27 +127,37 @@ O arquivo `tiers.json` controla todo o comportamento do plugin. Resolução em c
 {
   "mode": "normal",
   "tiers": {
-    "fast": { "model": "github-copilot/claude-haiku-4.5", "costRatio": 1, "cap": 8 },
-    "medium": { "model": "github-copilot/gpt-5.3-codex", "costRatio": 5, "cap": 12 },
-    "heavy": { "model": "github-copilot/claude-sonnet-4.5", "costRatio": 20, "cap": 20 }
+    "fast": { "model": "opencode/big-pickle", "costRatio": 1, "cap": 8 },
+    "medium": { "model": "llama.cpp/Nex-N2-mini", "costRatio": 5, "cap": 12 },
+    "heavy": { "model": "llama.cpp/Nex-N2-mini", "costRatio": 20, "cap": 20 }
   },
   "modes": {
-    "normal": { "defaultTier": "medium" }
+    "normal": { "description": "Balanced routing", "defaultTier": "medium" },
+    "budget": { "description": "Cost-first", "defaultTier": "fast" },
+    "quality": { "description": "Quality-first", "defaultTier": "medium" },
+    "deep": { "description": "Depth-first", "defaultTier": "heavy" }
   },
   "taskPatterns": {
-    "fast": ["find", "search", "read", "buscar"],
-    "medium": ["implement", "refactor", "fix", "criar"],
-    "heavy": ["design", "architecture", "debug", "analisar"]
+    "fast": ["find", "search", "read", "buscar", "procurar", "listar", "mostrar"],
+    "medium": ["refactor", "implement", "fix", "criar", "corrigir", "editar", "validar"],
+    "heavy": ["design", "architecture", "debug", "analisar", "revisar", "diagnosticar"]
   },
   "enforcement": {
     "mode": "hard-block",
-    "trivialDirectAllowed": true
+    "trivialDirectAllowed": false
   },
   "routing": {
-    "strategy": "keyword",
-    "selectorModel": "github-copilot/claude-haiku-4.5",
+    "strategy": "llm",
+    "selectorModel": "opencode/big-pickle",
     "selectorTimeoutMs": 1200,
     "selectorMaxTokens": 16
+  },
+  "tokenTracking": {
+    "enabled": true,
+    "maxHistoryFiles": 50,
+    "maxHistoryDays": 30,
+    "sessionTTLMinutes": 30,
+    "maxSessionsMemory": 100
   }
 }
 ```
@@ -142,6 +178,8 @@ npm run build        # Compila src/ → dist/index.js
 ```bash
 npm run typecheck    # Verifica tipos (src + test)
 npm run test         # Roda testes unitários (vitest)
+npm run lint         # ESLint — zero erros
+npm run format       # Prettier — formata todo o código
 ```
 
 ### Gate Completo (CI-style)
@@ -208,14 +246,65 @@ Crie ou edite `tiers.json` no diretório do projeto alvo para customizar:
 
 O plugin mapeia automaticamente agentes nativos do OpenCode para tiers:
 
-| Agente | Tier |
-|--------|------|
-| `explore` | `@fast` |
-| `build` | `@medium` |
-| `general` | `@heavy` |
-| `plan` | `@heavy` |
+| Agente | Tier | Modelo |
+|--------|------|--------|
+| `explore` | `@fast` | `opencode/big-pickle` |
+| `build` | `@medium` | `llama.cpp/Nex-N2-mini` |
+| `general` | `@heavy` | `llama.cpp/Nex-N2-mini` |
+| `plan` | `@heavy` | `llama.cpp/Nex-N2-mini` |
 
-Ver src/index.ts:13-18.
+Ver src/index.ts.
+
+## Token Tracking
+
+O plugin captura uso real de tokens via hook `tool.execute.after`, não estimativas.
+
+### Event Format
+
+```typescript
+interface TokenRecord {
+  inputTokens: number
+  outputTokens: number
+  cacheTokens?: number
+  reasoningTokens?: number
+  tier?: string
+  toolName?: string
+  timestamp?: number
+}
+```
+
+### API Pública
+
+```typescript
+recordStepFinish(sessionId: string, tokens: TokenRecord): Promise<void>
+recordRoutingDecision(sessionId: string, tier: string): Promise<void>
+getSummary(sessionId: string): Promise<SessionMetrics | null>
+persistTokenMetrics(sessionId: string): Promise<boolean>
+getHistory(): Promise<SessionMetrics[]>
+getSessionReport(sessionId: string): Promise<string>
+getComparison(sessionId: string): Promise<string>
+```
+
+### Persistência (v1.0)
+
+```json
+{
+  "version": "1.0",
+  "sessionId": "abc123-def456",
+  "createdAt": "2026-06-27T10:00:00Z",
+  "records": [...],
+  "routingDecisions": [...],
+  "tierAccuracy": 0.85
+}
+```
+
+### Comandos
+
+| Comando | Descrição |
+|---------|-----------|
+| `/token-report <sessionId>` | Exibe métricas detalhadas da sessão |
+| `/token-history` | Lista todas as sessões persistidas |
+| `/token-compare <sessionId> <tier>` | Compara custo real vs. hipotético em outro tier |
 
 ## Exemplos de Uso
 
@@ -225,8 +314,8 @@ Ver src/index.ts:13-18.
 busque autenticação no projeto
 ```
 
-→ Classificado como `@fast` (keyword: "busque")  
-→ Roteado para modelo rápido/barato (ex: claude-haiku-4.5)
+→ Classificado como `@fast` (keyword: "busque")
+→ Roteado para `opencode/big-pickle`
 
 ### Tarefa medium (implementação)
 
@@ -234,8 +323,8 @@ busque autenticação no projeto
 refatore a função de login para usar async/await
 ```
 
-→ Classificado como `@medium` (keyword: "refatore")  
-→ Roteado para modelo intermediário (ex: gpt-5.3-codex)
+→ Classificado como `@medium` (keyword: "refatore")
+→ Roteado para `llama.cpp/Nex-N2-mini`
 
 ### Tarefa heavy (arquitetura/debug)
 
@@ -243,8 +332,8 @@ refatore a função de login para usar async/await
 analyze code quality and propose architecture changes
 ```
 
-→ Classificado como `@heavy` (keyword: "analyze", "architecture")  
-→ Roteado para modelo poderoso (ex: claude-sonnet-4.5)
+→ Classificado como `@heavy` (keyword: "analyze", "architecture")
+→ Roteado para `llama.cpp/Nex-N2-mini` (tier heavy)
 
 ## Troubleshooting
 
@@ -254,12 +343,15 @@ analyze code quality and propose architecture changes
 | Não está delegando | Keywords não cobrem o prompt real | Ajustar `taskPatterns` ou usar `enforcement.mode="hard-block"` |
 | Delega mas mantém modelo errado | Tier configurado incorretamente | Verificar `/tiers` e ajustar `tiers.<tier>.model` |
 | Aviso de `tiers.json` ausente | Arquivo não existe no projeto nem no global | Criar `tiers.json` no projeto ou em `~/.config/opencode/` |
+| Hard-block bloqueia tudo | `trivialDirectAllowed=false` impede execução direta | Configurar `trivialDirectAllowed: true` se desejar |
+| Eventos órfãos no token tracking | Race condition entre hooks | OrphanBuffer lida automaticamente com 5s de retry |
+| Relatório de sessão vazio | Sessão não encontrada ou expirou | Verificar com `/token-history` o sessionId correto |
 
 ## Links Relacionados
 
 - [Arquitetura](./arquitetura.md) — decisões arquiteturais e componentes internos
 - [AGENTS.md](../AGENTS.md) — workflow de desenvolvimento TLC
-- [STATE.md](../.specs/STATE.md) — decisões ativas (AD-001 a AD-005)
+- [STATE.md](../.specs/STATE.md) — decisões ativas (AD-001 a AD-006)
 - [README.md](../README.md) — overview rápido e instalação
 
 ## Licença
