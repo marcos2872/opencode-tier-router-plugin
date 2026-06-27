@@ -102,12 +102,13 @@ T5, T6 → T7
 **Done when**:
 - [x] `package.json` created with `"type": "module"`, `"peerDependencies": { "@opencode-ai/plugin": ">=1.0.0" }`, devDeps `typescript`, `vitest`, `@types/node`
 - [x] `tsconfig.json` created with `"module": "preserve"`, `"strict": true`, `"outDir": "dist"`
-- [x] `tiers.json` created with three tiers (fast/medium/heavy), four modes (normal/budget/quality/deep), and taskPatterns matching spec.md `taskPatterns`
+- [x] `tiers.json` created with three tiers (fast/medium/heavy), four modes (normal/budget/quality/deep), and taskPatterns matching spec.md
+- [x] Default models in tiers.json: @fast=`github-copilot/claude-haiku-4-5`, @medium=`github-copilot/claude-sonnet-4-5`, @heavy=`github-copilot/claude-opus-4-8`
 - [x] `npx tsc --noEmit` passes
 
 **Tests**: none (config files only)
 **Gate**: build
-**Commit**: `build(opencode-tier-router): scaffold project with package.json, tsconfig, and tiers.json`
+**Commit**: `build(opencode-tier-router): scaffold project with defaults for github-copilot models`
 
 ---
 
@@ -149,12 +150,12 @@ T5, T6 → T7
 - Skill: NONE
 
 **Done when**:
-- [ ] `buildDelegationProtocol(cfg)` returns compact string with tiers, cost ratios, mode, task patterns, and rules
-- [ ] Protocol format matches reference: `## Model Delegation Protocol\nTiers: @fast=model(Nx) @medium=model(Nx) @heavy=model(Nx) mode:X\nR: @fast→keyword/... @medium→... @heavy→...`
-- [ ] Each mode (normal/budget/quality/deep) produces a different protocol string with correct defaultTier emphasis
-- [ ] `classifyTask(text, taskPatterns)` returns `"fast" | "medium" | "heavy" | null` based on keyword matching
-- [ ] Classification is case-insensitive and matches on word boundaries
-- [ ] Gate check passes: `npx vitest run`
+- [x] `buildDelegationProtocol(cfg)` returns compact string with tiers, cost ratios, mode, task patterns, and rules
+- [x] Protocol format matches reference: `## Model Delegation Protocol\nTiers: @fast=model(Nx) @medium=model(Nx) @heavy=model(Nx) mode:X\nR: @fast→keyword/... @medium→... @heavy→...`
+- [x] Each mode (normal/budget/quality/deep) produces a different protocol string with correct defaultTier emphasis
+- [x] `classifyTask(text, taskPatterns)` returns `"fast" | "medium" | "heavy" | null` based on keyword matching
+- [x] Classification is case-insensitive and matches on word boundaries
+- [x] Gate check passes: `npx vitest run`
 
 **Tests**: unit (coverage: all modes produce correct string; each keyword maps to correct tier; unknown input returns null; cost ratios rendered correctly)
 **Gate**: quick
@@ -174,12 +175,12 @@ T5, T6 → T7
 - Skill: NONE
 
 **Done when**:
-- [ ] `classifyTask(text, patterns)` returns the matching tier key
-- [ ] Priority: if multiple tiers match, the most specific (highest-priority) tier wins. Priority: heavy > medium > fast.
-- [ ] Case-insensitive matching
-- [ ] Word-boundary matching (e.g., "debug" in "debugging" should match; but only if pattern matches)
-- [ ] Returns `null` when no pattern matches
-- [ ] Gate check passes: `npx vitest run`
+- [x] `classifyTask(text, patterns)` returns the matching tier key
+- [x] Priority: if multiple tiers match, the most specific (highest-priority) tier wins. Priority: heavy > medium > fast.
+- [x] Case-insensitive matching
+- [x] Word-boundary matching (e.g., "debug" in "debugging" should match; but only if pattern matches)
+- [x] Returns `null` when no pattern matches
+- [x] Gate check passes: `npx vitest run`
 
 **Tests**: unit (coverage: every keyword from tiers.json maps correctly; mixed keywords resolve to highest priority; no match returns null; case insensitive)
 **Gate**: quick
@@ -239,7 +240,7 @@ T5, T6 → T7
 
 ### T7: Implement Plugin Entry Point and Commands
 
-**What**: Wire all hooks in index.ts: config hook (registers tier agents + commands), system.transform (injects protocol), tool.execute.after (caps banners), experimental.text.complete (narration), and command.execute.before (/tiers, /budget)
+**What**: Wire all hooks in index.ts: config hook (registers tier agents + commands), system.transform (injects protocol), tool.execute.after (caps banners), experimental.text.complete (narration), and command.execute.before (/tiers, /budget, /router)
 **Where**: `src/index.ts`
 **Depends on**: T2, T3, T5, T6
 **Reuses**: All prior modules
@@ -251,18 +252,22 @@ T5, T6 → T7
 **Done when**:
 - [ ] Plugin exports default factory function `(ctx: PluginInput) => Plugin`
 - [ ] `config` hook registers three subagent agents (fast/medium/heavy) with models from tiers.json
-- [ ] `config` hook registers commands `/tiers` and `/budget` with descriptions and templates
-- [ ] `experimental.chat.system.transform` hook injects delegation protocol from protocol.ts — skips injection for subagent sessions
-- [ ] `tool.execute.after` hook calls capTracker.record() and appends banners to read-only tool results
-- [ ] `experimental.text.complete` hook calls detectNarration() and appends `[⚠ narration detected: "..."]` on match
-- [ ] `command.execute.before` hook dispatches `/tiers` (shows active config) and `/budget` (switches mode, persists via config.saveMode())
+- [ ] `config` hook registers commands `/tiers`, `/budget`, and `/router` with descriptions and templates
+- [ ] `experimental.chat.system.transform` hook injects delegation protocol from protocol.ts — skips injection for subagent sessions AND when router is disabled
+- [ ] `tool.execute.after` hook calls capTracker.record() and appends banners to read-only tool results — short-circuits when router disabled
+- [ ] `experimental.text.complete` hook calls detectNarration() and appends `[⚠ narration detected: "..."]` on match — short-circuits when router disabled
+- [ ] `command.execute.before` hook dispatches:
+  - `/tiers` — shows active config
+  - `/budget` — switches mode, persists via config.saveMode()
+  - `/router` — shows status (on/off); `/router on` re-enables; `/router off` disables all routing (hooks short-circuit with no side effects)
+- [ ] Router state (on/off) is a simple boolean in the plugin closure, no persistence needed — starts ON by default
 - [ ] All hooks wrapped in try/catch with `// best-effort: never crash a real session`
 - [ ] Build gate passes: `npx tsc --noEmit`
 - [ ] `npx vitest run` passes (existing tests from prior tasks)
 
 **Tests**: none (integration-level — needs OpenCode runtime)
 **Gate**: build
-**Commit**: `feat(opencode-tier-router): wire plugin entry point with all hooks and commands`
+**Commit**: `feat(opencode-tier-router): wire plugin entry point with all hooks, commands, and on/off toggle`
 
 ---
 
