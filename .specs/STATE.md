@@ -45,10 +45,10 @@
 ## Handoff
 
 - **Feature**: opencode-tier-router
-- **Phase / Task**: —
-- **Completed**: T1 (9b340e0), T2 (94ab478), T3 (bdf51ab), T4 (7c32b52), T5 (3217243), T6 (52f9ce7), T7 (91b0aef)
+- **Phase / Task**: Validation
+- **Completed**: T1–T7 + fixes for Copilot defaults, model validation, plugin entry tests, protocol rule test
 - **In-progress** (file:line): —
-- **Next step**: Run Verifier for feature-level validation
+- **Next step**: Re-run Verifier after fixes
 - **Blockers**: none
-- **Uncommitted files**: none
+- **Uncommitted files**: .specs/features/opencode-tier-router/validation.md (to be regenerated)
 - **Branch**: master
