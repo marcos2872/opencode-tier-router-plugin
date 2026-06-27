@@ -29,13 +29,14 @@ This project uses `tlc-spec-driven` skill (`.agents/skills/tlc-spec-driven/`).
 
 ```
 opencode-tier-router/
-├── tiers.json                 # Single config: tiers, modes, taskPatterns
+├── tiers.json                 # Single config: tiers, modes, taskPatterns, enforcement, routing
 ├── src/
 │   ├── index.ts               # Plugin entry: all hooks wired
 │   └── router/
 │       ├── config.ts          # Load/validate tiers.json, layered resolution
 │       ├── protocol.ts        # ~210 token delegation protocol
 │       ├── classifier.ts      # Keyword → tier classification
+│       ├── selector.ts        # keyword/llm routing selector + fallback chain
 │       └── caps.ts            # Cap tracker + redundancy detection
 ├── narration.ts               # Narration pattern detection
 └── test/                      # Unit tests per module
@@ -47,6 +48,7 @@ opencode-tier-router/
 - Single `tiers.json`, no separate state file, no provider presets
 - Routing via system prompt injection (~210 tokens), not a router model
 - Enforcement defaults to hard-block (`trivialDirectAllowed=true`), advisory available via config
+- Routing strategy defaults to `keyword`, optional `llm` selector with fallback (`llm -> keyword -> defaultTier`)
 - Config resolution: project `tiers.json` > `~/.config/opencode/tiers.json` > create in project dir
 
 ## Commands
@@ -70,6 +72,6 @@ npm run typecheck && npx vitest run
 
 ## Reference
 
-- OpenCode plugin API: `@opencode-ai/plugin` — hooks: `config`, `chat.system.transform`, `tool.execute.before/after`, `experimental.text.complete`, `command.execute.before`
-- Key hook order: `config → chat.message → chat.system.transform → chat.params`
+- OpenCode plugin API: `@opencode-ai/plugin` — hooks: `config`, `chat.message`, `chat.system.transform`, `permission.ask`, `tool.execute.before/after`, `experimental.text.complete`, `command.execute.before`
+- Key hook order used by plugin: `config → chat.message → chat.system.transform → permission.ask`
 - Every hook wrapped in `try/catch` with `// best-effort: never crash a real session`
