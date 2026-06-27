@@ -152,6 +152,8 @@ const tierRouterPlugin: Plugin = async (ctx) => {
   const capTracker = createCapTracker();
   const subagentSessions = new Set<string>();
   const hardBlockedSessions = new Map<string, TierName>();
+  const hardBlockReasons = new Map<string, string>();
+  const preferredTierSessions = new Map<string, TierName>();
   let enabled = true;
 
   return {
@@ -209,48 +211,59 @@ const tierRouterPlugin: Plugin = async (ctx) => {
         if (input.agent && isTierName(input.agent)) {
           subagentSessions.add(input.sessionID);
           hardBlockedSessions.delete(input.sessionID);
+          hardBlockReasons.delete(input.sessionID);
+          preferredTierSessions.delete(input.sessionID);
           return;
         }
 
         if (!enabled) {
           hardBlockedSessions.delete(input.sessionID);
+          hardBlockReasons.delete(input.sessionID);
+          preferredTierSessions.delete(input.sessionID);
           return;
         }
 
         const cfg = await loadConfig(ctx.directory);
-        if (cfg.enforcement.mode !== 'hard-block') {
-          hardBlockedSessions.delete(input.sessionID);
-          return;
-        }
-
         const mappedTier = input.agent ? AGENT_TIER_MAP[input.agent] : undefined;
-        if (mappedTier) {
-          if (mappedTier === 'fast' && cfg.enforcement.trivialDirectAllowed) {
-            hardBlockedSessions.delete(input.sessionID);
-            return;
-          }
-          hardBlockedSessions.set(input.sessionID, mappedTier);
-          return;
-        }
 
         const summaryText = `${output.message.summary?.title ?? ''}\n${output.message.summary?.body ?? ''}`.trim();
         const text = summaryText || messageText((output.parts ?? []) as Array<{ type?: string; text?: string }>);
         const explicitClassification = classifyTask(text, cfg.taskPatterns);
-        const defaultTier = cfg.modes[cfg.mode]?.defaultTier;
-        const fallbackTier = defaultTier && isTierName(defaultTier) ? defaultTier : null;
-        const classification = explicitClassification ?? (text.length > 0 ? fallbackTier : null);
+        const desiredTier = explicitClassification ?? mappedTier ?? null;
 
-        if (!classification) {
+        if (desiredTier) {
+          preferredTierSessions.set(input.sessionID, desiredTier);
+        } else {
+          preferredTierSessions.delete(input.sessionID);
+        }
+
+        if (cfg.enforcement.mode !== 'hard-block') {
           hardBlockedSessions.delete(input.sessionID);
+          hardBlockReasons.delete(input.sessionID);
           return;
         }
 
-        if (classification === 'fast' && cfg.enforcement.trivialDirectAllowed && isTrivialFastTask(text)) {
+        if (!desiredTier) {
           hardBlockedSessions.delete(input.sessionID);
+          hardBlockReasons.delete(input.sessionID);
           return;
         }
 
-        hardBlockedSessions.set(input.sessionID, classification);
+        if (desiredTier === 'fast' && cfg.enforcement.trivialDirectAllowed && isTrivialFastTask(text)) {
+          hardBlockedSessions.delete(input.sessionID);
+          hardBlockReasons.delete(input.sessionID);
+          return;
+        }
+
+        hardBlockedSessions.set(input.sessionID, desiredTier);
+        if (mappedTier && mappedTier !== desiredTier) {
+          hardBlockReasons.set(
+            input.sessionID,
+            `Current agent maps to @${mappedTier}, but this request was classified as @${desiredTier}. Redirect to @${desiredTier}.`,
+          );
+        } else {
+          hardBlockReasons.set(input.sessionID, `This request requires @${desiredTier}.`);
+        }
       } catch (err) {
         // best-effort: never crash a real session
         console.warn('[opencode-tier-router] chat.message hook failed:', err instanceof Error ? err.message : String(err));
@@ -267,10 +280,16 @@ const tierRouterPlugin: Plugin = async (ctx) => {
         output.system = output.system ?? [];
         output.system.push(protocol);
 
+        const preferredTier = input.sessionID ? preferredTierSessions.get(input.sessionID) : undefined;
+        if (preferredTier) {
+          output.system.push(`Routing hint: Preferred tier for this request is @${preferredTier}. Delegate to @${preferredTier} when not trivial.`);
+        }
+
         const tier = input.sessionID ? hardBlockedSessions.get(input.sessionID) : undefined;
         if (cfg.enforcement.mode === 'hard-block' && tier) {
+          const reason = input.sessionID ? hardBlockReasons.get(input.sessionID) : undefined;
           output.system.push(
-            `HARD-BLOCK: This request MUST be delegated to @${tier}. Do not execute tools directly in this session. Attempt delegation now. If direct execution is blocked, immediately delegate to @${tier}.`,
+            `HARD-BLOCK: This request MUST be delegated to @${tier}. Do not execute tools directly in this session. Attempt delegation now. If direct execution is blocked, immediately delegate to @${tier}.${reason ? ` ${reason}` : ''}`,
           );
         }
       } catch (err) {
@@ -348,10 +367,12 @@ const tierRouterPlugin: Plugin = async (ctx) => {
 
         if (command === 'tiers') {
           const cfg = await loadConfig(ctx.directory);
+          const preferredTier = preferredTierSessions.get(input.sessionID);
           const lines = [
             `Mode: ${cfg.mode} (${cfg.modes[cfg.mode]?.description ?? ''})`,
             `Enforcement: ${cfg.enforcement.mode} (trivial direct allowed: ${cfg.enforcement.trivialDirectAllowed ? 'yes' : 'no'})`,
             `Agent mapping: explore->@fast, build->@medium, general->@heavy, plan->@heavy`,
+            `Preferred tier (current session): ${preferredTier ? `@${preferredTier}` : 'none yet'}`,
             'Tiers:',
           ];
           for (const tier of TIER_NAMES) {

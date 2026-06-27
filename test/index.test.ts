@@ -147,8 +147,33 @@ describe('tierRouterPlugin', () => {
     const text = textOf(output.parts);
     expect(text).toContain('Mode: normal');
     expect(text).toContain('Agent mapping: explore->@fast, build->@medium, general->@heavy, plan->@heavy');
+    expect(text).toContain('Preferred tier (current session): none yet');
     expect(text).toContain('@fast:');
     expect(text).toContain('github-copilot/claude-haiku-4.5');
+  });
+
+  it('tracks preferred tier dynamically by intent, overriding mapped build tier when needed', async () => {
+    const plugin = await tierRouterPlugin(makeCtx(projectDir));
+    await plugin['chat.message']?.(
+      { sessionID: 's-dyn', agent: 'build' },
+      {
+        message: {
+          role: 'user',
+          id: 'm-dyn',
+          sessionID: 's-dyn',
+          time: { created: 0 },
+          agent: 'build',
+          model: { providerID: 'github-copilot', modelID: 'gpt-5.3-codex' },
+          summary: { title: 'find authentication code', diffs: [] },
+        },
+        parts: [{ type: 'text', text: 'find authentication code' } as unknown as TextPart],
+      },
+    );
+
+    const tiersOut = { parts: [] as TextPart[] };
+    await plugin['command.execute.before']?.({ command: '/tiers', sessionID: 's-dyn', arguments: '' }, tiersOut);
+    const text = textOf(tiersOut.parts);
+    expect(text).toContain('Preferred tier (current session): @fast');
   });
 
   it('/budget lists modes with active one highlighted', async () => {
@@ -309,9 +334,9 @@ describe('tierRouterPlugin', () => {
           time: { created: 0 },
           agent: 'build',
           model: { providerID: 'github-copilot', modelID: 'gpt-5.3-codex' },
-          summary: { title: 'analyze code quality thoroughly', diffs: [] },
+          summary: { title: 'debug authentication flow thoroughly', diffs: [] },
         },
-        parts: [{ type: 'text', text: 'analyze code quality thoroughly' } as unknown as TextPart],
+        parts: [{ type: 'text', text: 'debug authentication flow thoroughly' } as unknown as TextPart],
       },
     );
 
