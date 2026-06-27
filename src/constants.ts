@@ -1,83 +1,83 @@
-/** Delegation protocol size in tokens */
+/** Tamanho do protocolo de delegação em tokens */
 export const TOKEN_PROTOCOL_SIZE = 210;
 
-/** Maximum session cache entries in memory */
+/** Número máximo de entradas de cache de sessão na memória */
 export const LRU_MAX_SESSIONS = 100;
 
-/** Session TTL before eviction (in minutes) */
+/** TTL de sessão antes da evicção (em minutos) */
 export const SESSION_TTL_MINUTES = 30;
 
-/** Maximum orphan events in buffer before cleanup */
+/** Número máximo de eventos órfãos no buffer antes da limpeza */
 export const ORPHAN_BUFFER_SIZE = 10000;
 
-/** Cleanup interval for orphan buffer (milliseconds) */
+/** Intervalo de limpeza do buffer de eventos órfãos (em milissegundos) */
 export const CLEANUP_INTERVAL_MS = 10 * 1000;
 
-/** Maximum history files to keep on disk */
+/** Número máximo de arquivos de histórico para manter em disco */
 export const MAX_HISTORY_FILES = 50;
 
-/** Maximum history days to keep on disk */
+/** Número máximo de dias de histórico para manter em disco */
 export const MAX_HISTORY_DAYS = 30;
 
-/** Cost divisor (tokens per thousand) */
+/** Divisor de custo (tokens por mil) */
 export const COST_DIVISOR = 1000;
 
-/** Maximum JSON input size for safe parsing (1MB) */
+/** Tamanho máximo de entrada JSON para análise segura (1MB) */
 export const MAX_JSON_SIZE = 1024 * 1024;
 
-/** Default cost per 1K input tokens (USD) */
+/** Custo padrão por 1K tokens de entrada (USD) */
 export const DEFAULT_INPUT_COST_PER_1K = 0.0015;
 
-/** Default cost per 1K output tokens (USD) */
+/** Custo padrão por 1K tokens de saída (USD) */
 export const DEFAULT_OUTPUT_COST_PER_1K = 0.006;
 
-/** Trivial fast task max length */
+/** Comprimento máximo para tarefas rápidas triviais */
 export const TRIVIAL_TASK_MAX_LENGTH = 120;
 
-/** Cap warning threshold (%) */
+/** Limiar de aviso do cap (%) */
 export const CAP_WARNING_THRESHOLD = 80;
 
-/** Cap warning threshold in remaining calls */
+/** Limiar de aviso do cap em chamadas restantes */
 export const CAP_WARNING_REMAINING_THRESHOLD = 2;
 
-/** Default max cap per tier */
+/** Cap máximo padrão por tier */
 export const DEFAULT_TIER_CAP = 8;
 
-/** Default fast tier cost ratio */
+/** Razão de custo padrão do tier fast */
 export const DEFAULT_FAST_COST_RATIO = 1;
 
-/** Default medium tier cost ratio */
+/** Razão de custo padrão do tier medium */
 export const DEFAULT_MEDIUM_COST_RATIO = 5;
 
-/** Default heavy tier cost ratio */
+/** Razão de custo padrão do tier heavy */
 export const DEFAULT_HEAVY_COST_RATIO = 20;
 
-/** Default medium tier cap */
+/** Cap padrão do tier medium */
 export const DEFAULT_MEDIUM_TIER_CAP = 12;
 
-/** Default heavy tier cap */
+/** Cap padrão do tier heavy */
 export const DEFAULT_HEAVY_TIER_CAP = 20;
 
-/** Fast tier maximum token threshold */
+/** Limite máximo de tokens do tier fast */
 export const FAST_TIER_MAX_TOKENS = 2000;
 
-/** Medium tier maximum token threshold */
+/** Limite máximo de tokens do tier medium */
 export const MEDIUM_TIER_MAX_TOKENS = 10000;
 
-/** Heavy tier minimum token threshold */
+/** Limite mínimo de tokens do tier heavy */
 export const HEAVY_TIER_MIN_TOKENS = 10000;
 
-/** Orphan max retry attempts */
+/** Tentativas máximas de retry de eventos órfãos */
 export const ORPHAN_MAX_ATTEMPTS = 5;
 
-/** Orphan retry interval (milliseconds) */
+/** Intervalo de retry de eventos órfãos (em milissegundos) */
 export const ORPHAN_RETRY_INTERVAL_MS = 1000;
 
-/** Orphan max wait time (milliseconds) */
+/** Tempo máximo de espera de eventos órfãos (em milissegundos) */
 export const ORPHAN_MAX_WAIT_MS = 5000;
 
-/** Minutes per hour */
+/** Minutos por hora */
 export const MINUTES_PER_HOUR = 60;
 
-/** Milliseconds per minute */
+/** Milissegundos por minuto */
 export const MILLISECONDS_PER_MINUTE = 1000;

@@ -1,9 +1,9 @@
 /**
- * opencode-tier-router — Plugin entry point
+ * opencode-tier-router — Ponto de entrada do plugin
  *
- * Thin wrapper that creates the plugin and delegates all hook
- * orchestration to PluginOrchestrator. Kept intentionally small
- * for SRP compliance — all business logic lives in dedicated modules.
+ * Função wrapper fina que cria o plugin e delega toda a orquestração de hooks
+ * para o PluginOrchestrator. Mantida intencionalmente pequena para cumprir SRP
+ * — toda a lógica de negócio está em módulos dedicados.
  */
 
 import { homedir } from 'node:os';
@@ -94,11 +94,11 @@ async function loadConfig(projectDir: string): Promise<RouterConfig> {
 }
 
 /**
- * Create the OpenCode tier routing plugin.
+ * Cria o plugin de roteamento de tiers do OpenCode.
  *
- * The plugin wires configuration, message routing, system prompt injection,
- * permission denial, token tracking, narration detection, and token commands.
- * All hooks run best-effort and never throw into the host session.
+ * O plugin conecta configuração, roteamento de mensagens, injeção de prompt do sistema,
+ * negação de permissão, rastreamento de tokens, detecção de narração e comandos de tokens.
+ * Todos os hooks rodam com melhor esforço e nunca lançam exceções para a sessão do host.
  */
 const tierRouterPlugin: Plugin = async (ctx) => {
   const cfg = await loadConfig(ctx.directory);

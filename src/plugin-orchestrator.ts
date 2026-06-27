@@ -1,13 +1,13 @@
 /**
- * PluginOrchestrator — Hook orchestration layer
+ * PluginOrchestrator — Camada de orquestração de hooks
  *
- * Responsibility: Wire all plugin hooks and manage shared state.
- * Extracted from index.ts to respect SRP (index.ts is now a thin wrapper).
+ * Responsabilidade: Conectar todos os hooks do plugin e gerenciar estado compartilhado.
+ * Extraído de index.ts para respeitar SRP (index.ts agora é apenas um wrapper fino).
  *
- * State managed here:
+ * Estado gerenciado aqui:
  * - capTracker, subagentSessions, hardBlockedSessions
  * - preferredTierSessions, selectionSourceSessions
- * - TokenTracker lifecycle
+ * - ciclo de vida do TokenTracker
  */
 
 import { join } from 'node:path';
@@ -61,21 +61,21 @@ interface ToolExecuteOutput {
 }
 
 /**
- * Narrow a string to the set of known tier names.
+ * Restringe uma string ao conjunto de nomes de tier conhecidos.
  */
 function isTierName(name: string): name is TierName {
   return (TIER_NAMES as readonly string[]).includes(name);
 }
 
 /**
- * Check whether tool output contains usage or response data.
+ * Verifica se a saída da ferramenta contém dados de uso ou de resposta.
  */
 function isToolOutputWithUsage(out: unknown): out is ToolExecuteOutput {
   return out !== null && typeof out === 'object' && ('usage' in out || 'output' in out);
 }
 
 /**
- * Detect whether a task is both fast and trivial enough to allow direct execution.
+ * Detecta se uma tarefa é rápida e trivial o bastante para permitir execução direta.
  */
 function isTrivialFastTask(text: string): boolean {
   const compact = text.toLowerCase().trim();
@@ -84,7 +84,7 @@ function isTrivialFastTask(text: string): boolean {
 }
 
 /**
- * Extract readable text from OpenCode message parts.
+ * Extrai texto legível das partes de mensagem do OpenCode.
  */
 function messageText(parts: Array<{ type?: string; text?: string }>): string {
   return parts
@@ -95,7 +95,7 @@ function messageText(parts: Array<{ type?: string; text?: string }>): string {
 }
 
 /**
- * Create a text command output part for OpenCode command hooks.
+ * Cria uma parte de saída de comando de texto para hooks de comando do OpenCode.
  */
 function makeTextPart(sessionID: string, text: string): TextPart {
   const id = `cmd-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -109,11 +109,11 @@ function makeTextPart(sessionID: string, text: string): TextPart {
 }
 
 /**
- * PluginOrchestrator — Central hub for all plugin hook handlers.
+ * PluginOrchestrator — Hub central para todos os handlers de hooks do plugin.
  *
- * Encapsulates shared session state, TokenTracker lifecycle, and
- * delegates to the appropriate router modules. All methods are
- * best-effort and never throw into the OpenCode host session.
+ * Encapsula estado compartilhado de sessões, ciclo de vida do TokenTracker e
+ * delega para os módulos de roteamento apropriados. Todos os métodos rodam com
+ * melhor esforço e nunca lançam exceções para a sessão do host do OpenCode.
  */
 export class PluginOrchestrator {
   private capTracker = createCapTracker();
@@ -131,7 +131,7 @@ export class PluginOrchestrator {
   ) {}
 
   /**
-   * Initialize the token tracker for this plugin instance.
+   * Inicializa o rastreador de tokens para esta instância do plugin.
    */
   async initialize(): Promise<void> {
     try {
@@ -147,7 +147,7 @@ export class PluginOrchestrator {
   }
 
   /**
-   * Load router config for a project, using defaults when config is missing.
+   * Carrega a configuração do roteador para um projeto, usando padrões quando a configuração estiver ausente.
    */
   private async loadConfig(): Promise<RouterConfig> {
     // Provided via constructor from outer context
@@ -157,7 +157,7 @@ export class PluginOrchestrator {
   // ─── Hook Handlers ──────────────────────────────────────────
 
   /**
-   * Configure OpenCode agents, modes, and commands for tier routing.
+   * Configura agentes, modos e comandos do OpenCode para roteamento de tiers.
    */
   async handleConfig(input: Config): Promise<void> {
     try {
@@ -231,7 +231,7 @@ export class PluginOrchestrator {
   }
 
   /**
-   * Classify incoming chat messages and track routing decisions.
+   * Classifica mensagens de chat recebidas e rastreia decisões de roteamento.
    */
   async handleChatMessage(input: { agent?: string; sessionID: string }, output: { message: { summary?: { title?: string; body?: string } }; parts?: unknown[] }): Promise<void> {
     try {
@@ -301,7 +301,7 @@ export class PluginOrchestrator {
   }
 
   /**
-   * Inject delegation protocol and hard-block hints into the system prompt.
+   * Injeta protocolo de delegação e dicas de hard-block no prompt do sistema.
    */
   async handleSystemTransform(input: { sessionID?: string }, output: { system?: string[] }): Promise<void> {
     try {
@@ -334,7 +334,7 @@ export class PluginOrchestrator {
   }
 
   /**
-   * Deny direct execution permissions when a hard-block is active.
+   * Recusa permissões de execução direta quando um hard-block estiver ativo.
    */
   async handlePermissionAsk(input: { sessionID?: string; type?: string }, output: { status?: string }): Promise<void> {
     try {
@@ -353,7 +353,7 @@ export class PluginOrchestrator {
   }
 
   /**
-   * Capture token usage after tool execution and update cap banners.
+   * Captura uso de tokens após a execução de uma ferramenta e atualiza avisos de limite.
    */
   async handleToolExecuteAfter(input: { sessionID?: string; tool: string; args?: Record<string, unknown> }, output: ToolExecuteOutput & { output?: string }): Promise<void> {
     try {
@@ -423,7 +423,7 @@ export class PluginOrchestrator {
   }
 
   /**
-   * Detect narration in text completion output.
+   * Detecta narração na saída de conclusão de texto.
    */
   async handleTextComplete(_input: unknown, output: { text: string }): Promise<void> {
     try {
@@ -439,7 +439,7 @@ export class PluginOrchestrator {
   }
 
   /**
-   * Handle router and token tracking commands before they reach OpenCode.
+   * Lida com comandos de roteador e rastreamento de tokens antes que eles alcancem o OpenCode.
    */
   async handleCommandExecuteBefore(input: { sessionID: string; command: string; arguments: string }, output: { parts?: TextPart[] }): Promise<void> {
     try {
