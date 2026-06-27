@@ -1,8 +1,8 @@
 /**
- * Filesystem Storage — Adapter Layer
+ * Armazenamento em Arquivo — Camada de Adaptador
  *
- * Responsibility: Implement MetricsStorage using Node.js fs/promises
- * Production implementation for persisting metrics to disk
+ * Responsabilidade: Implementar MetricsStorage usando Node.js fs/promises
+ * Implementação de produção para persistir métricas em disco
  */
 
 import { mkdir, writeFile, readFile, readdir, unlink, stat } from 'node:fs/promises';
@@ -12,7 +12,7 @@ import type { MetricsStorage } from './metrics-storage.js';
 /**
  * FilesystemStorage
  *
- * Production implementation: writes/reads files from filesystem.
+ * Implementação de produção: grava/le arquivos do sistema de arquivos.
  */
 export class FilesystemStorage implements MetricsStorage {
   async save(filename: string, content: string): Promise<void> {

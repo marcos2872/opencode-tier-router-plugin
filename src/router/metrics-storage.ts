@@ -1,44 +1,44 @@
 /**
- * Metrics Storage — Port/Interface Layer
+ * Armazenamento de Métricas — Camada de Porta/Interface
  *
- * Responsibility: Define abstraction for persistence I/O
- * ✅ Dependency Inversion: Implementations depend on this interface
- * Allows swapping filesystem for in-memory storage in tests
+ * Responsabilidade: Definir abstração para I/O de persistência
+ * ✅ Inversão de Dependência: Implementações dependem desta interface
+ * Permite alternar armazenamento em arquivo por armazenamento em memória em testes
  */
 
 /**
- * MetricsStorage interface
+ * Interface MetricsStorage
  *
- * Abstracts all I/O operations for persisting and loading metrics.
- * Implementations (FilesystemStorage, InMemoryStorage) are in separate modules.
+ * Abstrai todas as operações de I/O para persistir e carregar métricas.
+ * Implementações (FilesystemStorage, InMemoryStorage) ficam em módulos separados.
  */
 export interface MetricsStorage {
   /**
-   * Save content to a file at the given path.
-   * Create directory recursively if needed.
+   * Salva conteúdo em um arquivo no caminho fornecido.
+   * Cria diretórios recursivamente se necessário.
    */
   save(filename: string, content: string): Promise<void>;
 
   /**
-   * Load content from a file at the given path.
-   * Return empty string if file doesn't exist.
+   * Carrega conteúdo de um arquivo no caminho fornecido.
+   * Retorna string vazia se o arquivo não existir.
    */
   load(filename: string): Promise<string>;
 
   /**
-   * List files in a directory matching a pattern.
-   * Return empty array if directory doesn't exist.
+   * Lista arquivos em um diretório que correspondem a um padrão.
+   * Retorna array vazio se o diretório não existir.
    */
   listFiles(dir: string): Promise<string[]>;
 
   /**
-   * Delete a file at the given path.
-   * No-op if file doesn't exist.
+   * Remove um arquivo no caminho fornecido.
+   * Sem ação se o arquivo não existir.
    */
   delete(filename: string): Promise<void>;
 
   /**
-   * Check if a file exists at the given path.
+   * Verifica se um arquivo existe no caminho fornecido.
    */
   exists(filename: string): Promise<boolean>;
 }

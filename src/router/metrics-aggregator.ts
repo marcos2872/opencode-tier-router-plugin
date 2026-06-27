@@ -1,144 +1,144 @@
 /**
- * Metrics Aggregator — Domain Layer
+ * Agregador de Métricas — Camada de Domínio
  *
- * Responsibility: Aggregate TokenRecords into SessionTokenSummary
- * Calculate tier accuracy based on actual token usage
- * Zero I/O, pure business logic
+ * Responsabilidade: Agregar TokenRecords em SessionTokenSummary
+ * Calcula a precisão do tier com base no uso real de tokens
+ * Sem I/O, lógica de negócio pura
  */
 
 import type { TokenRecord, TokenUsage } from './token-event-parser.js';
 import type { RouterConfig, TierName } from './config.js';
 
 /**
- * Tier accuracy grade calculated from token usage and config thresholds.
+ * Grau de precisão do tier calculado a partir do uso de tokens e dos limites da config.
  */
 export type TierAccuracy = 'OPTIMAL' | 'RIGHT' | 'ACCEPTABLE' | 'SUBOPTIMAL' | 'OVERSHOT' | 'UNKNOWN';
 
 /**
- * Accuracy breakdown by grade, expressed as percentages.
+ * Divisão da precisão por grau, expressa em porcentagens.
  */
 export interface AccuracyBreakdown {
   /**
-   * Percentage of records classified as optimal.
+   * Percentual de registros classificados como optimal.
    */
   optimal: number;
 
   /**
-   * Percentage of records classified as right-tier fits.
+   * Percentual de registros classificados como ajustes adequados ao tier.
    */
   right: number;
 
   /**
-   * Percentage of records classified as acceptable overages or small tasks.
+   * Percentual de registros classificados como excedentes aceitáveis ou pequenas tarefas.
    */
   acceptable: number;
 
   /**
-   * Percentage of records classified as under-provisioned tiers.
+   * Percentual de registros classificados como tiers subdimensionados.
    */
   suboptimal: number;
 
   /**
-   * Percentage of records classified as overshot tiers.
+   * Percentual de registros classificados como tiers superdimensionados.
    */
   overshot: number;
 }
 
 /**
- * Aggregated metrics for one token tracking session.
+ * Métricas agregadas para uma sessão de rastreamento de tokens.
  */
 export interface SessionTokenSummary {
   /**
-   * OpenCode session ID.
+   * ID da sessão OpenCode.
    */
   sessionId: string;
 
   /**
-   * Token records included in this summary.
+   * Registros de tokens incluídos neste resumo.
    */
   records: TokenRecord[];
 
   /**
-   * Earliest captured step timestamp in the session.
+   * Primeira marca temporal capturada da etapa na sessão.
    */
   startTime: number;
 
   /**
-   * Latest captured step timestamp in the session.
+   * Última marca temporal capturada da etapa na sessão.
    */
   endTime: number;
 
   /**
-   * Total input tokens.
+   * Total de tokens de entrada.
    */
   totalInputTokens: number;
 
   /**
-   * Total output tokens.
+   * Total de tokens de saída.
    */
   totalOutputTokens: number;
 
   /**
-   * Total reasoning tokens.
+   * Total de tokens de raciocínio.
    */
   totalReasoningTokens: number;
 
   /**
-   * Total cache read tokens.
+   * Total de tokens de leitura em cache.
    */
   totalCacheCost: number;
 
   /**
-   * Total actual cost.
+   * Custo real total.
    */
   totalCostReal: number;
 
   /**
-   * Accuracy breakdown by grade.
+   * Divisão da precisão por grau.
    */
   accuracyBreakdown: AccuracyBreakdown;
 
   /**
-   * Average input token estimation error percentage.
+   * Erro percentual médio de estimativa de tokens de entrada.
    */
   averageInputEstimationError: number;
 
   /**
-   * Average output token estimation error percentage.
+   * Erro percentual médio de estimativa de tokens de saída.
    */
   averageOutputEstimationError: number;
 
   /**
-   * Cost saved compared with the medium/default baseline.
+   * Custo economizado em comparação com a baseline média/default.
    */
   costSavedVsDefault: number;
 
   /**
-   * Cost saved compared with the heavy baseline.
+   * Custo economizado em comparação com a baseline heavy.
    */
   costSavedVsHeavy: number;
 
   /**
-   * Average observed cost ratio for delegated tiers.
+   * Proporção de custo real média para tiers delegados.
    */
   averageActualCostRatio: number;
 }
 
 /**
- * MetricsAggregator interface
+ * Interface MetricsAggregator
  *
- * Port: abstraction for aggregation logic and accuracy calculation.
- * Allows testing with mock implementations.
+ * Porta: abstração para lógica de agregação e cálculo de precisão.
+ * Permite testes com implementações mock.
  */
 export interface MetricsAggregator {
    /**
-    * Calculate tier accuracy based on actual token usage and delegated tier.
-    * Uses thresholds from config.
+    * Calcula a precisão do tier com base no uso real de tokens e no tier delegado.
+    * Usa limites da config.
     *
-    * @param totalTokens - Total token count to classify.
-    * @param tier - Tier to classify.
-    * @param cfg - Router config containing tier thresholds.
-    * @returns Tier accuracy grade.
+    * @param totalTokens - Quantidade total de tokens a classificar.
+    * @param tier - Tier a classificar.
+    * @param cfg - Configuração do roteador contendo os limites do tier.
+    * @returns Grau de precisão do tier.
     */
    calculateTierAccuracy(
     totalTokens: number,
@@ -147,11 +147,11 @@ export interface MetricsAggregator {
   ): TierAccuracy;
 
    /**
-    * Aggregate all records from a session into a summary with metrics.
+    * Agrega todos os registros de uma sessão em um resumo com métricas.
     *
-    * @param records - Token records to aggregate.
-    * @param cfg - Router config containing tier cost ratios.
-    * @returns Aggregated session summary.
+    * @param records - Registros de tokens a serem agregados.
+    * @param cfg - Configuração do roteador contendo as proporções de custo do tier.
+    * @returns Resumo da sessão agregada.
     */
    aggregateSessionMetrics(records: TokenRecord[], cfg: RouterConfig): SessionTokenSummary;
 }
@@ -159,16 +159,16 @@ export interface MetricsAggregator {
 /**
  * DefaultMetricsAggregator
  *
- * Reference implementation: standard aggregation and accuracy calculation.
+ * Implementação de referência: agregação e cálculo de precisão padrão.
  */
 export class DefaultMetricsAggregator implements MetricsAggregator {
   /**
-   * Calculate tier accuracy based on total tokens and configured thresholds.
+   * Calcula a precisão do tier com base no total de tokens e nos limites configurados.
    *
-   * @param totalTokens - Total token count to classify.
-   * @param tier - Tier to classify.
-   * @param cfg - Router config containing tier thresholds.
-   * @returns Tier accuracy grade.
+   * @param totalTokens - Quantidade total de tokens a classificar.
+   * @param tier - Tier a classificar.
+   * @param cfg - Configuração do roteador contendo os limites do tier.
+   * @returns Grau de precisão do tier.
    * @example
    * ```ts
    * const accuracy = aggregator.calculateTierAccuracy(5000, 'medium', config);
@@ -203,11 +203,11 @@ export class DefaultMetricsAggregator implements MetricsAggregator {
   }
 
   /**
-   * Aggregate token records into a session summary with cost and accuracy metrics.
+   * Agrega registros de tokens em um resumo de sessão com métricas de custo e precisão.
    *
-   * @param records - Token records to aggregate.
-   * @param cfg - Router config containing tier cost ratios.
-   * @returns Aggregated session summary.
+   * @param records - Registros de tokens a serem agregados.
+   * @param cfg - Configuração do roteador contendo as proporções de custo do tier.
+   * @returns Resumo da sessão agregada.
    * @example
    * ```ts
    * const summary = aggregator.aggregateSessionMetrics(records, config);

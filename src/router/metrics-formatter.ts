@@ -1,9 +1,9 @@
 /**
- * Metrics Formatter — Presentation Layer
+ * Formatação de Métricas — Camada de Apresentação
  *
- * Responsibility: Format SessionTokenSummary for display
- * ✅ OCP: Add new formats without modifying domain logic
- * Strategies: Markdown (MVP), can extend to CSV, JSON later
+ * Responsabilidade: Formatar SessionTokenSummary para exibição
+ * ✅ OCP: Adicionar novos formatos sem modificar a lógica de domínio
+ * Estratégias: Markdown (MVP), pode estender para CSV, JSON mais adiante
  */
 
 import type { SessionTokenSummary } from './metrics-aggregator.js';
@@ -11,23 +11,23 @@ import type { PersistedTokenSession } from './token-tracker.js';
 import type { TierName } from './config.js';
 
 /**
- * MetricsFormatter interface
+ * Interface MetricsFormatter
  *
- * Abstraction for formatting metrics into various output formats.
+ * Abstração para formatar métricas em vários formatos de saída.
  */
 export interface MetricsFormatter {
   /**
-   * Format session summary as report string (markdown, csv, json, etc).
+   * Formata o resumo da sessão como string de relatório (Markdown, CSV, JSON etc).
    */
   formatReport(summary: SessionTokenSummary): string;
 
   /**
-   * Format list of persisted sessions as history string.
+   * Formata lista de sessões persistidas como string de histórico.
    */
   formatHistory(sessions: PersistedTokenSession[]): string;
 
   /**
-   * Format comparison: what if all delegations went to a different tier?
+   * Formata comparação: e se todas as delegações fossem para outro tier?
    */
   formatComparison(summary: SessionTokenSummary, compareTier: TierName): string;
 }
@@ -35,8 +35,8 @@ export interface MetricsFormatter {
 /**
  * MarkdownMetricsFormatter
  *
- * Reference implementation: formats as GitHub-flavored markdown.
- * Human-readable, renders nicely in chat interfaces.
+ * Implementação de referência: formata como Markdown compatível com GitHub.
+ * Legível por humanos, renderiza bem em interfaces de chat.
  */
 export class MarkdownMetricsFormatter implements MetricsFormatter {
   formatReport(summary: SessionTokenSummary): string {

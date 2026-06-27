@@ -1,8 +1,8 @@
 /**
- * In-Memory Storage — Adapter Layer
+ * Armazenamento em Memória — Camada de Adaptador
  *
- * Responsibility: Implement MetricsStorage using in-memory Map
- * Test implementation for unit testing without I/O
+ * Responsabilidade: Implementar MetricsStorage usando Map em memória
+ * Implementação de teste para testes unitários sem I/O
  */
 
 import type { MetricsStorage } from './metrics-storage.js';
@@ -10,8 +10,8 @@ import type { MetricsStorage } from './metrics-storage.js';
 /**
  * InMemoryStorage
  *
- * Test implementation: stores everything in memory.
- * Perfect for unit tests (fast, deterministic, no I/O).
+ * Implementação de teste: armazena tudo em memória.
+ * Perfeita para testes unitários (rápida, determinística, sem I/O).
  */
 export class InMemoryStorage implements MetricsStorage {
   private files: Map<string, string> = new Map();
@@ -37,14 +37,14 @@ export class InMemoryStorage implements MetricsStorage {
   }
 
   /**
-   * Test helper: get all files (for assertions in tests)
+   * Função auxiliar de teste: obtém todos os arquivos (para assertivas em testes)
    */
   getAllFiles(): Map<string, string> {
     return new Map(this.files);
   }
 
   /**
-   * Test helper: clear all files (for test isolation)
+   * Função auxiliar de teste: limpa todos os arquivos (para isolamento de testes)
    */
   clear(): void {
     this.files.clear();
