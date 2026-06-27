@@ -1,4 +1,4 @@
-# Contributing to opencode-tier-router
+# Contributing to opencode-tier-router-plugin
 
 ## Getting Started
 

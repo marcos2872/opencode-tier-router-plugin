@@ -1,5 +1,5 @@
 {
-  "name": "opencode-tier-router",
+  "name": "opencode-tier-router-plugin",
   "version": "0.1.0",
   "type": "module",
   "description": "OpenCode plugin that routes tasks to the cheapest adequate model tier",

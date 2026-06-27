@@ -1,8 +1,8 @@
-# opencode-tier-router — Documentação do Projeto
+# opencode-tier-router-plugin — Documentação do Projeto
 
 ## Visão Geral
 
-O **opencode-tier-router** é um plugin para OpenCode que implementa **roteamento inteligente de tarefas** para diferentes tiers de modelos de linguagem (`@fast`, `@medium`, `@heavy`) com o objetivo de **reduzir custos operacionais mantendo a qualidade das respostas**.
+O **opencode-tier-router-plugin** é um plugin para OpenCode que implementa **roteamento inteligente de tarefas** para diferentes tiers de modelos de linguagem (`@fast`, `@medium`, `@heavy`) com o objetivo de **reduzir custos operacionais mantendo a qualidade das respostas**.
 
 O plugin classifica automaticamente o tipo de tarefa solicitada pelo usuário e direciona para o modelo mais adequado e econômico, sem necessidade de infraestrutura externa (proxies, agentes dedicados ou routers separados).
 
@@ -28,7 +28,7 @@ O plugin classifica automaticamente o tipo de tarefa solicitada pelo usuário e 
 ## Estrutura de Pastas
 
 ```
-opencode-tier-router/
+opencode-tier-router-plugin/
 ├── .agents/                   # Skills TLC (tlc-spec-driven)
 ├── .specs/                    # Especificações e decisões arquiteturais
 │   ├── STATE.md               # Decisões ativas (AD-001 a AD-006)

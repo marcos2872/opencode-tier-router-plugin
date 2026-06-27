@@ -1,4 +1,4 @@
-# opencode-tier-router
+# opencode-tier-router-plugin
 
 🚀 **Plugin para OpenCode** que faz **roteamento inteligente por tiers de modelo** (`@fast`, `@medium`, `@heavy`) com base no tipo de tarefa + **rastreamento real de uso de tokens**.
 

@@ -1,5 +1,5 @@
 /**
- * opencode-tier-router — Ponto de entrada do plugin
+ * opencode-tier-router-plugin — Ponto de entrada do plugin
  *
  * Função wrapper fina que cria o plugin e delega toda a orquestração de hooks
  * para o PluginOrchestrator. Mantida intencionalmente pequena para cumprir SRP

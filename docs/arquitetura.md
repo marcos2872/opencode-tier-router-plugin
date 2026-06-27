@@ -1,8 +1,8 @@
-# opencode-tier-router — Arquitetura
+# opencode-tier-router-plugin — Arquitetura
 
 ## Visão Arquitetural
 
-O **opencode-tier-router** é implementado como um **plugin OpenCode** que intercepta hooks do ciclo de vida de chat e execução de ferramentas para realizar **roteamento inteligente baseado em tiers de modelos**.
+O **opencode-tier-router-plugin** é implementado como um **plugin OpenCode** que intercepta hooks do ciclo de vida de chat e execução de ferramentas para realizar **roteamento inteligente baseado em tiers de modelos**.
 
 A arquitetura segue os princípios de:
 
@@ -127,7 +127,7 @@ As decisões arquiteturais estão documentadas em `.specs/STATE.md`. Resumo das 
 ```mermaid
 graph TD
     subgraph OpenCode["OpenCode Host"]
-        subgraph Plugin["opencode-tier-router (Plugin)"]
+        subgraph Plugin["opencode-tier-router-plugin (Plugin)"]
             Index["src/index.ts<br/>━━━━━━━━━━━━━━━<br/>• Hooks: config, chat.message,<br/>  system.transform, permission.ask,<br/>  tool.execute.before/after<br/>• Comandos: /tiers, /budget, /router,<br/>  /token-report, /token-history,<br/>  /token-compare<br/>• Estado: config, capTracker, routerOn"]
 
             Orchestrator["src/plugin-orchestrator.ts<br/>━━━━━━━━━━━━━━━<br/>• Hook orchestration<br/>• Chat message handling<br/>• Subagent session tracking"]

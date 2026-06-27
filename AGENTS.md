@@ -1,4 +1,4 @@
-# AGENTS.md — opencode-tier-router
+# AGENTS.md — opencode-tier-router-plugin
 
 ## First rule
 
@@ -28,7 +28,7 @@ This project uses `tlc-spec-driven` skill (`.agents/skills/tlc-spec-driven/`).
 ## Project structure
 
 ```
-opencode-tier-router/
+opencode-tier-router-plugin/
 ├── tiers.json                 # Single config: tiers, modes, taskPatterns, enforcement, routing, tokenTracking
 ├── src/
 │   ├── index.ts               # Plugin entry: all hooks wired (config, chat.message, chat.system.transform, tool.execute.after, command.execute.before)
