@@ -24,6 +24,21 @@ const AGENT_TIER_MAP: Record<string, TierName> = {
   plan: 'heavy',
 };
 
+interface ToolExecuteOutput {
+  usage?: {
+    inputTokens?: number;
+    outputTokens?: number;
+    reasoningTokens?: number;
+    cacheReadTokens?: number;
+    cacheWriteTokens?: number;
+    input?: number;
+    output?: number;
+    reasoning?: number;
+    cache?: { read?: number; write?: number };
+  };
+  output?: string;
+}
+
 const FALLBACK_CONFIG: RouterConfig = {
   mode: 'normal',
   tiers: {
@@ -145,6 +160,10 @@ function isTrivialFastTask(text: string): boolean {
 
 function isTierName(name: string): name is TierName {
   return (TIER_NAMES as readonly string[]).includes(name);
+}
+
+function isToolOutputWithUsage(out: unknown): out is ToolExecuteOutput {
+  return out !== null && typeof out === 'object' && ('usage' in out || 'output' in out);
 }
 
 function globalConfigDir(): string {
@@ -418,7 +437,12 @@ const tierRouterPlugin: Plugin = async (ctx) => {
 
         // FASE5: Record token usage for tracking
         if (tokenTracker) {
-          const out = output as any;
+          let out: ToolExecuteOutput;
+          if (isToolOutputWithUsage(output)) {
+            out = output;
+          } else {
+            out = {};
+          }
           let usage = out.usage;
           if (!usage && out.output) {
             // Try to extract usage from output string (if JSON-encoded)
