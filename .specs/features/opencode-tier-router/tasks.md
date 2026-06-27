@@ -9,7 +9,7 @@ Implement these tasks with the `tlc-spec-driven` skill: **activate it by name an
 ---
 
 **Design**: (skipped — Medium scope, architecture inline in AD entries on STATE.md)
-**Status**: Draft | Approved | In Progress | Done
+**Status**: Done
 
 ---
 
