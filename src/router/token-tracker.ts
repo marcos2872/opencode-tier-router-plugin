@@ -60,9 +60,13 @@ export interface PersistedTokenSession {
  * Stores active sessions. When evicted (LRU or TTL), sessions are persisted to disk.
  */
 class SessionCache {
+  /**
+   * Internal storage using Map which preserves insertion order.
+   * Map.delete(key) + Map.set(key, value) moves an entry to the end in O(1).
+   * The first entry in iteration order is the least recently used (LRU).
+   */
   private cache: Map<string, { summary: SessionTokenSummary; lastAccess: number; delegationCount: number }> =
     new Map();
-  private accessOrder: string[] = []; // Track LRU order
   private isEvictionLocked = false;
 
   constructor(
@@ -73,15 +77,15 @@ class SessionCache {
   set(sessionId: string, summary: SessionTokenSummary, delegationCount: number): void {
     const existing = this.cache.get(sessionId);
     if (existing) {
-      // Update and touch LRU
+      // Update and touch LRU — delete + set moves to end (O(1))
       existing.summary = summary;
       existing.lastAccess = Date.now();
       existing.delegationCount = delegationCount;
-      this.touchLRU(sessionId);
+      this.cache.delete(sessionId);
+      this.cache.set(sessionId, existing);
     } else {
-      // New session
+      // New session — set adds at end
       this.cache.set(sessionId, { summary, lastAccess: Date.now(), delegationCount });
-      this.accessOrder.push(sessionId);
     }
   }
 
@@ -89,7 +93,9 @@ class SessionCache {
     const entry = this.cache.get(sessionId);
     if (entry) {
       entry.lastAccess = Date.now();
-      this.touchLRU(sessionId);
+      // Touch LRU — delete + set moves to end (O(1))
+      this.cache.delete(sessionId);
+      this.cache.set(sessionId, entry);
       return entry.summary;
     }
     return undefined;
@@ -99,6 +105,10 @@ class SessionCache {
    * Get sessions that should be evicted:
    * - Exceeded TTL
    * - Over capacity (LRU)
+   *
+   * Uses Map's native insertion order for O(1) LRU tracking:
+   * - First entries in iteration are oldest (LRU)
+   * - touchLRU moves entry to end via delete+set
    */
   getEvictionCandidates(options?: { skipLock?: boolean }): { sessionId: string; summary: SessionTokenSummary; delegationCount: number }[] {
     const shouldSkipLock = options?.skipLock ?? false;
@@ -128,7 +138,7 @@ class SessionCache {
     const now = Date.now();
     const ttlMs = this.ttlMinutes * 60 * 1000;
     const candidates: { sessionId: string; summary: SessionTokenSummary; delegationCount: number }[] = [];
-    const evictedSessionIds = new Set(candidates.map(c => c.sessionId));
+    const evictedSessionIds = new Set<string>();
 
     // TTL-based eviction
     for (const [sessionId, entry] of Array.from(this.cache.entries())) {
@@ -144,9 +154,10 @@ class SessionCache {
     }
 
     // LRU-based eviction (if over capacity)
+    // Iterate in insertion order — first entries are oldest
     if (this.cache.size + candidates.length > this.maxSessions) {
       const toEvict = Math.max(0, this.cache.size + candidates.length - this.maxSessions);
-      for (const sessionId of Array.from(this.accessOrder)) {
+      for (const [sessionId] of this.cache.entries()) {
         if (evictedSessionIds.size >= toEvict) break;
         if (evictedSessionIds.has(sessionId)) continue;
 
@@ -166,7 +177,6 @@ class SessionCache {
     for (const candidate of candidates) {
       if (!this.cache.has(candidate.sessionId)) continue;
       this.cache.delete(candidate.sessionId);
-      this.accessOrder = this.accessOrder.filter(s => s !== candidate.sessionId);
     }
 
     return candidates;
@@ -185,12 +195,18 @@ class SessionCache {
 
   clear(): void {
     this.cache.clear();
-    this.accessOrder = [];
   }
 
+  /**
+   * Touch LRU by moving an entry to the end of the Map.
+   * O(1) — Map.delete + Map.set preserves native insertion order.
+   */
   private touchLRU(sessionId: string): void {
-    this.accessOrder = this.accessOrder.filter(s => s !== sessionId);
-    this.accessOrder.push(sessionId);
+    const entry = this.cache.get(sessionId);
+    if (entry) {
+      this.cache.delete(sessionId);
+      this.cache.set(sessionId, entry);
+    }
   }
 }
 
