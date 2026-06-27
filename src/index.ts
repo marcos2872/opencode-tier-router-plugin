@@ -4,7 +4,7 @@ import type { Plugin, Config } from '@opencode-ai/plugin';
 import type { TextPart } from '@opencode-ai/sdk';
 import { loadTiers, saveMode, ConfigError, type RouterConfig } from './router/config.js';
 import { buildDelegationProtocol } from './router/protocol.js';
-import { classifyTask } from './router/classifier.js';
+import { selectTierByStrategy, type SelectionSource } from './router/selector.js';
 import { createCapTracker } from './router/caps.js';
 import { detectNarration } from './narration.js';
 
@@ -43,7 +43,29 @@ const FALLBACK_CONFIG: RouterConfig = {
     },
   },
   taskPatterns: {
-    fast: ['find', 'grep', 'search', 'where', 'locate', 'list', 'show', 'read', 'explore', 'buscar', 'procurar', 'ler', 'listar', 'mostrar'],
+    fast: [
+      'find',
+      'grep',
+      'search',
+      'where',
+      'locate',
+      'list',
+      'show',
+      'read',
+      'explore',
+      'buscar',
+      'busque',
+      'busca',
+      'procurar',
+      'procure',
+      'procura',
+      'ler',
+      'leia',
+      'listar',
+      'liste',
+      'mostrar',
+      'mostre',
+    ],
     medium: [
       'refactor',
       'implement',
@@ -89,6 +111,12 @@ const FALLBACK_CONFIG: RouterConfig = {
   enforcement: {
     mode: 'hard-block',
     trivialDirectAllowed: true,
+  },
+  routing: {
+    strategy: 'keyword',
+    selectorModel: 'github-copilot/claude-haiku-4.5',
+    selectorTimeoutMs: 1200,
+    selectorMaxTokens: 16,
   },
 };
 
@@ -154,6 +182,7 @@ const tierRouterPlugin: Plugin = async (ctx) => {
   const hardBlockedSessions = new Map<string, TierName>();
   const hardBlockReasons = new Map<string, string>();
   const preferredTierSessions = new Map<string, TierName>();
+  const selectionSourceSessions = new Map<string, SelectionSource>();
   let enabled = true;
 
   return {
@@ -213,6 +242,7 @@ const tierRouterPlugin: Plugin = async (ctx) => {
           hardBlockedSessions.delete(input.sessionID);
           hardBlockReasons.delete(input.sessionID);
           preferredTierSessions.delete(input.sessionID);
+          selectionSourceSessions.delete(input.sessionID);
           return;
         }
 
@@ -220,6 +250,7 @@ const tierRouterPlugin: Plugin = async (ctx) => {
           hardBlockedSessions.delete(input.sessionID);
           hardBlockReasons.delete(input.sessionID);
           preferredTierSessions.delete(input.sessionID);
+          selectionSourceSessions.delete(input.sessionID);
           return;
         }
 
@@ -228,13 +259,15 @@ const tierRouterPlugin: Plugin = async (ctx) => {
 
         const summaryText = `${output.message.summary?.title ?? ''}\n${output.message.summary?.body ?? ''}`.trim();
         const text = summaryText || messageText((output.parts ?? []) as Array<{ type?: string; text?: string }>);
-        const explicitClassification = classifyTask(text, cfg.taskPatterns);
-        const desiredTier = explicitClassification ?? mappedTier ?? null;
+        const selection = await selectTierByStrategy(text, cfg, ctx.client);
+        const desiredTier = selection.tier ?? mappedTier ?? null;
 
         if (desiredTier) {
           preferredTierSessions.set(input.sessionID, desiredTier);
+          selectionSourceSessions.set(input.sessionID, selection.source);
         } else {
           preferredTierSessions.delete(input.sessionID);
+          selectionSourceSessions.delete(input.sessionID);
         }
 
         if (cfg.enforcement.mode !== 'hard-block') {
@@ -282,7 +315,10 @@ const tierRouterPlugin: Plugin = async (ctx) => {
 
         const preferredTier = input.sessionID ? preferredTierSessions.get(input.sessionID) : undefined;
         if (preferredTier) {
-          output.system.push(`Routing hint: Preferred tier for this request is @${preferredTier}. Delegate to @${preferredTier} when not trivial.`);
+          const source = input.sessionID ? selectionSourceSessions.get(input.sessionID) : undefined;
+          output.system.push(
+            `Routing hint: Preferred tier for this request is @${preferredTier}${source ? ` (source: ${source})` : ''}. Delegate to @${preferredTier} when not trivial.`,
+          );
         }
 
         const tier = input.sessionID ? hardBlockedSessions.get(input.sessionID) : undefined;
@@ -368,11 +404,13 @@ const tierRouterPlugin: Plugin = async (ctx) => {
         if (command === 'tiers') {
           const cfg = await loadConfig(ctx.directory);
           const preferredTier = preferredTierSessions.get(input.sessionID);
+          const source = selectionSourceSessions.get(input.sessionID);
           const lines = [
             `Mode: ${cfg.mode} (${cfg.modes[cfg.mode]?.description ?? ''})`,
             `Enforcement: ${cfg.enforcement.mode} (trivial direct allowed: ${cfg.enforcement.trivialDirectAllowed ? 'yes' : 'no'})`,
+            `Routing strategy: ${cfg.routing.strategy} (selector model: ${cfg.routing.selectorModel})`,
             `Agent mapping: explore->@fast, build->@medium, general->@heavy, plan->@heavy`,
-            `Preferred tier (current session): ${preferredTier ? `@${preferredTier}` : 'none yet'}`,
+            `Preferred tier (current session): ${preferredTier ? `@${preferredTier}` : 'none yet'}${source ? ` via ${source}` : ''}`,
             'Tiers:',
           ];
           for (const tier of TIER_NAMES) {

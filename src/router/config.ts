@@ -23,12 +23,20 @@ export interface EnforcementConfig {
   trivialDirectAllowed: boolean;
 }
 
+export interface RoutingConfig {
+  strategy: 'keyword' | 'llm';
+  selectorModel: string;
+  selectorTimeoutMs: number;
+  selectorMaxTokens: number;
+}
+
 export interface RouterConfig {
   mode: string;
   tiers: Record<string, TierConfig>;
   modes: Record<string, ModeConfig>;
   taskPatterns: TaskPatterns;
   enforcement: EnforcementConfig;
+  routing: RoutingConfig;
 }
 
 export interface ActiveTiers {
@@ -80,10 +88,17 @@ const DEFAULT_CONFIG: RouterConfig = {
       'read',
       'explore',
       'buscar',
+      'busque',
+      'busca',
       'procurar',
+      'procure',
+      'procura',
       'ler',
+      'leia',
       'listar',
+      'liste',
       'mostrar',
+      'mostre',
     ],
     medium: [
       'refactor',
@@ -130,6 +145,12 @@ const DEFAULT_CONFIG: RouterConfig = {
   enforcement: {
     mode: 'hard-block',
     trivialDirectAllowed: true,
+  },
+  routing: {
+    strategy: 'keyword',
+    selectorModel: 'github-copilot/claude-haiku-4.5',
+    selectorTimeoutMs: 1200,
+    selectorMaxTokens: 16,
   },
 };
 
@@ -190,6 +211,24 @@ export function validateConfig(config: unknown): asserts config is RouterConfig 
   }
   if (typeof enforcement.trivialDirectAllowed !== 'boolean') {
     throw new ConfigError('enforcement.trivialDirectAllowed must be boolean');
+  }
+
+  if (!cfg.routing || typeof cfg.routing !== 'object') {
+    cfg.routing = structuredClone(DEFAULT_CONFIG.routing);
+  }
+
+  const routing = cfg.routing as Partial<RoutingConfig>;
+  if (routing.strategy !== 'keyword' && routing.strategy !== 'llm') {
+    throw new ConfigError('routing.strategy must be "keyword" or "llm"');
+  }
+  if (typeof routing.selectorModel !== 'string' || routing.selectorModel.length === 0) {
+    throw new ConfigError('routing.selectorModel must be a non-empty string');
+  }
+  if (typeof routing.selectorTimeoutMs !== 'number' || !Number.isFinite(routing.selectorTimeoutMs) || routing.selectorTimeoutMs <= 0) {
+    throw new ConfigError('routing.selectorTimeoutMs must be a positive number');
+  }
+  if (typeof routing.selectorMaxTokens !== 'number' || !Number.isFinite(routing.selectorMaxTokens) || routing.selectorMaxTokens <= 0) {
+    throw new ConfigError('routing.selectorMaxTokens must be a positive number');
   }
 
   if (typeof cfg.mode !== 'string' || cfg.mode.length === 0) {

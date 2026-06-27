@@ -46,6 +46,12 @@ async function writeTiers(dir: string, overrides: Record<string, unknown> = {}):
       medium: ['refactor', 'implement'],
       heavy: ['design', 'debug'],
     },
+    routing: {
+      strategy: 'keyword',
+      selectorModel: 'github-copilot/claude-haiku-4.5',
+      selectorTimeoutMs: 1200,
+      selectorMaxTokens: 16,
+    },
   };
   await writeFile(join(dir, 'tiers.json'), JSON.stringify({ ...base, ...overrides }, null, 2));
 }
@@ -146,6 +152,7 @@ describe('tierRouterPlugin', () => {
 
     const text = textOf(output.parts);
     expect(text).toContain('Mode: normal');
+    expect(text).toContain('Routing strategy: keyword');
     expect(text).toContain('Agent mapping: explore->@fast, build->@medium, general->@heavy, plan->@heavy');
     expect(text).toContain('Preferred tier (current session): none yet');
     expect(text).toContain('@fast:');
@@ -173,7 +180,7 @@ describe('tierRouterPlugin', () => {
     const tiersOut = { parts: [] as TextPart[] };
     await plugin['command.execute.before']?.({ command: '/tiers', sessionID: 's-dyn', arguments: '' }, tiersOut);
     const text = textOf(tiersOut.parts);
-    expect(text).toContain('Preferred tier (current session): @fast');
+    expect(text).toContain('Preferred tier (current session): @fast via keyword');
   });
 
   it('/budget lists modes with active one highlighted', async () => {

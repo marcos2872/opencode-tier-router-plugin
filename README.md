@@ -122,13 +122,19 @@ Ordem de resolução:
     }
   },
   "taskPatterns": {
-    "fast": ["find", "grep", "search", "read", "list", "buscar", "procurar", "ler", "listar"],
+    "fast": ["find", "grep", "search", "read", "list", "buscar", "busque", "procurar", "procure", "ler", "leia", "listar", "liste"],
     "medium": ["implement", "refactor", "fix", "update", "create", "implementar", "refatorar", "corrigir", "atualizar", "criar", "validar"],
     "heavy": ["design", "architecture", "debug", "analyze", "quality", "review", "arquitetura", "depurar", "analisar", "qualidade", "revisar"]
   },
   "enforcement": {
     "mode": "hard-block",
     "trivialDirectAllowed": true
+  },
+  "routing": {
+    "strategy": "keyword",
+    "selectorModel": "github-copilot/claude-haiku-4.5",
+    "selectorTimeoutMs": 1200,
+    "selectorMaxTokens": 16
   }
 }
 ```
@@ -146,6 +152,10 @@ Ordem de resolução:
 | `taskPatterns` | lista de keywords | Classificação por intenção |
 | `enforcement.mode` | `advisory`, `hard-block` | Advisory só orienta; hard-block nega execução direta quando necessário |
 | `enforcement.trivialDirectAllowed` | `true`, `false` | Em hard-block, permite/bloqueia tarefas triviais |
+| `routing.strategy` | `keyword`, `llm` | Seleção de tier por keyword (padrão) ou por modelo rápido |
+| `routing.selectorModel` | `provider/model` | Modelo usado para seleção quando `strategy=llm` |
+| `routing.selectorTimeoutMs` | número > 0 | Timeout da seleção LLM |
+| `routing.selectorMaxTokens` | número > 0 | Limite de tokens para resposta do selector |
 
 ---
 

@@ -47,10 +47,17 @@
       "read",
       "explore",
       "buscar",
+      "busque",
+      "busca",
       "procurar",
+      "procure",
+      "procura",
       "ler",
+      "leia",
       "listar",
-      "mostrar"
+      "liste",
+      "mostrar",
+      "mostre"
     ],
     "medium": [
       "refactor",
@@ -97,5 +104,11 @@
   "enforcement": {
     "mode": "hard-block",
     "trivialDirectAllowed": true
+  },
+  "routing": {
+    "strategy": "keyword",
+    "selectorModel": "github-copilot/claude-haiku-4.5",
+    "selectorTimeoutMs": 1200,
+    "selectorMaxTokens": 16
   }
 }

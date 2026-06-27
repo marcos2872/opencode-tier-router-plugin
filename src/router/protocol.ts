@@ -33,6 +33,7 @@ export function buildDelegationProtocol(cfg: RouterConfig): string {
     '## Model Delegation Protocol',
     `Tiers: ${tiersLine} mode:${cfg.mode}`,
     `Default: @${defaultTier}`,
+    `Routing: strategy=${cfg.routing.strategy} selector=${cfg.routing.selectorModel}`,
     `R: ${rulesLine}`,
     `Mode: ${cfg.mode} (${emphasis})`,
     'Rule: Classify user intent by keywords. For non-trivial requests, delegate to the cheapest matching tier. If no tier matches, use the default.',

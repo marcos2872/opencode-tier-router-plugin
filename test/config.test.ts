@@ -49,6 +49,12 @@ const validConfig: RouterConfig = {
     mode: 'advisory',
     trivialDirectAllowed: true,
   },
+  routing: {
+    strategy: 'keyword',
+    selectorModel: 'github-copilot/claude-haiku-4.5',
+    selectorTimeoutMs: 1200,
+    selectorMaxTokens: 16,
+  },
 };
 
 describe('resolveTiersPath', () => {

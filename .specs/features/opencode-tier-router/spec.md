@@ -40,6 +40,7 @@ Every ambiguity is resolved or recorded here — nothing is left silently unclea
 | Cost ratios | 1x / 5x / 20x | Directional signal for orchestrator; user-tunable | y |
 | Default mode | normal | Balanced; user switches via /budget | y |
 | Enforcement mode | hard-block by default, configurable to advisory | Prioritize deterministic delegation in production sessions | y |
+| Routing strategy | keyword by default, optional llm selector with fallback | Keep baseline cheap/stable while allowing smarter semantic selection when needed | y |
 | Fallback behavior | Orquestrador executa diretamente se subagente falhar | Fail-safe: nunca perder a tarefa | y |
 | Concurrency | Hooks podem ser chamados concorrentemente; cada sessão tem seu tracker | Plugin stores são criados por instância (closure) | y |
 
@@ -181,6 +182,23 @@ Every ambiguity is resolved or recorded here — nothing is left silently unclea
 
 ---
 
+### P9: Routing Strategy (keyword / llm)
+
+**User Story**: As a developer, I want routing strategy to be configurable between keyword matching and a fast selector model so that I can balance cost/latency vs semantic accuracy.
+
+**Why P9**: Keyword routing is cheap and deterministic, while LLM routing handles natural language variation better.
+
+**Acceptance Criteria**:
+
+1. WHEN `routing.strategy = "keyword"` THEN tier selection SHALL use keyword + conjugation-aware lexical matching
+2. WHEN `routing.strategy = "llm"` THEN tier selection SHALL query `routing.selectorModel` and accept only `fast|medium|heavy`
+3. WHEN LLM selector fails (timeout/error/invalid output) THEN router SHALL fallback to keyword selection, then default tier if needed
+4. WHEN user runs `/tiers` THEN output SHALL show routing strategy and selector model
+
+**Independent Test**: Set strategy to `llm`, simulate selector failure, verify fallback to keyword/default tier without session crash.
+
+---
+
 ## Edge Cases
 
 - WHEN tiers.json is missing or malformed THEN the plugin SHALL log a warning and continue with hardcoded defaults
@@ -216,6 +234,8 @@ Every ambiguity is resolved or recorded here — nothing is left silently unclea
 | RTR-17 | P7: Plugin desligado (noop) | Tasks | ✅ Verified |
 | RTR-18 | P8: Hard-block opt-in | Tasks | ✅ Verified |
 | RTR-19 | P8: Agent mapping build/explore/general/plan | Tasks | ✅ Verified |
+| RTR-20 | P9: Routing strategy keyword/llm | Tasks | ✅ Verified |
+| RTR-21 | P9: LLM failure fallback chain | Tasks | ✅ Verified |
 
 **ID format:** `RTR-[NUMBER]` (Router)
 
