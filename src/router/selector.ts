@@ -137,25 +137,29 @@ function classifyByLexicon(text: string): TierName | null {
   return 'fast';
 }
 
+interface OpenCodeClientLike {
+  session: {
+    prompt: (...args: unknown[]) => Promise<unknown>;
+  };
+}
+
 /**
  * Guarda de tipo para validar que um valor desconhecido é um cliente OpenCode
  * com função session.prompt.
  */
-function isOpenCodeClient(client: unknown): client is { session: { prompt: Function } } {
-  return client !== null &&
+function isOpenCodeClient(client: unknown): client is OpenCodeClientLike {
+  return (
+    client !== null &&
     typeof client === 'object' &&
     'session' in client &&
     client.session !== null &&
     typeof client.session === 'object' &&
     'prompt' in client.session &&
-    typeof (client.session as Record<string, unknown>).prompt === 'function';
+    typeof (client.session as Record<string, unknown>).prompt === 'function'
+  );
 }
 
-async function classifyByLLM(
-  text: string,
-  cfg: RouterConfig,
-  client: unknown,
-): Promise<TierName | null> {
+async function classifyByLLM(text: string, cfg: RouterConfig, client: unknown): Promise<TierName | null> {
   if (!isOpenCodeClient(client)) return null;
 
   const api = client;
@@ -198,11 +202,7 @@ async function classifyByLLM(
   return Promise.race([requestPromise, timeoutPromise]);
 }
 
-export async function selectTierByStrategy(
-  text: string,
-  cfg: RouterConfig,
-  client?: unknown,
-): Promise<TierSelection> {
+export async function selectTierByStrategy(text: string, cfg: RouterConfig, client?: unknown): Promise<TierSelection> {
   if (cfg.routing.strategy === 'llm') {
     const llmTier = await classifyByLLM(text, cfg, client);
     if (llmTier) {

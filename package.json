@@ -7,13 +7,23 @@
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "lint": "eslint src/ test/",
+    "lint:fix": "eslint src/ test/ --fix",
+    "format": "prettier --check src/ test/",
+    "format:fix": "prettier --write src/ test/",
+    "precommit": "npm run typecheck && npm run lint && npm run format"
   },
   "peerDependencies": {
     "@opencode-ai/plugin": ">=1.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.62.0",
+    "@typescript-eslint/parser": "^8.62.0",
+    "eslint": "^10.6.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.9.0",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"
   }
