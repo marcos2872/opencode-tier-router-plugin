@@ -116,13 +116,13 @@ Status: ✅ VALID
 --- Configuration ---
 enforcement.mode: hard-block
 enforcement.trivialDirectAllowed: false
-routing.strategy: keyword
+routing.strategy: llm
 mode: normal
 
 --- Tier Models ---
-@fast:   github-copilot/claude-haiku-4.5 (1x)
-@medium: github-copilot/gpt-5.3-codex (5x)
-@heavy:  github-copilot/claude-sonnet-4.5 (20x)
+@fast:   opencode/big-pickle (1x)
+@medium: llama.cpp/Nex-N2-mini (5x)
+@heavy:  llama.cpp/Nex-N2-mini (20x)
 
 ✅ All checks passed! Plugin enforces 100% delegation to subagents.
 ═══════════════════════════════════════════════════════════════
@@ -157,27 +157,27 @@ mode: normal
   },
   "tiers": {
     "fast": {
-      "model": "github-copilot/claude-haiku-4.5",
+      "model": "opencode/big-pickle",
       "costRatio": 1,
       "cap": 8,
       "thresholds": { "min": 0, "max": 2000 }
     },
     "medium": {
-      "model": "github-copilot/gpt-5.3-codex",
+      "model": "llama.cpp/Nex-N2-mini",
       "costRatio": 5,
       "cap": 12,
       "thresholds": { "min": 2000, "max": 10000 }
     },
     "heavy": {
-      "model": "github-copilot/claude-sonnet-4.5",
+      "model": "llama.cpp/Nex-N2-mini",
       "costRatio": 20,
       "cap": 20,
       "thresholds": { "min": 10000, "max": null }
     }
   },
   "routing": {
-    "strategy": "keyword",
-    "selectorModel": "github-copilot/claude-haiku-4.5",
+    "strategy": "llm",
+    "selectorModel": "opencode/big-pickle",
     "selectorTimeoutMs": 1200,
     "selectorMaxTokens": 16
   },
