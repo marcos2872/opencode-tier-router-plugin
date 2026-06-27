@@ -25,6 +25,13 @@ import { DefaultTokenEventParser } from './router/token-event-parser.js';
 import { DefaultMetricsAggregator } from './router/metrics-aggregator.js';
 import { MarkdownMetricsFormatter } from './router/metrics-formatter.js';
 import { executeTokenCommand, isTokenCommand } from './router/token-commands.js';
+import {
+  COST_DIVISOR,
+  DEFAULT_INPUT_COST_PER_1K,
+  DEFAULT_OUTPUT_COST_PER_1K,
+  TRIVIAL_TASK_MAX_LENGTH,
+} from './constants.js';
+import { safeJsonParse } from './utils/safe-json.js';
 
 const TIER_NAMES = ['fast', 'medium', 'heavy'] as const;
 type TierName = (typeof TIER_NAMES)[number];
@@ -72,7 +79,7 @@ function isToolOutputWithUsage(out: unknown): out is ToolExecuteOutput {
  */
 function isTrivialFastTask(text: string): boolean {
   const compact = text.toLowerCase().trim();
-  if (compact.length === 0 || compact.length > 120) return false;
+  if (compact.length === 0 || compact.length > TRIVIAL_TASK_MAX_LENGTH) return false;
   return TRIVIAL_HINT_RE.test(compact) && !MULTI_STEP_HINT_RE.test(compact);
 }
 
@@ -372,12 +379,8 @@ export class PluginOrchestrator {
         }
         let usage = out.usage;
         if (!usage && out.output) {
-          try {
-            const parsed = JSON.parse(out.output);
-            usage = parsed.usage || usage;
-          } catch {
-            // Not JSON, skip
-          }
+          const parsed = safeJsonParse<{ usage?: ToolExecuteOutput['usage'] }>(out.output);
+          usage = parsed?.usage || usage;
         }
 
         if (usage) {
@@ -387,7 +390,7 @@ export class PluginOrchestrator {
           const cacheRead = usage.cacheReadTokens ?? usage.cache?.read ?? 0;
           const cacheWrite = usage.cacheWriteTokens ?? usage.cache?.write ?? 0;
 
-          const estimatedCost = ((inputTokens * 0.0015) + (outputTokens * 0.006)) / 1000;
+          const estimatedCost = ((inputTokens * DEFAULT_INPUT_COST_PER_1K) + (outputTokens * DEFAULT_OUTPUT_COST_PER_1K)) / COST_DIVISOR;
 
           const tier = this.preferredTierSessions.get(input.sessionID);
           const cfg = await this.loadConfig();

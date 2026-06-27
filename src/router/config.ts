@@ -1,5 +1,20 @@
 import { access, readFile, writeFile, rename, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
+import {
+  DEFAULT_FAST_COST_RATIO,
+  DEFAULT_HEAVY_COST_RATIO,
+  DEFAULT_HEAVY_TIER_CAP,
+  DEFAULT_MEDIUM_COST_RATIO,
+  DEFAULT_MEDIUM_TIER_CAP,
+  DEFAULT_TIER_CAP,
+  FAST_TIER_MAX_TOKENS,
+  HEAVY_TIER_MIN_TOKENS,
+  LRU_MAX_SESSIONS,
+  MAX_HISTORY_DAYS,
+  MAX_HISTORY_FILES,
+  MEDIUM_TIER_MAX_TOKENS,
+  SESSION_TTL_MINUTES,
+} from '../constants.js';
 
 /**
  * Tier name used by the router.
@@ -227,21 +242,21 @@ const DEFAULT_CONFIG: RouterConfig = {
   tiers: {
     fast: {
       model: 'github-copilot/claude-haiku-4.5',
-      costRatio: 1,
-      cap: 8,
-      thresholds: { min: 0, max: 2000 }, // ✅ ERRO-003: Default thresholds
+      costRatio: DEFAULT_FAST_COST_RATIO,
+      cap: DEFAULT_TIER_CAP,
+      thresholds: { min: 0, max: FAST_TIER_MAX_TOKENS }, // ✅ ERRO-003: Default thresholds
     },
     medium: {
       model: 'github-copilot/gpt-5.3-codex',
-      costRatio: 5,
-      cap: 12,
-      thresholds: { min: 2000, max: 10000 },
+      costRatio: DEFAULT_MEDIUM_COST_RATIO,
+      cap: DEFAULT_MEDIUM_TIER_CAP,
+      thresholds: { min: FAST_TIER_MAX_TOKENS, max: MEDIUM_TIER_MAX_TOKENS },
     },
     heavy: {
       model: 'github-copilot/claude-sonnet-4.5',
-      costRatio: 20,
-      cap: 20,
-      thresholds: { min: 10000, max: null }, // unlimited
+      costRatio: DEFAULT_HEAVY_COST_RATIO,
+      cap: DEFAULT_HEAVY_TIER_CAP,
+      thresholds: { min: HEAVY_TIER_MIN_TOKENS, max: null }, // unlimited
     },
   },
   modes: {
@@ -340,10 +355,10 @@ const DEFAULT_CONFIG: RouterConfig = {
   },
   tokenTracking: {
     enabled: true,
-    maxHistoryFiles: 50, // ✅ ERRO-005: Bounded disk (50 files max)
-    maxHistoryDays: 30,
-    sessionTTLMinutes: 30, // ✅ ERRO-004: 30-min TTL
-    maxSessionsMemory: 100, // ✅ ERRO-004: Max 100 sessions in memory
+    maxHistoryFiles: MAX_HISTORY_FILES, // ✅ ERRO-005: Bounded disk (50 files max)
+    maxHistoryDays: MAX_HISTORY_DAYS,
+    sessionTTLMinutes: SESSION_TTL_MINUTES, // ✅ ERRO-004: 30-min TTL
+    maxSessionsMemory: LRU_MAX_SESSIONS, // ✅ ERRO-004: Max 100 sessions in memory
   },
 };
 

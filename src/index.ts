@@ -11,13 +11,21 @@ import { join } from 'node:path';
 import type { Plugin, Config } from '@opencode-ai/plugin';
 import { loadTiers, ConfigError, type RouterConfig } from './router/config.js';
 import { PluginOrchestrator } from './plugin-orchestrator.js';
+import {
+  DEFAULT_FAST_COST_RATIO,
+  DEFAULT_HEAVY_COST_RATIO,
+  DEFAULT_HEAVY_TIER_CAP,
+  DEFAULT_MEDIUM_COST_RATIO,
+  DEFAULT_MEDIUM_TIER_CAP,
+  DEFAULT_TIER_CAP,
+} from './constants.js';
 
 const FALLBACK_CONFIG: RouterConfig = {
   mode: 'normal',
   tiers: {
-    fast: { model: 'github-copilot/claude-haiku-4.5', costRatio: 1, cap: 8 },
-    medium: { model: 'github-copilot/gpt-5.3-codex', costRatio: 5, cap: 12 },
-    heavy: { model: 'github-copilot/claude-sonnet-4.5', costRatio: 20, cap: 20 },
+    fast: { model: 'github-copilot/claude-haiku-4.5', costRatio: DEFAULT_FAST_COST_RATIO, cap: DEFAULT_TIER_CAP },
+    medium: { model: 'github-copilot/gpt-5.3-codex', costRatio: DEFAULT_MEDIUM_COST_RATIO, cap: DEFAULT_MEDIUM_TIER_CAP },
+    heavy: { model: 'github-copilot/claude-sonnet-4.5', costRatio: DEFAULT_HEAVY_COST_RATIO, cap: DEFAULT_HEAVY_TIER_CAP },
   },
   modes: {
     normal: {

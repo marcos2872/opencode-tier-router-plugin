@@ -18,6 +18,14 @@ import type { MetricsFormatter } from './metrics-formatter.js';
 import type { TokenEventParser, TokenRecord, RoutingDecision, StepFinishEvent, TokenUsage } from './token-event-parser.js';
 import type { RouterConfig } from './config.js';
 import { OrphanBuffer } from './orphan-buffer.js';
+import {
+  LRU_MAX_SESSIONS,
+  MILLISECONDS_PER_MINUTE,
+  MAX_HISTORY_FILES,
+  MINUTES_PER_HOUR,
+  SESSION_TTL_MINUTES,
+} from '../constants.js';
+import { safeJsonParse } from '../utils/safe-json.js';
 
 /**
  * PersistedTokenSession — Format for saving to disk
@@ -136,7 +144,7 @@ class SessionCache {
 
   private collectEvictionCandidates(): { sessionId: string; summary: SessionTokenSummary; delegationCount: number }[] {
     const now = Date.now();
-    const ttlMs = this.ttlMinutes * 60 * 1000;
+    const ttlMs = this.ttlMinutes * MINUTES_PER_HOUR * MILLISECONDS_PER_MINUTE;
     const candidates: { sessionId: string; summary: SessionTokenSummary; delegationCount: number }[] = [];
     const evictedSessionIds = new Set<string>();
 
@@ -245,8 +253,8 @@ export class TokenTracker {
   ) {
     const ttConfig = config.tokenTracking;
     this.cache = new SessionCache(
-      ttConfig?.maxSessionsMemory ?? 100,
-      ttConfig?.sessionTTLMinutes ?? 30,
+      ttConfig?.maxSessionsMemory ?? LRU_MAX_SESSIONS,
+      ttConfig?.sessionTTLMinutes ?? SESSION_TTL_MINUTES,
     );
     this.orphanBuffer = new OrphanBuffer();
     this.orphanBuffer.startCleanup(() => {
@@ -502,11 +510,9 @@ export class TokenTracker {
           const path = `${this.storageDir}/${file}`;
           const content = await this.storage.load(path);
           if (content) {
-            try {
-              const session = JSON.parse(content) as PersistedTokenSession;
+            const session = safeJsonParse<PersistedTokenSession>(content);
+            if (session) {
               sessions.push(session);
-            } catch {
-              // Skip malformed files
             }
           }
         }
@@ -674,8 +680,8 @@ export class TokenTracker {
         return null;
       }
 
-      const persisted = JSON.parse(content) as PersistedTokenSession;
-      return persisted.summary;
+      const persisted = safeJsonParse<PersistedTokenSession>(content);
+      return persisted?.summary ?? null;
     } catch (err) {
       console.error('[TokenTracker] Failed to load persisted metrics:', err);
       return null;
@@ -739,7 +745,7 @@ export class TokenTracker {
   private async cleanupOldFiles(): Promise<void> {
     try {
       const ttConfig = this.config.tokenTracking;
-      const maxFiles = ttConfig?.maxHistoryFiles ?? 50;
+      const maxFiles = ttConfig?.maxHistoryFiles ?? MAX_HISTORY_FILES;
 
       const files = await this.storage.listFiles(this.storageDir);
       const tokenFiles = files.filter(f => f.startsWith('token-') && f.endsWith('.json')).sort();

@@ -1,6 +1,8 @@
+import { CAP_WARNING_REMAINING_THRESHOLD, DEFAULT_TIER_CAP } from '../constants.js';
+
 const READ_ONLY_TOOLS = new Set(['grep', 'read', 'glob', 'ls']);
-const DEFAULT_MAX = 8;
-const WARNING_THRESHOLD_REMAINING = 2;
+const DEFAULT_MAX = DEFAULT_TIER_CAP;
+const WARNING_THRESHOLD_REMAINING = CAP_WARNING_REMAINING_THRESHOLD;
 
 /**
  * CapTracker manages per-session tool-call caps and redundancy warnings.

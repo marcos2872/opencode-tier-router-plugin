@@ -19,6 +19,12 @@
  */
 
 import { calculateCost } from './cost-calculator.js';
+import {
+  CLEANUP_INTERVAL_MS,
+  ORPHAN_MAX_ATTEMPTS,
+  ORPHAN_MAX_WAIT_MS,
+  ORPHAN_RETRY_INTERVAL_MS,
+} from '../constants.js';
 import type { TokenRecord, RoutingDecision } from './token-event-parser.js';
 
 interface OrphanEntry {
@@ -36,9 +42,9 @@ interface OrphanEntry {
 export class OrphanBuffer {
   private buffer: Map<string, OrphanEntry> = new Map();
   private cleanupInterval: ReturnType<typeof setInterval> | null = null;
-  private readonly MAX_ATTEMPTS = 5;
-  private readonly RETRY_INTERVAL_MS = 1000; // 1s between retries
-  private readonly MAX_WAIT_MS = 5000; // 5s total wait before marking as unknown
+  private readonly MAX_ATTEMPTS = ORPHAN_MAX_ATTEMPTS;
+  private readonly RETRY_INTERVAL_MS = ORPHAN_RETRY_INTERVAL_MS; // 1s between retries
+  private readonly MAX_WAIT_MS = ORPHAN_MAX_WAIT_MS; // 5s total wait before marking as unknown
 
   /**
    * Add an orphaned record to the buffer.
@@ -144,7 +150,7 @@ export class OrphanBuffer {
     this.cleanupInterval = setInterval(() => {
       const expired = this.getExpired();
       callback(expired);
-    }, 10000);
+    }, CLEANUP_INTERVAL_MS);
   }
 
   /**
