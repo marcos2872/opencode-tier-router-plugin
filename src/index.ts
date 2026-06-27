@@ -2,7 +2,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { Plugin, Config } from '@opencode-ai/plugin';
 import type { TextPart } from '@opencode-ai/sdk';
-import { loadTiers, saveMode, type RouterConfig } from './router/config.js';
+import { loadTiers, saveMode, ConfigError, type RouterConfig } from './router/config.js';
 import { buildDelegationProtocol } from './router/protocol.js';
 import { createCapTracker } from './router/caps.js';
 import { detectNarration } from './narration.js';
@@ -54,6 +54,14 @@ async function loadConfig(projectDir: string): Promise<RouterConfig> {
   try {
     return await loadTiers(projectDir, globalConfigDir());
   } catch (err) {
+    // Missing config is expected — use defaults silently.
+    if (
+      err instanceof ConfigError &&
+      (err.cause as NodeJS.ErrnoException | undefined)?.code === 'ENOENT'
+    ) {
+      return FALLBACK_CONFIG;
+    }
+
     // best-effort: never crash a real session
     console.warn(
       '[opencode-tier-router] failed to load tiers.json, using defaults:',

@@ -62,6 +62,26 @@ describe('tierRouterPlugin', () => {
     await rm(projectDir, { recursive: true, force: true });
   });
 
+  it('uses defaults silently when tiers.json is missing', async () => {
+    const emptyDir = join('/tmp', `tier-router-empty-${Date.now()}`);
+    await mkdir(emptyDir, { recursive: true });
+
+    const warnings: string[] = [];
+    const originalWarn = console.warn;
+    console.warn = (...args: unknown[]) => warnings.push(args.join(' '));
+
+    try {
+      const plugin = await tierRouterPlugin(makeCtx(emptyDir));
+      const config: Config = { agent: {} };
+      await plugin.config?.(config);
+      expect(config.agent?.fast).toBeDefined();
+      expect(warnings).toHaveLength(0);
+    } finally {
+      console.warn = originalWarn;
+      await rm(emptyDir, { recursive: true, force: true });
+    }
+  });
+
   it('registers fast/medium/heavy subagent agents from tiers.json', async () => {
     const plugin = await tierRouterPlugin(makeCtx(projectDir));
     const config: Config = { agent: {} };
