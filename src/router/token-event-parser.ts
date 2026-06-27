@@ -16,7 +16,7 @@ export interface TokenUsage {
 export interface RoutingDecision {
   tier: 'fast' | 'medium' | 'heavy' | 'unknown';
   costRatio: number;
-  estimated: { input: number; output: number };
+  estimated?: { input: number; output: number };
 }
 
 export interface TokenRecord {

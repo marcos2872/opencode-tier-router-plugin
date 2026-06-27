@@ -17,6 +17,7 @@ import type { MetricsAggregator, SessionTokenSummary } from './metrics-aggregato
 import type { MetricsFormatter } from './metrics-formatter.js';
 import type { TokenEventParser, TokenRecord, RoutingDecision } from './token-event-parser.js';
 import type { RouterConfig } from './config.js';
+import { OrphanBuffer } from './orphan-buffer.js';
 
 /**
  * PersistedTokenSession — Format for saving to disk
@@ -29,81 +30,6 @@ export interface PersistedTokenSession {
   delegationCount: number;
   savedAt: number; // timestamp
   summary: SessionTokenSummary;
-}
-
-/**
- * OrphanBuffer — ✅ ERRO-002 CORRIGIDO
- *
- * Race condition: A step-finish event arrives before the routing decision is stored.
- * Solution: Buffer orphan events for up to 5 seconds, then retry correlation.
- * After 5s, assign to 'unknown' tier and save immediately.
- */
-class OrphanBuffer {
-  private buffer: Map<string, { record: TokenRecord; attempts: number; firstSeen: number }> = new Map();
-  private readonly MAX_ATTEMPTS = 5;
-  private readonly RETRY_INTERVAL_MS = 1000; // 1s between retries
-  private readonly MAX_WAIT_MS = 5000; // 5s total wait
-
-  add(record: TokenRecord): void {
-    const key = `${record.sessionId}:${record.timestamp}`;
-    this.buffer.set(key, { record, attempts: 0, firstSeen: Date.now() });
-  }
-
-  /**
-   * Try to correlate an orphan record with a routing decision.
-   * Return the updated record if found, otherwise return undefined.
-   */
-  tryCorrelate(sessionId: string, routingDecision: RoutingDecision): TokenRecord | undefined {
-    // Find the oldest orphan for this session
-    let oldestKey: string | undefined;
-    let oldestRecord: TokenRecord | undefined;
-    let oldestTime = Infinity;
-
-    for (const [key, entry] of this.buffer.entries()) {
-      if (entry.record.sessionId === sessionId && entry.firstSeen < oldestTime) {
-        oldestTime = entry.firstSeen;
-        oldestKey = key;
-        oldestRecord = entry.record;
-      }
-    }
-
-    if (!oldestKey || !oldestRecord) return undefined;
-
-    // Correlate and remove from buffer
-    const correlated: TokenRecord = {
-      ...oldestRecord,
-      delegatedTier: routingDecision.tier,
-      estimatedTokens: routingDecision.estimated,
-    };
-    this.buffer.delete(oldestKey);
-    return correlated;
-  }
-
-  /**
-   * Get all orphans that have exceeded the max wait time.
-   * These will be saved with delegatedTier='unknown'.
-   */
-  getExpired(): TokenRecord[] {
-    const now = Date.now();
-    const expired: TokenRecord[] = [];
-
-    for (const [key, entry] of this.buffer.entries()) {
-      if (now - entry.firstSeen >= this.MAX_WAIT_MS) {
-        expired.push(entry.record);
-        this.buffer.delete(key);
-      }
-    }
-
-    return expired;
-  }
-
-  size(): number {
-    return this.buffer.size;
-  }
-
-  clear(): void {
-    this.buffer.clear();
-  }
 }
 
 /**
