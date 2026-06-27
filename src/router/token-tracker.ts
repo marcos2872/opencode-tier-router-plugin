@@ -287,10 +287,17 @@ export class TokenTracker {
 
   /**
    * Get formatted report for a session.
+   * RTT-T9: Checks cache first, then disk
    */
   async getSessionReport(sessionId: string): Promise<string> {
     try {
-      const summary = this.cache.get(sessionId);
+      let summary = this.cache.get(sessionId);
+      if (!summary) {
+        const persisted = await this.loadPersistedTokenMetrics(sessionId);
+        if (persisted) {
+          summary = persisted;
+        }
+      }
       if (!summary) {
         return `No data for session ${sessionId}`;
       }
@@ -333,10 +340,17 @@ export class TokenTracker {
 
   /**
    * Get formatted comparison for a session vs hypothetical tier.
+   * RTT-T11: Checks cache first, then disk
    */
   async getComparison(sessionId: string, tier: 'fast' | 'medium' | 'heavy'): Promise<string> {
     try {
-      const summary = this.cache.get(sessionId);
+      let summary = this.cache.get(sessionId);
+      if (!summary) {
+        const persisted = await this.loadPersistedTokenMetrics(sessionId);
+        if (persisted) {
+          summary = persisted;
+        }
+      }
       if (!summary) {
         return `No data for session ${sessionId}`;
       }

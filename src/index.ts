@@ -8,6 +8,12 @@ import { selectTierByStrategy, type SelectionSource } from './router/selector.js
 import { createCapTracker } from './router/caps.js';
 import { detectNarration } from './narration.js';
 import { assertEnforcement, reportEnforcement } from './router/enforcement-validator.js';
+import { TokenTracker } from './router/token-tracker.js';
+import { FilesystemStorage } from './router/filesystem-storage.js';
+import { DefaultTokenEventParser } from './router/token-event-parser.js';
+import { DefaultMetricsAggregator } from './router/metrics-aggregator.js';
+import { MarkdownMetricsFormatter } from './router/metrics-formatter.js';
+import { executeTokenCommand, isTokenCommand } from './router/token-commands.js';
 
 const TIER_NAMES = ['fast', 'medium', 'heavy'] as const;
 type TierName = (typeof TIER_NAMES)[number];
@@ -186,6 +192,22 @@ const tierRouterPlugin: Plugin = async (ctx) => {
   const selectionSourceSessions = new Map<string, SelectionSource>();
   let enabled = true;
 
+  // Initialize TokenTracker for FASE3 commands
+  let tokenTracker: TokenTracker | null = null;
+  const initializeTokenTracker = async () => {
+    try {
+      const cfg = await loadConfig(ctx.directory);
+      const storage = new FilesystemStorage();
+      const parser = new DefaultTokenEventParser();
+      const aggregator = new DefaultMetricsAggregator();
+      const formatter = new MarkdownMetricsFormatter();
+      const storageDir = join(ctx.directory, '.opencode', 'token-metrics');
+      tokenTracker = new TokenTracker(storage, parser, aggregator, formatter, cfg, storageDir);
+    } catch (err) {
+      console.error('[opencode-tier-router] Failed to initialize token tracker:', err);
+    }
+  };
+
   return {
     config: async (input: Config) => {
       try {
@@ -202,6 +224,9 @@ const tierRouterPlugin: Plugin = async (ctx) => {
           console.warn(reportEnforcement(cfg));
           // Best-effort: continue but log the issue
         }
+
+        // Initialize token tracker for FASE3 commands
+        await initializeTokenTracker();
 
         input.agent = input.agent ?? {};
         for (const tier of TIER_NAMES) {
@@ -241,6 +266,19 @@ const tierRouterPlugin: Plugin = async (ctx) => {
         input.command.router = {
           template: '/router [on|off]',
           description: 'Enable or disable tier routing',
+        };
+        // FASE3: Token tracking commands
+        input.command['token-report'] = {
+          template: '/token-report <sessionId>',
+          description: 'Show real token metrics for a session',
+        };
+        input.command['token-history'] = {
+          template: '/token-history',
+          description: 'List all persisted token tracking sessions',
+        };
+        input.command['token-compare'] = {
+          template: '/token-compare <sessionId> <tier>',
+          description: 'Estimate cost if session were delegated to different tier',
         };
       } catch (err) {
         // best-effort: never crash a real session
@@ -398,6 +436,15 @@ const tierRouterPlugin: Plugin = async (ctx) => {
       try {
         const command = input.command.replace(/^\//, '').toLowerCase();
         const args = input.arguments.trim();
+
+        // FASE3: Handle token tracking commands
+        if (isTokenCommand(command) && tokenTracker) {
+          const result = await executeTokenCommand(tokenTracker, command, args);
+          if (result !== null) {
+            output.parts = [makeTextPart(input.sessionID, result)];
+            return;
+          }
+        }
 
         if (command === 'router') {
           if (args === 'on') {
