@@ -44,11 +44,11 @@
 
 ## Handoff
 
-- **Feature**: opencode-tier-router
-- **Phase / Task**: Validation
-- **Completed**: T1–T7 + fixes for Copilot defaults, model validation, plugin entry tests, protocol rule test
+- **Feature**: —
+- **Phase / Task**: —
+- **Completed**: opencode-tier-router — all tasks + fixes verified (PASS)
 - **In-progress** (file:line): —
-- **Next step**: Re-run Verifier after fixes
+- **Next step**: —
 - **Blockers**: none
-- **Uncommitted files**: .specs/features/opencode-tier-router/validation.md (to be regenerated)
+- **Uncommitted files**: none
 - **Branch**: master
