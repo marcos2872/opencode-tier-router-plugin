@@ -14,6 +14,14 @@
 
 import type { RouterConfig } from './config.js';
 
+/**
+ * Resultado da validação das regras de aplicação obrigatória de delegação.
+ *
+ * @property isValid - Indica se nenhuma regra crítica de enforcement foi violada.
+ * @property errors - Lista de erros que impedem a aplicação segura de 100% de delegação.
+ * @property warnings - Lista de avisos não bloqueantes sobre cobertura ou qualidade da configuração.
+ * @property recommendations - Lista de recomendações para melhorar auditoria, custos ou aderência.
+ */
 export interface EnforcementValidation {
   isValid: boolean;
   errors: string[];

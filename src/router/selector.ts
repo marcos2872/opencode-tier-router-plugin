@@ -1,9 +1,22 @@
 import type { RouterConfig } from './config.js';
 import { classifyTask as classifyByPattern } from './classifier.js';
 
+/**
+ * Representa um dos tiers de complexidade usados pelo roteador.
+ */
 export type TierName = 'fast' | 'medium' | 'heavy';
+
+/**
+ * Indica a origem da seleção de tier feita pelo seletor.
+ */
 export type SelectionSource = 'llm' | 'keyword' | 'fallback-keyword' | 'fallback-default';
 
+/**
+ * Resultado da seleção de tier para uma solicitação.
+ *
+ * @property tier - Tier escolhido: `fast`, `medium` ou `heavy`.
+ * @property source - Origem da seleção: `llm`, `keyword`, `fallback-keyword` ou `fallback-default`.
+ */
 export interface TierSelection {
   tier: TierName;
   source: SelectionSource;
@@ -202,6 +215,14 @@ async function classifyByLLM(text: string, cfg: RouterConfig, client: unknown): 
   return Promise.race([requestPromise, timeoutPromise]);
 }
 
+/**
+ * Seleciona o tier mais adequado para uma solicitação usando a estratégia configurada.
+ *
+ * @param text - Texto da solicitação a ser classificada.
+ * @param cfg - Configuração do roteador com estratégia, fallback e padrões de tarefa.
+ * @param client - Cliente OpenCode opcional usado quando a estratégia é `llm`.
+ * @returns Seleção do tier escolhido e sua origem.
+ */
 export async function selectTierByStrategy(text: string, cfg: RouterConfig, client?: unknown): Promise<TierSelection> {
   if (cfg.routing.strategy === 'llm') {
     const llmTier = await classifyByLLM(text, cfg, client);
