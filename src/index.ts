@@ -13,9 +13,9 @@ type TierName = (typeof TIER_NAMES)[number];
 const FALLBACK_CONFIG: RouterConfig = {
   mode: 'normal',
   tiers: {
-    fast: { model: 'openai/gpt-4.1-nano', costRatio: 1, cap: 8 },
-    medium: { model: 'anthropic/claude-sonnet-4-5', costRatio: 5, cap: 12 },
-    heavy: { model: 'anthropic/claude-opus-4', costRatio: 20, cap: 20 },
+    fast: { model: 'github-copilot/claude-haiku-4-5', costRatio: 1, cap: 8 },
+    medium: { model: 'github-copilot/claude-sonnet-4-5', costRatio: 5, cap: 12 },
+    heavy: { model: 'github-copilot/claude-opus-4-8', costRatio: 20, cap: 20 },
   },
   modes: {
     normal: {
@@ -87,7 +87,7 @@ const tierRouterPlugin: Plugin = async (ctx) => {
         input.agent = input.agent ?? {};
         for (const tier of TIER_NAMES) {
           const model = cfg.tiers[tier]?.model;
-          if (!model || !model.includes('/')) {
+          if (!model || !/^[^/]+\/[^/]+$/.test(model)) {
             console.warn(`[opencode-tier-router] skipping invalid tier model for @${tier}: ${model}`);
             continue;
           }

@@ -40,9 +40,9 @@ export class ConfigError extends Error {
 const DEFAULT_CONFIG: RouterConfig = {
   mode: 'normal',
   tiers: {
-    fast: { model: 'openai/gpt-4.1-nano', costRatio: 1, cap: 8 },
-    medium: { model: 'anthropic/claude-sonnet-4-5', costRatio: 5, cap: 12 },
-    heavy: { model: 'anthropic/claude-opus-4', costRatio: 20, cap: 20 },
+    fast: { model: 'github-copilot/claude-haiku-4-5', costRatio: 1, cap: 8 },
+    medium: { model: 'github-copilot/claude-sonnet-4-5', costRatio: 5, cap: 12 },
+    heavy: { model: 'github-copilot/claude-opus-4-8', costRatio: 20, cap: 20 },
   },
   modes: {
     normal: {
