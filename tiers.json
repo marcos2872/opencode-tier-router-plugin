@@ -1,0 +1,73 @@
+{
+  "mode": "normal",
+  "tiers": {
+    "fast": {
+      "model": "openai/gpt-4.1-nano",
+      "costRatio": 1,
+      "cap": 8
+    },
+    "medium": {
+      "model": "anthropic/claude-sonnet-4-5",
+      "costRatio": 5,
+      "cap": 12
+    },
+    "heavy": {
+      "model": "anthropic/claude-opus-4",
+      "costRatio": 20,
+      "cap": 20
+    }
+  },
+  "modes": {
+    "normal": {
+      "description": "Balanced routing: fast for search, medium for implementation, heavy for architecture/debug",
+      "defaultTier": "medium"
+    },
+    "budget": {
+      "description": "Cost-first: prefer @fast whenever possible",
+      "defaultTier": "fast"
+    },
+    "quality": {
+      "description": "Quality-first: prefer @medium and @heavy over @fast",
+      "defaultTier": "medium"
+    },
+    "deep": {
+      "description": "Depth-first: route architecture and debug tasks to @heavy",
+      "defaultTier": "heavy"
+    }
+  },
+  "taskPatterns": {
+    "fast": [
+      "find",
+      "grep",
+      "search",
+      "where",
+      "locate",
+      "list",
+      "show",
+      "read",
+      "explore"
+    ],
+    "medium": [
+      "refactor",
+      "implement",
+      "add",
+      "write",
+      "fix",
+      "update",
+      "change",
+      "create",
+      "edit",
+      "rename"
+    ],
+    "heavy": [
+      "design",
+      "architecture",
+      "debug",
+      "complex",
+      "explain",
+      "reason",
+      "analyze",
+      "optimize"
+    ]
+  }
+}

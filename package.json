@@ -1,0 +1,20 @@
+{
+  "name": "opencode-tier-router",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "OpenCode plugin that routes tasks to the cheapest adequate model tier",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@opencode-ai/plugin": ">=1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}
