@@ -15,7 +15,13 @@
 import type { MetricsStorage } from './metrics-storage.js';
 import type { MetricsAggregator, SessionTokenSummary } from './metrics-aggregator.js';
 import type { MetricsFormatter } from './metrics-formatter.js';
-import type { TokenEventParser, TokenRecord, RoutingDecision, StepFinishEvent, TokenUsage } from './token-event-parser.js';
+import type {
+  TokenEventParser,
+  TokenRecord,
+  RoutingDecision,
+  StepFinishEvent,
+  TokenUsage,
+} from './token-event-parser.js';
 import type { RouterConfig } from './config.js';
 import { OrphanBuffer } from './orphan-buffer.js';
 import {
@@ -73,8 +79,7 @@ class SessionCache {
    * Map.delete(key) + Map.set(key, value) move uma entrada para o fim em O(1).
    * A primeira entrada na ordem de iteração é a menos recentemente usada (LRU).
    */
-  private cache: Map<string, { summary: SessionTokenSummary; lastAccess: number; delegationCount: number }> =
-    new Map();
+  private cache: Map<string, { summary: SessionTokenSummary; lastAccess: number; delegationCount: number }> = new Map();
   private isEvictionLocked = false;
 
   constructor(
@@ -118,7 +123,9 @@ class SessionCache {
    * - As primeiras entradas na iteração são as mais antigas (LRU)
    * - touchLRU move a entrada para o fim via delete+set
    */
-  getEvictionCandidates(options?: { skipLock?: boolean }): { sessionId: string; summary: SessionTokenSummary; delegationCount: number }[] {
+  getEvictionCandidates(options?: {
+    skipLock?: boolean;
+  }): { sessionId: string; summary: SessionTokenSummary; delegationCount: number }[] {
     const shouldSkipLock = options?.skipLock ?? false;
     const wasLocked = this.isEvictionLocked;
     if (!shouldSkipLock && this.isEvictionLocked) return [];
@@ -348,11 +355,13 @@ export class TokenTracker {
   }
 
   private isStepFinishEvent(event: StepFinishEvent | null | undefined): event is StepFinishEvent {
-    return !!event &&
+    return (
+      !!event &&
       typeof event === 'object' &&
       typeof event.sessionID === 'string' &&
       typeof event.tokens?.input === 'number' &&
-      typeof event.tokens?.output === 'number';
+      typeof event.tokens?.output === 'number'
+    );
   }
 
   private toTokenRecord(event: StepFinishEvent): TokenRecord {
@@ -574,12 +583,12 @@ export class TokenTracker {
 
       // Also include in-memory sessions that haven't been persisted yet
       const allSessions: PersistedTokenSession[] = [...persistedSessions];
-      
+
       // Add in-memory sessions (convert cache to PersistedTokenSession format)
       // This is useful for testing and development
       for (const sessionId of this.sessionRecords.keys()) {
         const cached = this.cache.get(sessionId);
-        if (cached && !persistedSessions.some(s => s.sessionId === sessionId)) {
+        if (cached && !persistedSessions.some((s) => s.sessionId === sessionId)) {
           allSessions.push({
             version: '1.0',
             sessionId,
@@ -663,7 +672,7 @@ export class TokenTracker {
     try {
       const files = await this.storage.listFiles(this.storageDir);
       const sessionFiles = files
-        .filter(f => f.startsWith(`token-${sessionId.slice(0, 8)}-`) && f.endsWith('.json'))
+        .filter((f) => f.startsWith(`token-${sessionId.slice(0, 8)}-`) && f.endsWith('.json'))
         .sort()
         .reverse(); // Newest first
 
@@ -748,7 +757,7 @@ export class TokenTracker {
       const maxFiles = ttConfig?.maxHistoryFiles ?? MAX_HISTORY_FILES;
 
       const files = await this.storage.listFiles(this.storageDir);
-      const tokenFiles = files.filter(f => f.startsWith('token-') && f.endsWith('.json')).sort();
+      const tokenFiles = files.filter((f) => f.startsWith('token-') && f.endsWith('.json')).sort();
 
       if (tokenFiles.length > maxFiles) {
         const toDelete = tokenFiles.length - maxFiles;

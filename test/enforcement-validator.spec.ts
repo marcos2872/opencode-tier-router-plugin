@@ -50,26 +50,8 @@ const VALID_CONFIG: RouterConfig = {
   modes: { normal: { defaultTier: 'medium' } },
   taskPatterns: {
     fast: ['find', 'search', 'grep', 'locate', 'list', 'read', 'show'],
-    medium: [
-      'implement',
-      'add',
-      'write',
-      'fix',
-      'update',
-      'create',
-      'edit',
-      'refactor',
-    ],
-    heavy: [
-      'design',
-      'architecture',
-      'debug',
-      'complex',
-      'analyze',
-      'review',
-      'optimize',
-      'explain',
-    ],
+    medium: ['implement', 'add', 'write', 'fix', 'update', 'create', 'edit', 'refactor'],
+    heavy: ['design', 'architecture', 'debug', 'complex', 'analyze', 'review', 'optimize', 'explain'],
   },
   enforcement: {
     mode: 'hard-block',
@@ -123,11 +105,7 @@ describe('Enforcement Validator - 100% Delegation', () => {
     const validation = validateEnforcement(badConfig);
 
     expect(validation.isValid).toBe(false);
-    expect(
-      validation.errors.some((e) =>
-        e.includes('trivialDirectAllowed'),
-      ),
-    ).toBe(true);
+    expect(validation.errors.some((e) => e.includes('trivialDirectAllowed'))).toBe(true);
   });
 
   it('enforces correct cost hierarchy: fast < medium < heavy', () => {
@@ -192,9 +170,7 @@ describe('Enforcement Validator - Tier Configuration', () => {
     const validation = validateEnforcement(invalidModel);
 
     expect(validation.isValid).toBe(false);
-    expect(validation.errors.some((e) => e.includes('Invalid model'))).toBe(
-      true,
-    );
+    expect(validation.errors.some((e) => e.includes('Invalid model'))).toBe(true);
   });
 
   it('requires positive costRatio for each tier', () => {
@@ -244,9 +220,7 @@ describe('Enforcement Validator - Task Pattern Coverage', () => {
 
     const validation = validateEnforcement(sparsePatterns);
 
-    expect(validation.warnings.some((w) => w.includes('fast patterns'))).toBe(
-      true,
-    );
+    expect(validation.warnings.some((w) => w.includes('fast patterns'))).toBe(true);
   });
 
   it('warns if medium patterns are too sparse', () => {
@@ -260,9 +234,7 @@ describe('Enforcement Validator - Task Pattern Coverage', () => {
 
     const validation = validateEnforcement(sparsePatterns);
 
-    expect(validation.warnings.some((w) => w.includes('medium patterns'))).toBe(
-      true,
-    );
+    expect(validation.warnings.some((w) => w.includes('medium patterns'))).toBe(true);
   });
 
   it('warns if heavy patterns are too sparse', () => {
@@ -276,9 +248,7 @@ describe('Enforcement Validator - Task Pattern Coverage', () => {
 
     const validation = validateEnforcement(sparsePatterns);
 
-    expect(validation.warnings.some((w) => w.includes('heavy patterns'))).toBe(
-      true,
-    );
+    expect(validation.warnings.some((w) => w.includes('heavy patterns'))).toBe(true);
   });
 });
 
@@ -313,9 +283,7 @@ describe('Enforcement Validator - Routing Strategy', () => {
     const validation = validateEnforcement(invalidStrategy);
 
     expect(validation.isValid).toBe(false);
-    expect(validation.errors.some((e) => e.includes('routing.strategy'))).toBe(
-      true,
-    );
+    expect(validation.errors.some((e) => e.includes('routing.strategy'))).toBe(true);
   });
 });
 
@@ -408,18 +376,14 @@ describe('Enforcement Validator - Token Tracking', () => {
 
     const validation = validateEnforcement(noTracking);
 
-    expect(
-      validation.recommendations.some((r) => r.includes('tokenTracking')),
-    ).toBe(true);
+    expect(validation.recommendations.some((r) => r.includes('tokenTracking'))).toBe(true);
   });
 
   it('passes when token tracking is enabled', () => {
     const validation = validateEnforcement(VALID_CONFIG);
 
     expect(validation.isValid).toBe(true);
-    expect(
-      validation.recommendations.some((r) => r.includes('tokenTracking')),
-    ).toBe(false);
+    expect(validation.recommendations.some((r) => r.includes('tokenTracking'))).toBe(false);
   });
 });
 
@@ -449,9 +413,7 @@ describe('Enforcement Validator - Real-World Scenarios', () => {
     const validation = validateEnforcement(advisoryConfig);
 
     expect(validation.isValid).toBe(false);
-    expect(
-      validation.errors.some((e) => e.includes('CRITICAL')),
-    ).toBe(true);
+    expect(validation.errors.some((e) => e.includes('CRITICAL'))).toBe(true);
   });
 
   it('prevents trivial bypass (defeats purpose)', () => {
@@ -464,9 +426,7 @@ describe('Enforcement Validator - Real-World Scenarios', () => {
     const validation = validateEnforcement(bypassConfig);
 
     expect(validation.isValid).toBe(false);
-    expect(
-      validation.errors.some((e) => e.includes('trivialDirectAllowed')),
-    ).toBe(true);
+    expect(validation.errors.some((e) => e.includes('trivialDirectAllowed'))).toBe(true);
   });
 
   it('ensures all tiers are available for routing', () => {

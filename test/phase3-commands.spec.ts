@@ -14,11 +14,7 @@ import { InMemoryStorage } from '../src/router/in-memory-storage.js';
 import { DefaultMetricsAggregator } from '../src/router/metrics-aggregator.js';
 import { MarkdownMetricsFormatter } from '../src/router/metrics-formatter.js';
 import { DefaultTokenEventParser } from '../src/router/token-event-parser.js';
-import {
-  executeTokenCommand,
-  isTokenCommand,
-  getTokenCommandsHelp,
-} from '../src/router/token-commands.js';
+import { executeTokenCommand, isTokenCommand, getTokenCommandsHelp } from '../src/router/token-commands.js';
 import type { RouterConfig } from '../src/router/config.js';
 
 const TEST_CONFIG: RouterConfig = {
@@ -235,11 +231,7 @@ describe('Phase 3 - RTT-T11: /token-compare Command', () => {
       cost: 0.005,
     });
 
-    const result = await executeTokenCommand(
-      tracker,
-      'token-compare',
-      `${sessionId} medium`,
-    );
+    const result = await executeTokenCommand(tracker, 'token-compare', `${sessionId} medium`);
 
     expect(result).toBeTruthy();
     expect(typeof result).toBe('string');
@@ -259,11 +251,7 @@ describe('Phase 3 - RTT-T11: /token-compare Command', () => {
   });
 
   it('returns error message for invalid tier', async () => {
-    const result = await executeTokenCommand(
-      tracker,
-      'token-compare',
-      'sess-001 invalid-tier',
-    );
+    const result = await executeTokenCommand(tracker, 'token-compare', 'sess-001 invalid-tier');
 
     expect(result).toContain('Invalid tier');
     expect(result).toContain('fast');
@@ -286,11 +274,7 @@ describe('Phase 3 - RTT-T11: /token-compare Command', () => {
     });
 
     for (const tier of ['fast', 'medium', 'heavy']) {
-      const result = await executeTokenCommand(
-        tracker,
-        'token-compare',
-        `${sessionId} ${tier}`,
-      );
+      const result = await executeTokenCommand(tracker, 'token-compare', `${sessionId} ${tier}`);
 
       expect(result).toBeTruthy();
       expect(typeof result).toBe('string');
@@ -311,16 +295,8 @@ describe('Phase 3 - RTT-T11: /token-compare Command', () => {
       cost: 0.005,
     });
 
-    const result1 = await executeTokenCommand(
-      tracker,
-      'TOKEN-COMPARE',
-      `${sessionId} MEDIUM`,
-    );
-    const result2 = await executeTokenCommand(
-      tracker,
-      'Token-Compare',
-      `${sessionId} Medium`,
-    );
+    const result1 = await executeTokenCommand(tracker, 'TOKEN-COMPARE', `${sessionId} MEDIUM`);
+    const result2 = await executeTokenCommand(tracker, 'Token-Compare', `${sessionId} Medium`);
 
     expect(result1).toBeTruthy();
     expect(result2).toBeTruthy();
@@ -409,16 +385,10 @@ describe('Phase 3 - RTT-T12: Unknown Command Handling', () => {
   });
 
   it('executeTokenCommand never throws', async () => {
-    await expect(
-      executeTokenCommand(tracker, 'invalid', 'args'),
-    ).resolves.toBeDefined();
+    await expect(executeTokenCommand(tracker, 'invalid', 'args')).resolves.toBeDefined();
 
-    await expect(
-      executeTokenCommand(tracker, '', ''),
-    ).resolves.toBeDefined();
+    await expect(executeTokenCommand(tracker, '', '')).resolves.toBeDefined();
 
-    await expect(
-      executeTokenCommand(tracker, null as any, ''),
-    ).resolves.toBeDefined();
+    await expect(executeTokenCommand(tracker, null as any, '')).resolves.toBeDefined();
   });
 });

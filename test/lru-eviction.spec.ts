@@ -146,7 +146,7 @@ describe('TokenTracker - Memory Management (FASE0-T4)', () => {
     const first = cache.getEvictionCandidates();
     const second = cache.getEvictionCandidates();
     const candidates = [...first, ...second];
-    const sessionIds = candidates.map(candidate => candidate.sessionId);
+    const sessionIds = candidates.map((candidate) => candidate.sessionId);
 
     expect(first).toHaveLength(1);
     expect(second).toHaveLength(0);
@@ -184,7 +184,7 @@ describe('TokenTracker - Memory Management (FASE0-T4)', () => {
     let release!: () => void;
     const first = cache.withEvictionLock(async () => {
       const candidates = cache.getEvictionCandidates({ skipLock: true });
-      return new Promise<{ sessionId: string }[]>(resolve => {
+      return new Promise<{ sessionId: string }[]>((resolve) => {
         release = () => resolve(candidates);
       });
     });
@@ -194,7 +194,7 @@ describe('TokenTracker - Memory Management (FASE0-T4)', () => {
     release();
     const firstCandidates = (await first) ?? [];
 
-    expect(firstCandidates.map(candidate => candidate.sessionId)).toEqual(['session-1']);
+    expect(firstCandidates.map((candidate) => candidate.sessionId)).toEqual(['session-1']);
     expect(cache.size()).toBe(2);
   });
 
@@ -341,7 +341,7 @@ describe('TokenTracker - Memory Management (FASE0-T4)', () => {
       tokenTracking: {
         enabled: true,
         maxHistoryFiles: 100, // Custom value
-        maxHistoryDays: 60,    // Custom value
+        maxHistoryDays: 60, // Custom value
         sessionTTLMinutes: 45, // Custom value (45 min instead of 30)
         maxSessionsMemory: 500, // Custom value (500 instead of 100)
       },
@@ -410,7 +410,11 @@ describe('TokenTracker - Memory Management (FASE0-T4)', () => {
       cost: 5.0,
     };
 
-    const routing = { tier: 'medium' as const, costRatio: 5, estimated: { input: 900, output: 450 } } as RoutingDecision;
+    const routing = {
+      tier: 'medium' as const,
+      costRatio: 5,
+      estimated: { input: 900, output: 450 },
+    } as RoutingDecision;
     await tracker.recordEvent(event, routing);
 
     const comparison = await tracker.getComparison('compare-test', 'heavy');

@@ -87,7 +87,9 @@ describe('createCapTracker', () => {
     tracker.record(session, 'read', { path: '/same' });
     tracker.record(session, 'read', { path: '/same' });
 
-    expect(tracker.getBanner(session, 'read', { path: '/same' })).toContain('[⚠ REDUNDANT: this is the same read you ran at call #1]');
+    expect(tracker.getBanner(session, 'read', { path: '/same' })).toContain(
+      '[⚠ REDUNDANT: this is the same read you ran at call #1]',
+    );
   });
 
   it('detects redundant grep calls by pattern and path', () => {
@@ -97,7 +99,9 @@ describe('createCapTracker', () => {
     tracker.record(session, 'grep', { pattern: 'foo', path: '/src' });
     tracker.record(session, 'grep', { pattern: 'foo', path: '/src' });
 
-    expect(tracker.getBanner(session, 'grep', { pattern: 'foo', path: '/src' })).toContain('[⚠ REDUNDANT: this is the same grep you ran at call #1]');
+    expect(tracker.getBanner(session, 'grep', { pattern: 'foo', path: '/src' })).toContain(
+      '[⚠ REDUNDANT: this is the same grep you ran at call #1]',
+    );
   });
 
   it('does not flag different args as redundant', () => {
@@ -128,7 +132,9 @@ describe('createCapTracker', () => {
     tracker.record(session, 'read', { path: '/b' });
     tracker.record(session, 'read', { path: '/a' });
 
-    expect(tracker.getBanner(session, 'read', { path: '/a' })).toContain('[⚠ REDUNDANT: this is the same read you ran at call #1]');
+    expect(tracker.getBanner(session, 'read', { path: '/a' })).toContain(
+      '[⚠ REDUNDANT: this is the same read you ran at call #1]',
+    );
   });
 
   it('isolates sessions', () => {
@@ -138,7 +144,9 @@ describe('createCapTracker', () => {
     tracker.record('session-b', 'read', { path: '/shared' });
     tracker.record('session-a', 'read', { path: '/shared' });
 
-    expect(tracker.getBanner('session-a', 'read', { path: '/shared' })).toContain('[⚠ REDUNDANT: this is the same read you ran at call #1]');
+    expect(tracker.getBanner('session-a', 'read', { path: '/shared' })).toContain(
+      '[⚠ REDUNDANT: this is the same read you ran at call #1]',
+    );
     expect(tracker.getBanner('session-b', 'read', { path: '/shared' })).not.toContain('REDUNDANT');
   });
 

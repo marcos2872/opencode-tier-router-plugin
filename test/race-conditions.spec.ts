@@ -53,7 +53,7 @@ describe('Race Conditions', () => {
       }
 
       // Add 10 records (concurrently via Promise.all)
-      const results = records.map(r => {
+      const results = records.map((r) => {
         buffer.add(r);
         return true;
       });
@@ -69,7 +69,7 @@ describe('Race Conditions', () => {
       }
 
       // Add records
-      records.forEach(r => buffer.add(r));
+      records.forEach((r) => buffer.add(r));
       expect(buffer.size()).toBe(5);
 
       const routing: RoutingDecision = {
@@ -252,7 +252,7 @@ describe('Race Conditions', () => {
 
       expect(cache.size).toBe(3);
       expect(cache.has('s1')).toBe(false); // s1 was oldest (LRU)
-      expect(cache.has('s4')).toBe(true);  // newest survives
+      expect(cache.has('s4')).toBe(true); // newest survives
 
       vi.useRealTimers();
     });

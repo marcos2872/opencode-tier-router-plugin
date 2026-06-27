@@ -147,7 +147,7 @@ describe('Phase 1 - RTT-T2: recordStepFinish() Parsing & Correlation', () => {
 
   it('correlates with routing decision when provided', async () => {
     const sessionId = 'session-003';
-    
+
     // First record routing decision
     const routing: RoutingDecision = {
       tier: 'medium',

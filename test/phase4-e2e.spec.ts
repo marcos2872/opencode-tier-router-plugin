@@ -403,7 +403,7 @@ describe('Phase 4 - FASE4-E2E-T3: Routing Decision Correlation', () => {
     });
 
     // Wait a bit, then decision
-    await new Promise(r => setTimeout(r, 100));
+    await new Promise((r) => setTimeout(r, 100));
 
     await tracker.recordRoutingDecision(sessionId, {
       tier: 'heavy',
@@ -594,11 +594,7 @@ describe('Phase 4 - FASE4-E2E-T4: Session Aggregation & Accuracy', () => {
     });
 
     // Compare to heavy (should show savings)
-    const comparison = await executeTokenCommand(
-      tracker,
-      'token-compare',
-      `${sessionId} heavy`,
-    );
+    const comparison = await executeTokenCommand(tracker, 'token-compare', `${sessionId} heavy`);
 
     expect(comparison).toContain('Tier Comparison');
     expect(comparison).toContain('cheaper');
@@ -622,13 +618,9 @@ describe('Phase 4 - FASE4-E2E-T5: Error Handling & Edge Cases', () => {
   });
 
   it('handles null/undefined events gracefully', async () => {
-    await expect(
-      tracker.recordStepFinish(null as any),
-    ).resolves.toBeUndefined();
+    await expect(tracker.recordStepFinish(null as any)).resolves.toBeUndefined();
 
-    await expect(
-      tracker.recordStepFinish({} as any),
-    ).resolves.toBeUndefined();
+    await expect(tracker.recordStepFinish({} as any)).resolves.toBeUndefined();
   });
 
   it('handles null/undefined sessions in commands', async () => {
@@ -666,16 +658,10 @@ describe('Phase 4 - FASE4-E2E-T5: Error Handling & Edge Cases', () => {
   });
 
   it('never throws on command execution', async () => {
-    await expect(
-      executeTokenCommand(null as any, 'token-report', 'any-session'),
-    ).resolves.toBeDefined();
+    await expect(executeTokenCommand(null as any, 'token-report', 'any-session')).resolves.toBeDefined();
 
-    await expect(
-      executeTokenCommand(tracker, null as any, 'args'),
-    ).resolves.toBeDefined();
+    await expect(executeTokenCommand(tracker, null as any, 'args')).resolves.toBeDefined();
 
-    await expect(
-      executeTokenCommand(tracker, '', ''),
-    ).resolves.toBeDefined();
+    await expect(executeTokenCommand(tracker, '', '')).resolves.toBeDefined();
   });
 });

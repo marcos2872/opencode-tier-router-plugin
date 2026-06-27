@@ -47,7 +47,7 @@ export function validateEnforcement(cfg: RouterConfig): EnforcementValidation {
   if (cfg.enforcement.mode !== 'hard-block') {
     errors.push(
       `❌ CRITICAL: enforcement.mode is "${cfg.enforcement.mode}" but MUST be "hard-block". ` +
-      `Advisory mode allows tasks to bypass delegation!`,
+        `Advisory mode allows tasks to bypass delegation!`,
     );
   }
 
@@ -55,7 +55,7 @@ export function validateEnforcement(cfg: RouterConfig): EnforcementValidation {
   if (cfg.enforcement.trivialDirectAllowed === true) {
     errors.push(
       `❌ CRITICAL: enforcement.trivialDirectAllowed is true but MUST be false. ` +
-      `This allows "trivial" tasks to execute directly in main window!`,
+        `This allows "trivial" tasks to execute directly in main window!`,
     );
   }
 
@@ -69,9 +69,7 @@ export function validateEnforcement(cfg: RouterConfig): EnforcementValidation {
 
     const tierCfg = cfg.tiers[tier];
     if (!tierCfg.model || !/^[^/]+\/[^/]+$/.test(tierCfg.model)) {
-      errors.push(
-        `❌ Invalid model for @${tier}: "${tierCfg.model}" doesn't match "provider/model" format`,
-      );
+      errors.push(`❌ Invalid model for @${tier}: "${tierCfg.model}" doesn't match "provider/model" format`);
     }
 
     if (typeof tierCfg.costRatio !== 'number' || tierCfg.costRatio <= 0) {
@@ -85,9 +83,7 @@ export function validateEnforcement(cfg: RouterConfig): EnforcementValidation {
 
   // ✅ Routing strategy must be keyword or llm
   if (cfg.routing.strategy !== 'keyword' && cfg.routing.strategy !== 'llm') {
-    errors.push(
-      `❌ Invalid routing.strategy: "${cfg.routing.strategy}" (must be "keyword" or "llm")`,
-    );
+    errors.push(`❌ Invalid routing.strategy: "${cfg.routing.strategy}" (must be "keyword" or "llm")`);
   }
 
   // ✅ Task patterns should have reasonable coverage
@@ -96,21 +92,15 @@ export function validateEnforcement(cfg: RouterConfig): EnforcementValidation {
   const heavyPatterns = cfg.taskPatterns.heavy ?? [];
 
   if (fastPatterns.length < 3) {
-    warnings.push(
-      `⚠️  Too few fast patterns (${fastPatterns.length}): may not catch search tasks`,
-    );
+    warnings.push(`⚠️  Too few fast patterns (${fastPatterns.length}): may not catch search tasks`);
   }
 
   if (mediumPatterns.length < 5) {
-    warnings.push(
-      `⚠️  Too few medium patterns (${mediumPatterns.length}): may not catch implementation tasks`,
-    );
+    warnings.push(`⚠️  Too few medium patterns (${mediumPatterns.length}): may not catch implementation tasks`);
   }
 
   if (heavyPatterns.length < 5) {
-    warnings.push(
-      `⚠️  Too few heavy patterns (${heavyPatterns.length}): may not catch architecture/design tasks`,
-    );
+    warnings.push(`⚠️  Too few heavy patterns (${heavyPatterns.length}): may not catch architecture/design tasks`);
   }
 
   // ✅ Cost ratio should have reasonable hierarchy (fast < medium < heavy)
@@ -119,22 +109,16 @@ export function validateEnforcement(cfg: RouterConfig): EnforcementValidation {
   const heavyCost = cfg.tiers.heavy?.costRatio ?? 0;
 
   if (fastCost >= mediumCost) {
-    errors.push(
-      `❌ Cost hierarchy violated: @fast (${fastCost}x) should be < @medium (${mediumCost}x)`,
-    );
+    errors.push(`❌ Cost hierarchy violated: @fast (${fastCost}x) should be < @medium (${mediumCost}x)`);
   }
 
   if (mediumCost >= heavyCost) {
-    errors.push(
-      `❌ Cost hierarchy violated: @medium (${mediumCost}x) should be < @heavy (${heavyCost}x)`,
-    );
+    errors.push(`❌ Cost hierarchy violated: @medium (${mediumCost}x) should be < @heavy (${heavyCost}x)`);
   }
 
   // ⚠️ Token tracking should be enabled for compliance
   if (!cfg.tokenTracking?.enabled) {
-    recommendations.push(
-      `💡 Enable tokenTracking for full cost tracking and compliance auditing`,
-    );
+    recommendations.push(`💡 Enable tokenTracking for full cost tracking and compliance auditing`);
   }
 
   const isValid = errors.length === 0;
@@ -149,19 +133,12 @@ export function assertEnforcement(cfg: RouterConfig): void {
   const validation = validateEnforcement(cfg);
 
   if (!validation.isValid) {
-    const errorMsg = validation.errors
-      .map((e) => `  ${e}`)
-      .join('\n');
-    throw new Error(
-      `[Enforcement] Configuration invalid for 100% delegation:\n${errorMsg}`,
-    );
+    const errorMsg = validation.errors.map((e) => `  ${e}`).join('\n');
+    throw new Error(`[Enforcement] Configuration invalid for 100% delegation:\n${errorMsg}`);
   }
 
   if (validation.warnings.length > 0) {
-    console.warn(
-      '[Enforcement] Warnings:\n' +
-      validation.warnings.map((w) => `  ${w}`).join('\n'),
-    );
+    console.warn('[Enforcement] Warnings:\n' + validation.warnings.map((w) => `  ${w}`).join('\n'));
   }
 }
 
@@ -210,14 +187,10 @@ export function reportEnforcement(cfg: RouterConfig): string {
   }
 
   if (validation.isValid) {
-    lines.push(
-      '✅ All checks passed! Plugin enforces 100% delegation to subagents.',
-    );
+    lines.push('✅ All checks passed! Plugin enforces 100% delegation to subagents.');
   }
 
-  lines.push(
-    '═══════════════════════════════════════════════════════════════',
-  );
+  lines.push('═══════════════════════════════════════════════════════════════');
 
   return lines.join('\n');
 }

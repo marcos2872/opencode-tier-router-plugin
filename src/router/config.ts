@@ -231,7 +231,10 @@ export class ConfigError extends Error {
    * @param message - Mensagem de erro legível por humanos.
    * @param cause - Erro subjacente ou motivo da configuração inválida.
    */
-  constructor(message: string, public readonly cause?: unknown) {
+  constructor(
+    message: string,
+    public readonly cause?: unknown,
+  ) {
     super(message);
     this.name = 'ConfigError';
   }
@@ -477,10 +480,18 @@ export function validateConfig(config: unknown): asserts config is RouterConfig 
   if (typeof routing.selectorModel !== 'string' || routing.selectorModel.length === 0) {
     throw new ConfigError('routing.selectorModel must be a non-empty string');
   }
-  if (typeof routing.selectorTimeoutMs !== 'number' || !Number.isFinite(routing.selectorTimeoutMs) || routing.selectorTimeoutMs <= 0) {
+  if (
+    typeof routing.selectorTimeoutMs !== 'number' ||
+    !Number.isFinite(routing.selectorTimeoutMs) ||
+    routing.selectorTimeoutMs <= 0
+  ) {
     throw new ConfigError('routing.selectorTimeoutMs must be a positive number');
   }
-  if (typeof routing.selectorMaxTokens !== 'number' || !Number.isFinite(routing.selectorMaxTokens) || routing.selectorMaxTokens <= 0) {
+  if (
+    typeof routing.selectorMaxTokens !== 'number' ||
+    !Number.isFinite(routing.selectorMaxTokens) ||
+    routing.selectorMaxTokens <= 0
+  ) {
     throw new ConfigError('routing.selectorMaxTokens must be a positive number');
   }
 
@@ -567,16 +578,28 @@ export function validateConfig(config: unknown): asserts config is RouterConfig 
     if (tt.enabled !== undefined && typeof tt.enabled !== 'boolean') {
       throw new ConfigError('tokenTracking.enabled must be boolean');
     }
-    if (tt.maxHistoryFiles !== undefined && (typeof tt.maxHistoryFiles !== 'number' || !Number.isFinite(tt.maxHistoryFiles) || tt.maxHistoryFiles < 1)) {
+    if (
+      tt.maxHistoryFiles !== undefined &&
+      (typeof tt.maxHistoryFiles !== 'number' || !Number.isFinite(tt.maxHistoryFiles) || tt.maxHistoryFiles < 1)
+    ) {
       throw new ConfigError('tokenTracking.maxHistoryFiles must be a positive number');
     }
-    if (tt.maxHistoryDays !== undefined && (typeof tt.maxHistoryDays !== 'number' || !Number.isFinite(tt.maxHistoryDays) || tt.maxHistoryDays < 1)) {
+    if (
+      tt.maxHistoryDays !== undefined &&
+      (typeof tt.maxHistoryDays !== 'number' || !Number.isFinite(tt.maxHistoryDays) || tt.maxHistoryDays < 1)
+    ) {
       throw new ConfigError('tokenTracking.maxHistoryDays must be a positive number');
     }
-    if (tt.sessionTTLMinutes !== undefined && (typeof tt.sessionTTLMinutes !== 'number' || !Number.isFinite(tt.sessionTTLMinutes) || tt.sessionTTLMinutes < 1)) {
+    if (
+      tt.sessionTTLMinutes !== undefined &&
+      (typeof tt.sessionTTLMinutes !== 'number' || !Number.isFinite(tt.sessionTTLMinutes) || tt.sessionTTLMinutes < 1)
+    ) {
       throw new ConfigError('tokenTracking.sessionTTLMinutes must be a positive number');
     }
-    if (tt.maxSessionsMemory !== undefined && (typeof tt.maxSessionsMemory !== 'number' || !Number.isFinite(tt.maxSessionsMemory) || tt.maxSessionsMemory < 1)) {
+    if (
+      tt.maxSessionsMemory !== undefined &&
+      (typeof tt.maxSessionsMemory !== 'number' || !Number.isFinite(tt.maxSessionsMemory) || tt.maxSessionsMemory < 1)
+    ) {
       throw new ConfigError('tokenTracking.maxSessionsMemory must be a positive number');
     }
   }

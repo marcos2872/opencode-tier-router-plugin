@@ -166,7 +166,7 @@ describe('Phase 5 - FASE5-Plugin-T2: Tool.execute.after Hook Simulation', () => 
     const reasoning = usage.reasoning ?? 0;
     const cacheRead = usage.cache?.read ?? 0;
     const cacheWrite = usage.cache?.write ?? 0;
-    const estimatedCost = ((input * 0.0015) + (output * 0.006)) / 1000;
+    const estimatedCost = (input * 0.0015 + output * 0.006) / 1000;
 
     await tracker.recordStepFinish({
       sessionID: sessionId,
@@ -219,7 +219,7 @@ describe('Phase 5 - FASE5-Plugin-T2: Tool.execute.after Hook Simulation', () => 
         reasoning: 0,
         cache: { read: 0, write: 0 },
       },
-      cost: ((usage.input * 0.0015) + (usage.output * 0.006)) / 1000,
+      cost: (usage.input * 0.0015 + usage.output * 0.006) / 1000,
     });
 
     const report = await tracker.getSessionReport(sessionId);
@@ -276,7 +276,7 @@ describe('Phase 5 - FASE5-Plugin-T2: Tool.execute.after Hook Simulation', () => 
         reasoning: usage.reasoning,
         cache: { read: 0, write: 0 },
       },
-      cost: ((usage.input * 0.0015) + (usage.output * 0.006)) / 1000,
+      cost: (usage.input * 0.0015 + usage.output * 0.006) / 1000,
     });
 
     // Verify report includes tier accuracy
@@ -328,7 +328,7 @@ describe('Phase 5 - FASE5-Plugin-T3: Plugin + Tracker Integration', () => {
     await tracker.recordStepFinish({
       sessionID: sessionId,
       tokens: { ...usage },
-      cost: ((usage.input * 0.0015) + (usage.output * 0.006)) / 1000,
+      cost: (usage.input * 0.0015 + usage.output * 0.006) / 1000,
     });
 
     // Step 5: User runs /token-report command
@@ -380,7 +380,12 @@ describe('Phase 5 - FASE5-Plugin-T3: Plugin + Tracker Integration', () => {
     for (const sid of [sess1, sess2, sess3]) {
       await tracker.recordStepFinish({
         sessionID: sid,
-        tokens: { input: 100 * Math.random(), output: 200 * Math.random(), reasoning: 50, cache: { read: 10, write: 0 } },
+        tokens: {
+          input: 100 * Math.random(),
+          output: 200 * Math.random(),
+          reasoning: 50,
+          cache: { read: 10, write: 0 },
+        },
         cost: 0.005,
       });
     }
@@ -424,20 +429,12 @@ describe('Phase 5 - FASE5-Plugin-T4: Cost Comparison & Tier Analysis', () => {
     });
 
     // Compare to fast
-    const comparisonFast = await executeTokenCommand(
-      tracker,
-      'token-compare',
-      `${sessionId} fast`,
-    );
+    const comparisonFast = await executeTokenCommand(tracker, 'token-compare', `${sessionId} fast`);
     expect(comparisonFast).toContain('Tier Comparison');
     expect(comparisonFast).toContain('fast');
 
     // Compare to heavy
-    const comparisonHeavy = await executeTokenCommand(
-      tracker,
-      'token-compare',
-      `${sessionId} heavy`,
-    );
+    const comparisonHeavy = await executeTokenCommand(tracker, 'token-compare', `${sessionId} heavy`);
     expect(comparisonHeavy).toContain('Tier Comparison');
     expect(comparisonHeavy).toContain('heavy');
   });
@@ -454,11 +451,7 @@ describe('Phase 5 - FASE5-Plugin-T4: Cost Comparison & Tier Analysis', () => {
     });
 
     // Compare to medium - should show savings
-    const comparison = await executeTokenCommand(
-      tracker,
-      'token-compare',
-      `${sessionId} medium`,
-    );
+    const comparison = await executeTokenCommand(tracker, 'token-compare', `${sessionId} medium`);
 
     expect(comparison).toContain('cheaper');
     expect(comparison).toContain('%');

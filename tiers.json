@@ -2,7 +2,7 @@
   "mode": "normal",
   "tiers": {
     "fast": {
-      "model": "github-copilot/claude-haiku-4.5",
+      "model": "opencode/big-pickle",
       "costRatio": 1,
       "cap": 8,
       "thresholds": {
@@ -11,7 +11,7 @@
       }
     },
     "medium": {
-      "model": "github-copilot/gpt-5.3-codex",
+      "model": "llama.cpp/Nex-N2-mini",
       "costRatio": 5,
       "cap": 12,
       "thresholds": {
@@ -20,7 +20,7 @@
       }
     },
     "heavy": {
-      "model": "github-copilot/claude-sonnet-4.5",
+      "model": "llama.cpp/Nex-N2-mini",
       "costRatio": 20,
       "cap": 20,
       "thresholds": {
@@ -119,7 +119,7 @@
   },
   "routing": {
     "strategy": "llm",
-    "selectorModel": "github-copilot/claude-haiku-4.5",
+    "selectorModel": "opencode/big-pickle",
     "selectorTimeoutMs": 1200,
     "selectorMaxTokens": 16
   },
@@ -131,4 +131,3 @@
     "maxSessionsMemory": 100
   }
 }
-

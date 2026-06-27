@@ -234,10 +234,7 @@ describe('tierRouterPlugin', () => {
 
   it('/router on re-enables routing', async () => {
     const plugin = await tierRouterPlugin(makeCtx(projectDir));
-    await plugin['command.execute.before']?.(
-      { command: '/router', sessionID: 's1', arguments: 'off' },
-      { parts: [] },
-    );
+    await plugin['command.execute.before']?.({ command: '/router', sessionID: 's1', arguments: 'off' }, { parts: [] });
 
     const on = { command: '/router', sessionID: 's1', arguments: 'on' };
     const output = { parts: [] as TextPart[] };
@@ -246,7 +243,12 @@ describe('tierRouterPlugin', () => {
 
     const systemOut = { system: [] as string[] };
     await plugin['experimental.chat.system.transform']?.(
-      { sessionID: 's1', model: {} as unknown as Parameters<NonNullable<typeof plugin['experimental.chat.system.transform']>>[0]['model'] },
+      {
+        sessionID: 's1',
+        model: {} as unknown as Parameters<
+          NonNullable<(typeof plugin)['experimental.chat.system.transform']>
+        >[0]['model'],
+      },
       systemOut,
     );
     expect(systemOut.system.length).toBeGreaterThan(0);
@@ -254,14 +256,16 @@ describe('tierRouterPlugin', () => {
 
   it('when router is off, system transform, caps, and narration hooks are no-ops', async () => {
     const plugin = await tierRouterPlugin(makeCtx(projectDir));
-    await plugin['command.execute.before']?.(
-      { command: '/router', sessionID: 's1', arguments: 'off' },
-      { parts: [] },
-    );
+    await plugin['command.execute.before']?.({ command: '/router', sessionID: 's1', arguments: 'off' }, { parts: [] });
 
     const systemOut = { system: [] as string[] };
     await plugin['experimental.chat.system.transform']?.(
-      { sessionID: 's2', model: {} as unknown as Parameters<NonNullable<typeof plugin['experimental.chat.system.transform']>>[0]['model'] },
+      {
+        sessionID: 's2',
+        model: {} as unknown as Parameters<
+          NonNullable<(typeof plugin)['experimental.chat.system.transform']>
+        >[0]['model'],
+      },
       systemOut,
     );
     expect(systemOut.system).toHaveLength(0);
@@ -274,20 +278,14 @@ describe('tierRouterPlugin', () => {
     expect(toolOut.output).toBe('result');
 
     const textOut = { text: 'Still writing the function' };
-    await plugin['experimental.text.complete']?.(
-      { sessionID: 's2', messageID: 'm1', partID: 'p1' },
-      textOut,
-    );
+    await plugin['experimental.text.complete']?.({ sessionID: 's2', messageID: 'm1', partID: 'p1' }, textOut);
     expect(textOut.text).toBe('Still writing the function');
   });
 
   it('appends narration banner on experimental.text.complete', async () => {
     const plugin = await tierRouterPlugin(makeCtx(projectDir));
     const output = { text: 'Still writing the auth function' };
-    await plugin['experimental.text.complete']?.(
-      { sessionID: 's1', messageID: 'm1', partID: 'p1' },
-      output,
-    );
+    await plugin['experimental.text.complete']?.({ sessionID: 's1', messageID: 'm1', partID: 'p1' }, output);
     expect(output.text).toContain('[⚠ narration detected:');
     expect(output.text).toContain('Still writing the auth function');
   });
@@ -295,10 +293,7 @@ describe('tierRouterPlugin', () => {
   it('does not append narration banner for clean text', async () => {
     const plugin = await tierRouterPlugin(makeCtx(projectDir));
     const output = { text: 'The implementation is complete and tested.' };
-    await plugin['experimental.text.complete']?.(
-      { sessionID: 's1', messageID: 'm1', partID: 'p1' },
-      output,
-    );
+    await plugin['experimental.text.complete']?.({ sessionID: 's1', messageID: 'm1', partID: 'p1' }, output);
     expect(output.text).not.toContain('[⚠ narration detected:');
   });
 
@@ -308,7 +303,17 @@ describe('tierRouterPlugin', () => {
     await plugin.config?.(config);
     await plugin['chat.message']?.(
       { sessionID: 'sub1', agent: 'fast' },
-      { message: { role: 'user', id: 'm1', sessionID: 'sub1', time: { created: 0 }, agent: 'fast', model: { providerID: 'p', modelID: 'm' } }, parts: [] },
+      {
+        message: {
+          role: 'user',
+          id: 'm1',
+          sessionID: 'sub1',
+          time: { created: 0 },
+          agent: 'fast',
+          model: { providerID: 'p', modelID: 'm' },
+        },
+        parts: [],
+      },
     );
 
     const out = { title: 'read', output: 'file content', metadata: {} };
@@ -365,7 +370,12 @@ describe('tierRouterPlugin', () => {
 
     const systemOut = { system: [] as string[] };
     await plugin['experimental.chat.system.transform']?.(
-      { sessionID: 'main-hard', model: {} as unknown as Parameters<NonNullable<typeof plugin['experimental.chat.system.transform']>>[0]['model'] },
+      {
+        sessionID: 'main-hard',
+        model: {} as unknown as Parameters<
+          NonNullable<(typeof plugin)['experimental.chat.system.transform']>
+        >[0]['model'],
+      },
       systemOut,
     );
     expect(systemOut.system.join('\n')).toContain('HARD-BLOCK');

@@ -18,23 +18,11 @@ import {
   type StepFinishEvent,
   type RoutingDecision,
 } from '../src/router/token-event-parser.js';
-import {
-  DefaultMetricsAggregator,
-  type SessionTokenSummary,
-} from '../src/router/metrics-aggregator.js';
-import {
-  type MetricsStorage,
-} from '../src/router/metrics-storage.js';
-import {
-  InMemoryStorage,
-} from '../src/router/in-memory-storage.js';
-import {
-  MarkdownMetricsFormatter,
-} from '../src/router/metrics-formatter.js';
-import {
-  TokenTracker,
-  type PersistedTokenSession,
-} from '../src/router/token-tracker.js';
+import { DefaultMetricsAggregator, type SessionTokenSummary } from '../src/router/metrics-aggregator.js';
+import { type MetricsStorage } from '../src/router/metrics-storage.js';
+import { InMemoryStorage } from '../src/router/in-memory-storage.js';
+import { MarkdownMetricsFormatter } from '../src/router/metrics-formatter.js';
+import { TokenTracker, type PersistedTokenSession } from '../src/router/token-tracker.js';
 import type { RouterConfig } from '../src/router/config.js';
 
 // ============================================================================
@@ -454,14 +442,11 @@ describe('TokenTracker', () => {
         estimated: { input: 100, output: 50 },
       };
 
-      await tracker.recordEvent(
-        createTokenRecord(`session-${i}`, 100, 50, 10, 5, 0, 0.5, 1000 * i, 'fast'),
-        routing,
-      );
+      await tracker.recordEvent(createTokenRecord(`session-${i}`, 100, 50, 10, 5, 0, 0.5, 1000 * i, 'fast'), routing);
     }
 
     // Give async operations time to complete
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
     // At least one session should be persisted (evicted from memory)
     const persisted = await tracker.listSessions();
@@ -477,10 +462,7 @@ describe('TokenTracker', () => {
       estimated: { input: 100, output: 50 },
     };
 
-    await tracker.recordEvent(
-      createTokenRecord('session-compare', 100, 50, 10, 5, 0, 0.5, 1000),
-      routing,
-    );
+    await tracker.recordEvent(createTokenRecord('session-compare', 100, 50, 10, 5, 0, 0.5, 1000), routing);
 
     const comparison = await tracker.getComparison('session-compare', 'medium');
     expect(comparison).toContain('Tier Comparison');
@@ -494,10 +476,7 @@ describe('TokenTracker', () => {
       estimated: { input: 100, output: 50 },
     };
 
-    await tracker.recordEvent(
-      createTokenRecord('session-hist', 100, 50, 10, 5, 0, 0.5, 1000),
-      routing,
-    );
+    await tracker.recordEvent(createTokenRecord('session-hist', 100, 50, 10, 5, 0, 0.5, 1000), routing);
 
     const history = await tracker.getHistory();
     expect(history).toBeDefined();

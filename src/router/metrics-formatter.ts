@@ -72,13 +72,15 @@ export class MarkdownMetricsFormatter implements MetricsFormatter {
       '### Cost Comparison',
       `Actual cost: ${summary.totalCostReal.toFixed(6)}`,
       `If all @medium (5x): ${(summary.totalCostReal + summary.costSavedVsDefault).toFixed(6)}`,
-      `Savings vs default: ${summary.costSavedVsDefault.toFixed(6)} (${
-        ((summary.costSavedVsDefault / (summary.totalCostReal + summary.costSavedVsDefault)) * 100).toFixed(1)
-      }%)`,
+      `Savings vs default: ${summary.costSavedVsDefault.toFixed(6)} (${(
+        (summary.costSavedVsDefault / (summary.totalCostReal + summary.costSavedVsDefault)) *
+        100
+      ).toFixed(1)}%)`,
       `If all @heavy (20x): ${(summary.totalCostReal + summary.costSavedVsHeavy).toFixed(6)}`,
-      `Savings vs heavy: ${summary.costSavedVsHeavy.toFixed(6)} (${
-        ((summary.costSavedVsHeavy / (summary.totalCostReal + summary.costSavedVsHeavy)) * 100).toFixed(1)
-      }%)`,
+      `Savings vs heavy: ${summary.costSavedVsHeavy.toFixed(6)} (${(
+        (summary.costSavedVsHeavy / (summary.totalCostReal + summary.costSavedVsHeavy)) *
+        100
+      ).toFixed(1)}%)`,
     ];
 
     return lines.join('\n');
@@ -98,9 +100,10 @@ export class MarkdownMetricsFormatter implements MetricsFormatter {
     for (const session of sessions) {
       const tokens = session.summary.totalInputTokens + session.summary.totalOutputTokens;
       const accuracy = session.summary.accuracyBreakdown.right + session.summary.accuracyBreakdown.acceptable;
-      const savingsPercent = ((session.summary.costSavedVsDefault /
-        (session.summary.totalCostReal + session.summary.costSavedVsDefault)) *
-        100).toFixed(0);
+      const savingsPercent = (
+        (session.summary.costSavedVsDefault / (session.summary.totalCostReal + session.summary.costSavedVsDefault)) *
+        100
+      ).toFixed(0);
 
       lines.push(
         `| \`${session.sessionId.slice(0, 8)}\` | ${session.delegationCount} | ${tokens} | ${session.summary.totalCostReal.toFixed(6)} | ${accuracy.toFixed(0)}% | ${savingsPercent}% |`,

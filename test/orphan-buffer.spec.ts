@@ -2,7 +2,7 @@
  * OrphanBuffer Tests — FASE0-T2
  *
  * Tests the race condition fix for events arriving before routing decisions.
- * 
+ *
  * Scenarios:
  * 1. Event arrives, no routing decision yet → buffered as orphan
  * 2. Routing decision arrives → correlate with oldest orphan (FIFO)
@@ -18,11 +18,7 @@ import type { TokenRecord, RoutingDecision } from '../src/router/token-event-par
 // Test Fixtures
 // ============================================================================
 
-function createTokenRecord(
-  sessionId: string,
-  timestamp: number,
-  inputTokens: number = 100,
-): TokenRecord {
+function createTokenRecord(sessionId: string, timestamp: number, inputTokens: number = 100): TokenRecord {
   return {
     sessionId,
     timestamp,

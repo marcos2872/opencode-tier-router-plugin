@@ -194,10 +194,7 @@ export class DefaultTokenEventParser implements TokenEventParser {
    * ```
    */
   parse(event: StepFinishEvent, routingDecision?: RoutingDecision): TokenRecord {
-    const totalTokensUsed = event.tokens.input +
-                           event.tokens.output +
-                           event.tokens.reasoning +
-                           event.tokens.cache.read;
+    const totalTokensUsed = event.tokens.input + event.tokens.output + event.tokens.reasoning + event.tokens.cache.read;
 
     const record: TokenRecord = {
       sessionId: event.sessionID,
@@ -207,7 +204,9 @@ export class DefaultTokenEventParser implements TokenEventParser {
       delegatedTier: routingDecision?.tier ?? 'unknown',
       modelUsed: 'unknown', // will be enriched from context if needed
       estimatedTokens: routingDecision?.estimated,
-      estimatedCost: routingDecision?.estimated && calculateCost(routingDecision.estimated, { costRatio: routingDecision.costRatio }),
+      estimatedCost:
+        routingDecision?.estimated &&
+        calculateCost(routingDecision.estimated, { costRatio: routingDecision.costRatio }),
       tierAccuracy: 'UNKNOWN', // will be calculated by aggregator
       estimationError: { input: 0, output: 0 }, // will be calculated by aggregator
       totalTokensUsed,

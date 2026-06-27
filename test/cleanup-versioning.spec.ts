@@ -153,7 +153,7 @@ describe('TokenTracker - Cleanup + Versioning (FASE0-T5)', () => {
     await tracker.recordEvent(event, routing);
 
     const sessions = await tracker.listSessions();
-    
+
     // Check version format is semantic versioning
     if (sessions.length > 0) {
       const versionRegex = /^\d+\.\d+$/;
@@ -169,7 +169,11 @@ describe('TokenTracker - Cleanup + Versioning (FASE0-T5)', () => {
       cost: 2.5,
     };
 
-    const routing = { tier: 'medium' as const, costRatio: 5, estimated: { input: 450, output: 225 } } as RoutingDecision;
+    const routing = {
+      tier: 'medium' as const,
+      costRatio: 5,
+      estimated: { input: 450, output: 225 },
+    } as RoutingDecision;
     await tracker.recordEvent(event, routing);
 
     const sessions = await tracker.listSessions();
@@ -251,7 +255,11 @@ describe('TokenTracker - Cleanup + Versioning (FASE0-T5)', () => {
       cost: 5.0,
     };
 
-    const routing = { tier: 'medium' as const, costRatio: 5, estimated: { input: 900, output: 450 } } as RoutingDecision;
+    const routing = {
+      tier: 'medium' as const,
+      costRatio: 5,
+      estimated: { input: 900, output: 450 },
+    } as RoutingDecision;
     await tracker.recordEvent(event, routing);
 
     const sessions = await tracker.listSessions();

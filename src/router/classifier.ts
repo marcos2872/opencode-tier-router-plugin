@@ -17,10 +17,7 @@ const regexCache = new Map<string, RegExp>();
  * const tier = classifyTask('fix the build script', { fast: [], medium: ['build', 'fix'], heavy: [] });
  * ```
  */
-export function classifyTask(
-  text: string,
-  patterns: TaskPatterns,
-): 'fast' | 'medium' | 'heavy' | null {
+export function classifyTask(text: string, patterns: TaskPatterns): 'fast' | 'medium' | 'heavy' | null {
   const lower = text.toLowerCase();
   const order: Array<'heavy' | 'medium' | 'fast'> = ['heavy', 'medium', 'fast'];
 

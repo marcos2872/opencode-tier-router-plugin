@@ -21,9 +21,7 @@ import {
   type TokenThresholds,
   ConfigError,
 } from '../src/router/config.js';
-import {
-  DefaultMetricsAggregator,
-} from '../src/router/metrics-aggregator.js';
+import { DefaultMetricsAggregator } from '../src/router/metrics-aggregator.js';
 
 // ============================================================================
 // Tests: Config Validation with Thresholds

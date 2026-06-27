@@ -42,8 +42,10 @@ const AGENT_TIER_MAP: Record<string, TierName> = {
   plan: 'heavy',
 };
 
-const TRIVIAL_HINT_RE = /\b(find|grep|search|where|locate|list|show|read|explore|buscar|procurar|ler|listar|mostrar)\b/i;
-const MULTI_STEP_HINT_RE = /\b(and then|depois|em seguida|follow-up|implement|refactor|design|architecture|debug|analyze|implementar|refatorar|arquitetura|depurar|analisar)\b/i;
+const TRIVIAL_HINT_RE =
+  /\b(find|grep|search|where|locate|list|show|read|explore|buscar|procurar|ler|listar|mostrar)\b/i;
+const MULTI_STEP_HINT_RE =
+  /\b(and then|depois|em seguida|follow-up|implement|refactor|design|architecture|debug|analyze|implementar|refatorar|arquitetura|depurar|analisar)\b/i;
 
 interface ToolExecuteOutput {
   usage?: {
@@ -233,7 +235,10 @@ export class PluginOrchestrator {
   /**
    * Classifica mensagens de chat recebidas e rastreia decisões de roteamento.
    */
-  async handleChatMessage(input: { agent?: string; sessionID: string }, output: { message: { summary?: { title?: string; body?: string } }; parts?: unknown[] }): Promise<void> {
+  async handleChatMessage(
+    input: { agent?: string; sessionID: string },
+    output: { message: { summary?: { title?: string; body?: string } }; parts?: unknown[] },
+  ): Promise<void> {
     try {
       if (input.agent && isTierName(input.agent)) {
         this.subagentSessions.add(input.sessionID);
@@ -296,7 +301,10 @@ export class PluginOrchestrator {
         this.hardBlockReasons.set(input.sessionID, `This request requires @${desiredTier}.`);
       }
     } catch (err) {
-      console.warn('[opencode-tier-router] chat.message hook failed:', err instanceof Error ? err.message : String(err));
+      console.warn(
+        '[opencode-tier-router] chat.message hook failed:',
+        err instanceof Error ? err.message : String(err),
+      );
     }
   }
 
@@ -329,7 +337,10 @@ export class PluginOrchestrator {
         );
       }
     } catch (err) {
-      console.warn('[opencode-tier-router] system.transform hook failed:', err instanceof Error ? err.message : String(err));
+      console.warn(
+        '[opencode-tier-router] system.transform hook failed:',
+        err instanceof Error ? err.message : String(err),
+      );
     }
   }
 
@@ -348,14 +359,20 @@ export class PluginOrchestrator {
         output.status = 'deny';
       }
     } catch (err) {
-      console.warn('[opencode-tier-router] permission.ask hook failed:', err instanceof Error ? err.message : String(err));
+      console.warn(
+        '[opencode-tier-router] permission.ask hook failed:',
+        err instanceof Error ? err.message : String(err),
+      );
     }
   }
 
   /**
    * Captura uso de tokens após a execução de uma ferramenta e atualiza avisos de limite.
    */
-  async handleToolExecuteAfter(input: { sessionID?: string; tool: string; args?: Record<string, unknown> }, output: ToolExecuteOutput & { output?: string }): Promise<void> {
+  async handleToolExecuteAfter(
+    input: { sessionID?: string; tool: string; args?: Record<string, unknown> },
+    output: ToolExecuteOutput & { output?: string },
+  ): Promise<void> {
     try {
       if (!this.enabled) return;
       if (!input.sessionID) return;
@@ -390,14 +407,17 @@ export class PluginOrchestrator {
           const cacheRead = usage.cacheReadTokens ?? usage.cache?.read ?? 0;
           const cacheWrite = usage.cacheWriteTokens ?? usage.cache?.write ?? 0;
 
-          const estimatedCost = ((inputTokens * DEFAULT_INPUT_COST_PER_1K) + (outputTokens * DEFAULT_OUTPUT_COST_PER_1K)) / COST_DIVISOR;
+          const estimatedCost =
+            (inputTokens * DEFAULT_INPUT_COST_PER_1K + outputTokens * DEFAULT_OUTPUT_COST_PER_1K) / COST_DIVISOR;
 
           const tier = this.preferredTierSessions.get(input.sessionID);
           const cfg = await this.loadConfig();
-          const routing = tier ? {
-            tier,
-            costRatio: cfg.tiers[tier]?.costRatio ?? 1,
-          } : undefined;
+          const routing = tier
+            ? {
+                tier,
+                costRatio: cfg.tiers[tier]?.costRatio ?? 1,
+              }
+            : undefined;
 
           await this.tokenTracker.recordStepFinish({
             type: 'step-finish',
@@ -418,7 +438,10 @@ export class PluginOrchestrator {
         }
       }
     } catch (err) {
-      console.warn('[opencode-tier-router] tool.execute.after hook failed:', err instanceof Error ? err.message : String(err));
+      console.warn(
+        '[opencode-tier-router] tool.execute.after hook failed:',
+        err instanceof Error ? err.message : String(err),
+      );
     }
   }
 
@@ -434,14 +457,20 @@ export class PluginOrchestrator {
         output.text += `\n\n[⚠ narration detected: "${match}"]`;
       }
     } catch (err) {
-      console.warn('[opencode-tier-router] text.complete hook failed:', err instanceof Error ? err.message : String(err));
+      console.warn(
+        '[opencode-tier-router] text.complete hook failed:',
+        err instanceof Error ? err.message : String(err),
+      );
     }
   }
 
   /**
    * Lida com comandos de roteador e rastreamento de tokens antes que eles alcancem o OpenCode.
    */
-  async handleCommandExecuteBefore(input: { sessionID: string; command: string; arguments: string }, output: { parts?: TextPart[] }): Promise<void> {
+  async handleCommandExecuteBefore(
+    input: { sessionID: string; command: string; arguments: string },
+    output: { parts?: TextPart[] },
+  ): Promise<void> {
     try {
       const command = input.command.replace(/^\//, '').toLowerCase();
       const args = input.arguments.trim();
@@ -514,7 +543,10 @@ export class PluginOrchestrator {
         return;
       }
     } catch (err) {
-      console.warn('[opencode-tier-router] command.execute.before hook failed:', err instanceof Error ? err.message : String(err));
+      console.warn(
+        '[opencode-tier-router] command.execute.before hook failed:',
+        err instanceof Error ? err.message : String(err),
+      );
     }
   }
 }

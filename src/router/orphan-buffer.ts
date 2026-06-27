@@ -92,7 +92,8 @@ export class OrphanBuffer {
       ...oldestRecord,
       delegatedTier: routingDecision.tier,
       estimatedTokens: routingDecision.estimated,
-      estimatedCost: routingDecision.estimated && calculateCost(routingDecision.estimated, { costRatio: routingDecision.costRatio }),
+      estimatedCost:
+        routingDecision.estimated && calculateCost(routingDecision.estimated, { costRatio: routingDecision.costRatio }),
     };
 
     this.buffer.delete(oldestKey);

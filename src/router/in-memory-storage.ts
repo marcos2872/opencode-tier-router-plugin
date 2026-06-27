@@ -25,7 +25,7 @@ export class InMemoryStorage implements MetricsStorage {
   }
 
   async listFiles(dir: string): Promise<string[]> {
-    return [...this.files.keys()].filter(f => f.startsWith(dir));
+    return [...this.files.keys()].filter((f) => f.startsWith(dir));
   }
 
   async delete(filename: string): Promise<void> {

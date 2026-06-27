@@ -131,29 +131,29 @@ export interface SessionTokenSummary {
  * Permite testes com implementações mock.
  */
 export interface MetricsAggregator {
-   /**
-    * Calcula a precisão do tier com base no uso real de tokens e no tier delegado.
-    * Usa limites da config.
-    *
-    * @param totalTokens - Quantidade total de tokens a classificar.
-    * @param tier - Tier a classificar.
-    * @param cfg - Configuração do roteador contendo os limites do tier.
-    * @returns Grau de precisão do tier.
-    */
-   calculateTierAccuracy(
+  /**
+   * Calcula a precisão do tier com base no uso real de tokens e no tier delegado.
+   * Usa limites da config.
+   *
+   * @param totalTokens - Quantidade total de tokens a classificar.
+   * @param tier - Tier a classificar.
+   * @param cfg - Configuração do roteador contendo os limites do tier.
+   * @returns Grau de precisão do tier.
+   */
+  calculateTierAccuracy(
     totalTokens: number,
     tier: 'fast' | 'medium' | 'heavy' | 'unknown',
     cfg: RouterConfig,
   ): TierAccuracy;
 
-   /**
-    * Agrega todos os registros de uma sessão em um resumo com métricas.
-    *
-    * @param records - Registros de tokens a serem agregados.
-    * @param cfg - Configuração do roteador contendo as proporções de custo do tier.
-    * @returns Resumo da sessão agregada.
-    */
-   aggregateSessionMetrics(records: TokenRecord[], cfg: RouterConfig): SessionTokenSummary;
+  /**
+   * Agrega todos os registros de uma sessão em um resumo com métricas.
+   *
+   * @param records - Registros de tokens a serem agregados.
+   * @param cfg - Configuração do roteador contendo as proporções de custo do tier.
+   * @returns Resumo da sessão agregada.
+   */
+  aggregateSessionMetrics(records: TokenRecord[], cfg: RouterConfig): SessionTokenSummary;
 }
 
 /**
@@ -249,21 +249,23 @@ export class DefaultMetricsAggregator implements MetricsAggregator {
 
     // Accuracy breakdown (by tier accuracy grade)
     const accuracyBreakdown: AccuracyBreakdown = {
-      optimal: (records.filter(r => r.tierAccuracy === 'OPTIMAL').length / records.length) * 100,
-      right: (records.filter(r => r.tierAccuracy === 'RIGHT').length / records.length) * 100,
-      acceptable: (records.filter(r => r.tierAccuracy === 'ACCEPTABLE').length / records.length) * 100,
-      suboptimal: (records.filter(r => r.tierAccuracy === 'SUBOPTIMAL').length / records.length) * 100,
-      overshot: (records.filter(r => r.tierAccuracy === 'OVERSHOT').length / records.length) * 100,
+      optimal: (records.filter((r) => r.tierAccuracy === 'OPTIMAL').length / records.length) * 100,
+      right: (records.filter((r) => r.tierAccuracy === 'RIGHT').length / records.length) * 100,
+      acceptable: (records.filter((r) => r.tierAccuracy === 'ACCEPTABLE').length / records.length) * 100,
+      suboptimal: (records.filter((r) => r.tierAccuracy === 'SUBOPTIMAL').length / records.length) * 100,
+      overshot: (records.filter((r) => r.tierAccuracy === 'OVERSHOT').length / records.length) * 100,
     };
 
     // Estimation error (only for records that have estimates)
-    const recordsWithEstimates = records.filter(r => r.estimatedTokens);
-    const averageInputEstimationError = recordsWithEstimates.length > 0
-      ? recordsWithEstimates.reduce((sum, r) => sum + r.estimationError.input, 0) / recordsWithEstimates.length
-      : 0;
-    const averageOutputEstimationError = recordsWithEstimates.length > 0
-      ? recordsWithEstimates.reduce((sum, r) => sum + r.estimationError.output, 0) / recordsWithEstimates.length
-      : 0;
+    const recordsWithEstimates = records.filter((r) => r.estimatedTokens);
+    const averageInputEstimationError =
+      recordsWithEstimates.length > 0
+        ? recordsWithEstimates.reduce((sum, r) => sum + r.estimationError.input, 0) / recordsWithEstimates.length
+        : 0;
+    const averageOutputEstimationError =
+      recordsWithEstimates.length > 0
+        ? recordsWithEstimates.reduce((sum, r) => sum + r.estimationError.output, 0) / recordsWithEstimates.length
+        : 0;
 
     // Cost comparison
     const totalTokens = totalInputTokens + totalOutputTokens;
@@ -281,8 +283,8 @@ export class DefaultMetricsAggregator implements MetricsAggregator {
     return {
       sessionId: records[0].sessionId,
       records,
-      startTime: Math.min(...records.map(r => r.timestamp)),
-      endTime: Math.max(...records.map(r => r.timestamp)),
+      startTime: Math.min(...records.map((r) => r.timestamp)),
+      endTime: Math.max(...records.map((r) => r.timestamp)),
       totalInputTokens,
       totalOutputTokens,
       totalReasoningTokens,
