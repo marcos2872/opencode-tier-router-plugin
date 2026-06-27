@@ -44,11 +44,47 @@
 
 ## Handoff
 
-- **Feature**: —
-- **Phase / Task**: —
+- **Feature**: RTT-001 Real Token Cost Tracking (Caminho 2 + Correções Críticas)
+- **Phase / Task**: Specify → Design → Tasks (complete); Fase 0 (correções) ready to execute
 - **Completed**: opencode-tier-router — all tasks + fixes verified (PASS)
 - **In-progress** (file:line): —
-- **Next step**: —
+- **Next step**: Execute FASE0-T1 (separate into 5 SRP modules, 90 min)
 - **Blockers**: none
-- **Uncommitted files**: none
+- **Uncommitted files**: .specs/features/token-cost-tracking/{spec.md, design.md, tasks.md} — CORRIGIDOS com 5 fixes críticas
 - **Branch**: master
+- **Status**: Fase 0 (correções críticas) identified and documented; ready for implementation
+
+## Implementation Timeline
+
+- **FASE 0** (5 tasks, 5.5h): Corrigir 5 falhas críticas
+  - FASE0-T1: Separate into 5 SRP modules (90m)
+  - FASE0-T2: OrphanBuffer + retry 5s (60m)
+  - FASE0-T3: Config thresholds (45m)
+  - FASE0-T4: LRU + TTL + persist-on-evict (60m)
+  - FASE0-T5: Cleanup + versionamento (60m)
+  - **Next:** Comece com FASE0-T1 — é foundational para todo o resto
+
+- **FASE 1-4** (14 tasks, 11.75h): Implementar feature (conforme design corrigido)
+  - RTT-T1..T5: Event capture (4h)
+  - RTT-T6..T8: Aggregation (2.5h)
+  - RTT-T9..T12: Commands (3h)
+  - RTT-T13..T14: Integration (1.75h)
+
+- **Total**: 19 tasks, **16.75 horas** (vs 26.5h sem correções)
+
+## Decision Log Update
+
+### AD-006 (REVISED)
+- **Decision**: Real Token Tracking + 5 Critical Fixes
+- **Reason**: Heuristic estimates inaccurate; architecture had 5 critical design flaws causing data loss, invalid metrics, race conditions, and technical debt
+- **Fixes Applied**:
+  1. **ERRO-001**: Separate into 5 SRP modules (Clean Architecture)
+  2. **ERRO-002**: OrphanBuffer + retry 5s (temporal coupling)
+  3. **ERRO-003**: Config-driven thresholds (vs hardcoded)
+  4. **ERRO-004**: LRU + TTL + persist-on-evict (data loss prevention)
+  5. **ERRO-005**: Cleanup strategy + maxHistoryFiles (disk bounded)
+- **Trade-off**: +5.5h for Fase 0 → -10h debugging post-MVP → net -4.5h total
+- **Evidence**: Post-review architecture passes SOLID, Clean Code, DDD principles
+- **Scope**: RTT-001 implementation
+- **Date**: 2026-06-27 (post-review)
+- **Status**: active

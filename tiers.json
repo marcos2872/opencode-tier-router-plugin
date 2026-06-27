@@ -4,17 +4,29 @@
     "fast": {
       "model": "github-copilot/claude-haiku-4.5",
       "costRatio": 1,
-      "cap": 8
+      "cap": 8,
+      "thresholds": {
+        "min": 0,
+        "max": 2000
+      }
     },
     "medium": {
       "model": "github-copilot/gpt-5.3-codex",
       "costRatio": 5,
-      "cap": 12
+      "cap": 12,
+      "thresholds": {
+        "min": 2000,
+        "max": 10000
+      }
     },
     "heavy": {
       "model": "github-copilot/claude-sonnet-4.5",
       "costRatio": 20,
-      "cap": 20
+      "cap": 20,
+      "thresholds": {
+        "min": 10000,
+        "max": null
+      }
     }
   },
   "modes": {
@@ -110,5 +122,13 @@
     "selectorModel": "github-copilot/claude-haiku-4.5",
     "selectorTimeoutMs": 1200,
     "selectorMaxTokens": 16
+  },
+  "tokenTracking": {
+    "enabled": true,
+    "maxHistoryFiles": 50,
+    "maxHistoryDays": 30,
+    "sessionTTLMinutes": 30,
+    "maxSessionsMemory": 100
   }
 }
+

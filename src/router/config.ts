@@ -1,10 +1,18 @@
 import { access, readFile, writeFile, rename, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 
+export type TierName = 'fast' | 'medium' | 'heavy';
+
+export interface TokenThresholds {
+  min: number;      // Minimum tokens this tier should handle
+  max: number | null; // Maximum tokens this tier should handle (null = unlimited)
+}
+
 export interface TierConfig {
   model: string;
   costRatio: number;
   cap: number;
+  thresholds?: TokenThresholds; // ✅ ERRO-003: User-configurable tier thresholds
 }
 
 export interface ModeConfig {
@@ -30,6 +38,14 @@ export interface RoutingConfig {
   selectorMaxTokens: number;
 }
 
+export interface TokenTrackingConfig {
+  enabled?: boolean;           // Default: true if field is present
+  maxHistoryFiles?: number;    // ✅ ERRO-005: User-configurable max disk storage (default: 50)
+  maxHistoryDays?: number;     // Days to keep historical token records (default: 30)
+  sessionTTLMinutes?: number;  // ✅ ERRO-004: Session TTL before eviction (default: 30)
+  maxSessionsMemory?: number;  // ✅ ERRO-004: Max sessions in memory before LRU (default: 100)
+}
+
 export interface RouterConfig {
   mode: string;
   tiers: Record<string, TierConfig>;
@@ -37,6 +53,7 @@ export interface RouterConfig {
   taskPatterns: TaskPatterns;
   enforcement: EnforcementConfig;
   routing: RoutingConfig;
+  tokenTracking?: TokenTrackingConfig; // ✅ ERRO-003, ERRO-004, ERRO-005: Token cost tracking config
 }
 
 export interface ActiveTiers {
@@ -54,9 +71,24 @@ export class ConfigError extends Error {
 const DEFAULT_CONFIG: RouterConfig = {
   mode: 'normal',
   tiers: {
-    fast: { model: 'github-copilot/claude-haiku-4.5', costRatio: 1, cap: 8 },
-    medium: { model: 'github-copilot/gpt-5.3-codex', costRatio: 5, cap: 12 },
-    heavy: { model: 'github-copilot/claude-sonnet-4.5', costRatio: 20, cap: 20 },
+    fast: {
+      model: 'github-copilot/claude-haiku-4.5',
+      costRatio: 1,
+      cap: 8,
+      thresholds: { min: 0, max: 2000 }, // ✅ ERRO-003: Default thresholds
+    },
+    medium: {
+      model: 'github-copilot/gpt-5.3-codex',
+      costRatio: 5,
+      cap: 12,
+      thresholds: { min: 2000, max: 10000 },
+    },
+    heavy: {
+      model: 'github-copilot/claude-sonnet-4.5',
+      costRatio: 20,
+      cap: 20,
+      thresholds: { min: 10000, max: null }, // unlimited
+    },
   },
   modes: {
     normal: {
@@ -151,6 +183,13 @@ const DEFAULT_CONFIG: RouterConfig = {
     selectorModel: 'github-copilot/claude-haiku-4.5',
     selectorTimeoutMs: 1200,
     selectorMaxTokens: 16,
+  },
+  tokenTracking: {
+    enabled: true,
+    maxHistoryFiles: 50, // ✅ ERRO-005: Bounded disk (50 files max)
+    maxHistoryDays: 30,
+    sessionTTLMinutes: 30, // ✅ ERRO-004: 30-min TTL
+    maxSessionsMemory: 100, // ✅ ERRO-004: Max 100 sessions in memory
   },
 };
 
@@ -274,6 +313,19 @@ export function validateConfig(config: unknown): asserts config is RouterConfig 
     if (typeof t.cap !== 'number' || !Number.isFinite(t.cap) || t.cap <= 0) {
       throw new ConfigError(`tier "${tierName}" cap must be a positive number`);
     }
+    // ✅ ERRO-003: Validate thresholds if present
+    if (t.thresholds) {
+      if (typeof t.thresholds !== 'object') {
+        throw new ConfigError(`tier "${tierName}" thresholds must be an object`);
+      }
+      const th = t.thresholds as Partial<TokenThresholds>;
+      if (typeof th.min !== 'number' || !Number.isFinite(th.min) || th.min < 0) {
+        throw new ConfigError(`tier "${tierName}" thresholds.min must be a non-negative number`);
+      }
+      if (th.max !== null && (typeof th.max !== 'number' || !Number.isFinite(th.max) || th.max < th.min!)) {
+        throw new ConfigError(`tier "${tierName}" thresholds.max must be null or a number >= min`);
+      }
+    }
   }
 
   if (!cfg.taskPatterns || typeof cfg.taskPatterns !== 'object') {
@@ -289,6 +341,29 @@ export function validateConfig(config: unknown): asserts config is RouterConfig 
       if (typeof pattern !== 'string' || pattern.length === 0) {
         throw new ConfigError(`taskPatterns for tier "${tierName}" must contain non-empty strings`);
       }
+    }
+  }
+
+  // ✅ ERRO-003, ERRO-004, ERRO-005: Validate tokenTracking if present
+  if (cfg.tokenTracking) {
+    if (typeof cfg.tokenTracking !== 'object') {
+      throw new ConfigError('tokenTracking must be an object');
+    }
+    const tt = cfg.tokenTracking as Partial<TokenTrackingConfig>;
+    if (tt.enabled !== undefined && typeof tt.enabled !== 'boolean') {
+      throw new ConfigError('tokenTracking.enabled must be boolean');
+    }
+    if (tt.maxHistoryFiles !== undefined && (typeof tt.maxHistoryFiles !== 'number' || !Number.isFinite(tt.maxHistoryFiles) || tt.maxHistoryFiles < 1)) {
+      throw new ConfigError('tokenTracking.maxHistoryFiles must be a positive number');
+    }
+    if (tt.maxHistoryDays !== undefined && (typeof tt.maxHistoryDays !== 'number' || !Number.isFinite(tt.maxHistoryDays) || tt.maxHistoryDays < 1)) {
+      throw new ConfigError('tokenTracking.maxHistoryDays must be a positive number');
+    }
+    if (tt.sessionTTLMinutes !== undefined && (typeof tt.sessionTTLMinutes !== 'number' || !Number.isFinite(tt.sessionTTLMinutes) || tt.sessionTTLMinutes < 1)) {
+      throw new ConfigError('tokenTracking.sessionTTLMinutes must be a positive number');
+    }
+    if (tt.maxSessionsMemory !== undefined && (typeof tt.maxSessionsMemory !== 'number' || !Number.isFinite(tt.maxSessionsMemory) || tt.maxSessionsMemory < 1)) {
+      throw new ConfigError('tokenTracking.maxSessionsMemory must be a positive number');
     }
   }
 }
