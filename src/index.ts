@@ -7,6 +7,7 @@ import { buildDelegationProtocol } from './router/protocol.js';
 import { selectTierByStrategy, type SelectionSource } from './router/selector.js';
 import { createCapTracker } from './router/caps.js';
 import { detectNarration } from './narration.js';
+import { assertEnforcement, reportEnforcement } from './router/enforcement-validator.js';
 
 const TIER_NAMES = ['fast', 'medium', 'heavy'] as const;
 type TierName = (typeof TIER_NAMES)[number];
@@ -189,6 +190,18 @@ const tierRouterPlugin: Plugin = async (ctx) => {
     config: async (input: Config) => {
       try {
         const cfg = await loadConfig(ctx.directory);
+
+        // ✅ CRITICAL: Validate enforcement rules at initialization
+        try {
+          assertEnforcement(cfg);
+          console.log('[opencode-tier-router] Enforcement validation passed');
+        } catch (enforcementErr) {
+          console.warn(
+            '[opencode-tier-router] CRITICAL: Enforcement validation failed. Config is invalid for 100% delegation.',
+          );
+          console.warn(reportEnforcement(cfg));
+          // Best-effort: continue but log the issue
+        }
 
         input.agent = input.agent ?? {};
         for (const tier of TIER_NAMES) {
