@@ -23,7 +23,12 @@ import { createCapTracker } from './router/caps.js';
 import { detectNarration } from './narration.js';
 import { assertEnforcement, reportEnforcement } from './router/enforcement-validator.js';
 import { FileLogger } from './utils/logger.js';
-import { TRIVIAL_TASK_MAX_LENGTH, SESSION_TTL_MS } from './constants.js';
+import {
+  HARD_BLOCK_DELEGATION_MESSAGE,
+  HARD_BLOCK_DENIED_TOOLS,
+  SESSION_TTL_MS,
+  TRIVIAL_TASK_MAX_LENGTH,
+} from './constants.js';
 
 const TIER_NAMES = ['fast', 'medium', 'heavy'] as const;
 type TierName = (typeof TIER_NAMES)[number];
@@ -97,7 +102,10 @@ export class PluginOrchestrator {
   private pendingCommandResponses = new Map<string, TextPart[]>();
   private log: FileLogger;
 
-  constructor(private readonly ctx: PluginInput, private readonly config: RouterConfig) {
+  constructor(
+    private readonly ctx: PluginInput,
+    private readonly config: RouterConfig,
+  ) {
     this.log = new FileLogger();
   }
 
@@ -105,7 +113,7 @@ export class PluginOrchestrator {
     return this.ctx.project;
   }
 
-  get '$'(): PluginInput['$'] {
+  get $(): PluginInput['$'] {
     return this.ctx.$;
   }
 
@@ -278,16 +286,11 @@ export class PluginOrchestrator {
           }
           this.log.info('chat.message command intercepted', { cmdName, cmdArg });
           return;
-
         }
 
         if (cmdName === 'tiers') {
           const cfg = await this.loadConfig();
-          const lines = [
-            `Mode: ${cfg.mode}`,
-            `Enforcement: ${cfg.enforcement.mode}`,
-            `Tiers:`,
-          ];
+          const lines = [`Mode: ${cfg.mode}`, `Enforcement: ${cfg.enforcement.mode}`, `Tiers:`];
           for (const tier of ['fast', 'medium', 'heavy'] as const) {
             const t = cfg.tiers[tier];
             lines.push(`  @${tier}: ${t?.model ?? 'n/a'} (cost ${t?.costRatio ?? 'n/a'}x)`);
@@ -440,7 +443,12 @@ export class PluginOrchestrator {
       }
       if (!input.sessionID) return;
 
-      this.log.info('permission.ask', { sessionID: input.sessionID, type: input.type, isSubagent: this.subagentSessions.has(input.sessionID), isHardBlocked: this.hardBlockedSessions.has(input.sessionID) });
+      this.log.info('permission.ask', {
+        sessionID: input.sessionID,
+        type: input.type,
+        isSubagent: this.subagentSessions.has(input.sessionID),
+        isHardBlocked: this.hardBlockedSessions.has(input.sessionID),
+      });
 
       // Subagent → auto-allow without showing the permission dialog.
       // The event hook used to respond with 'once' AFTER the dialog appeared,
@@ -476,22 +484,34 @@ export class PluginOrchestrator {
       // The internal bus publishes "permission.asked"; the SDK type uses "permission.updated".
       if (event.type !== 'permission.asked' && event.type !== 'permission.updated') return;
 
-      const props = event.properties as {
-        id?: string;
-        sessionID?: string;
-        type?: string;
-        permission?: string;
-      } | undefined;
+      const props = event.properties as
+        | {
+            id?: string;
+            sessionID?: string;
+            type?: string;
+            permission?: string;
+          }
+        | undefined;
       if (!props?.sessionID) return;
 
       const client = (this.ctx as { client?: { postSessionIdPermissionsPermissionId?: Function } }).client;
       if (!client?.postSessionIdPermissionsPermissionId || !props.id) {
-        this.log.warn('cannot reply:', { hasClient: !!client, hasMethod: !!(client as any)?.postSessionIdPermissionsPermissionId, hasId: !!props.id, sessionID: props.sessionID });
+        this.log.warn('cannot reply:', {
+          hasClient: !!client,
+          hasMethod: !!(client as any)?.postSessionIdPermissionsPermissionId,
+          hasId: !!props.id,
+          sessionID: props.sessionID,
+        });
         return;
       }
 
       const tier = this.hardBlockedSessions.get(props.sessionID);
-      this.log.info('event', { sessionID: props.sessionID, permission: props.permission, tier: tier ?? null, isSubagent: this.subagentSessions.has(props.sessionID) });
+      this.log.info('event', {
+        sessionID: props.sessionID,
+        permission: props.permission,
+        tier: tier ?? null,
+        isSubagent: this.subagentSessions.has(props.sessionID),
+      });
       if (tier) {
         // Show a visible toast notification so the user understands the block,
         // even if the permission dialog is hidden behind the input prompt.
@@ -528,19 +548,7 @@ export class PluginOrchestrator {
     }
   }
 
-  private readonly HARD_BLOCK_DENIED_TOOLS = new Set([
-    'grep',
-    'glob',
-    'read',
-    'list',
-    'bash',
-    'edit',
-    'write',
-    'webfetch',
-    'websearch',
-  ]);
-  private readonly HARD_BLOCK_DELEGATION_MESSAGE =
-    'Delegue para @heavy. Esta ferramenta esta bloqueada para execucao direta.';
+  private readonly HARD_BLOCK_DENIED_TOOLS = new Set(HARD_BLOCK_DENIED_TOOLS);
 
   // Map of tools → contextual hint. The router (which has the delegation
   // protocol in its system prompt) reads "Router:" and chooses to delegate.
@@ -564,14 +572,25 @@ export class PluginOrchestrator {
     try {
       if (!this.enabled) return;
       if (!input.sessionID) return;
-      if (this.subagentSessions.has(input.sessionID)) return;
+
+      if (this.subagentSessions.has(input.sessionID)) {
+        output.allow = true;
+        delete output.message;
+        return;
+      }
 
       const tier = this.hardBlockedSessions.get(input.sessionID);
-      if (!tier || !this.HARD_BLOCK_DENIED_TOOLS.has(input.tool)) return;
+      if (!tier || !this.HARD_BLOCK_DENIED_TOOLS.has(input.tool as (typeof HARD_BLOCK_DENIED_TOOLS)[number])) return;
 
+      this.log.info('Denied tool blocked before execution', {
+        sessionID: input.sessionID,
+        callID: input.callID,
+        tool: input.tool,
+      });
       delete output.args;
+      delete output.message;
       output.allow = false;
-      output.message = this.HARD_BLOCK_DELEGATION_MESSAGE;
+      output.message = HARD_BLOCK_DELEGATION_MESSAGE;
     } catch (err) {
       await this.logObservable('error', 'Hook failed', {
         hook: 'tool.execute.before',

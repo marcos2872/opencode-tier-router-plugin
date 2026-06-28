@@ -24,6 +24,27 @@ export const CAP_WARNING_REMAINING_THRESHOLD = 2;
 export const SESSION_TTL_MS = 30 * 60 * 1000;
 
 /**
+ * Ferramentas nativas bloqueadas antes da execução em sessões principais hard-blocked.
+ */
+export const HARD_BLOCK_DENIED_TOOLS = [
+  'grep',
+  'glob',
+  'read',
+  'list',
+  'bash',
+  'edit',
+  'write',
+  'webfetch',
+  'websearch',
+] as const;
+
+/**
+ * Mensagem padrão de delegação para ferramentas bloqueadas por hard-block.
+ */
+export const HARD_BLOCK_DELEGATION_MESSAGE =
+  'Delegue para @heavy. Esta ferramenta esta bloqueada para execucao direta.';
+
+/**
  * Cap máximo padrão de chamadas de ferramenta por tier.
  */
 export const DEFAULT_TIER_CAP = 8;

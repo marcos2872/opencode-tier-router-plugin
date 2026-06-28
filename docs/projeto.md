@@ -136,6 +136,23 @@ O arquivo `tiers.json` controla todo o comportamento do plugin. Resolução em c
 
 Ver [arquitetura.md](./arquitetura.md#configuração-tiers.json) para detalhes sobre cada campo.
 
+## Contrato: `tool.execute.before`
+
+O plugin registra o hook `tool.execute.before` em `src/index.ts` e decide no `PluginOrchestrator` antes que ferramentas nativas sensíveis sejam executadas.
+
+- **Sessões principais hard-blocked**: ferramentas nativas `grep|glob|read|list|bash|edit|write|webfetch|websearch` são bloqueadas antes da execução. O hook retorna exatamente:
+
+```json
+{
+  "allow": false,
+  "message": "Delegue para @heavy. Esta ferramenta esta bloqueada para execucao direta."
+}
+```
+
+- **Proteção de arquivos sensíveis**: `read|list|glob|grep|bash|edit|write` são tratados como operações sensíveis no fluxo do router. Quando uma sessão principal hard-blocked tenta executar qualquer ferramenta da lista, o plugin grava um evento de auditoria no `FileLogger` com `sessionID`, `callID` e `tool`.
+- **Subagentes**: se `sessionID` pertence a um subagente, o hook retorna `{ "allow": true }` imediatamente e não aplica bloqueio do router.
+- **Ferramentas não listadas**: como `task`, o fluxo permanece inalterado para sessões principais, permitindo a delegação esperada.
+
 ## Comandos Úteis
 
 ### Build

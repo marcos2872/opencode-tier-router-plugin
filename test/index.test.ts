@@ -1,9 +1,11 @@
-import { mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdir, writeFile, rm, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { PluginInput, Config } from '@opencode-ai/plugin';
 import type { TextPart } from '@opencode-ai/sdk';
 import tierRouterPlugin from '../src/index.js';
+import { HARD_BLOCK_DELEGATION_MESSAGE, HARD_BLOCK_DENIED_TOOLS } from '../src/constants.js';
+import { FileLogger } from '../src/utils/logger.js';
 
 function makeClient(appLog: ReturnType<typeof vi.fn> = vi.fn(async () => true)): PluginInput['client'] {
   return {
@@ -27,7 +29,10 @@ function textOf(parts: TextPart[] | undefined): string {
   return parts?.map((p) => p.text).join('\n') ?? '';
 }
 
-async function classifyHardBlocked(plugin: Awaited<ReturnType<typeof tierRouterPlugin>>, sessionID: string): Promise<void> {
+async function classifyHardBlocked(
+  plugin: Awaited<ReturnType<typeof tierRouterPlugin>>,
+  sessionID: string,
+): Promise<void> {
   await plugin['chat.message']?.(
     { sessionID, agent: 'build' },
     {
@@ -90,6 +95,7 @@ describe('tierRouterPlugin', () => {
 
   afterEach(async () => {
     await rm(projectDir, { recursive: true, force: true });
+    await rm(join(process.cwd(), 'src', 'router-debug.log'), { force: true });
   });
 
   it('logs plugin init to client.app.log when available', async () => {
@@ -176,10 +182,9 @@ describe('tierRouterPlugin', () => {
     const appLog = vi.fn(async () => true);
     const plugin = await tierRouterPlugin(makeCtx(projectDir, makeClient(appLog)));
 
-    await plugin['experimental.text.complete']?.(
-      { sessionID: 's1', messageID: 'm1', partID: 'p1' },
-      { text: undefined } as unknown as { text: string },
-    );
+    await plugin['experimental.text.complete']?.({ sessionID: 's1', messageID: 'm1', partID: 'p1' }, {
+      text: undefined,
+    } as unknown as { text: string });
 
     expect(appLog).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -344,7 +349,15 @@ describe('tierRouterPlugin', () => {
           agent: 'build',
           model: { providerID: 'github-copilot', modelID: 'gpt-5.3-codex' },
         },
-        parts: [{ id: 'p-quality', sessionID: 's-quality', messageID: 'm-quality', type: 'text', text: 'melhore a navegação' }],
+        parts: [
+          {
+            id: 'p-quality',
+            sessionID: 's-quality',
+            messageID: 'm-quality',
+            type: 'text',
+            text: 'melhore a navegação',
+          },
+        ],
       } as unknown as Parameters<NonNullable<(typeof plugin)['chat.message']>>[0],
       {
         message: {
@@ -456,21 +469,31 @@ describe('tierRouterPlugin', () => {
     const plugin = await tierRouterPlugin(makeCtx(projectDir));
 
     const offCommand = { parts: [] as TextPart[] };
-    await plugin['command.execute.before']?.({ command: '/router', sessionID: 'test-pending-off', arguments: 'off' }, offCommand);
+    await plugin['command.execute.before']?.(
+      { command: '/router', sessionID: 'test-pending-off', arguments: 'off' },
+      offCommand,
+    );
 
     const offChat = { message: {}, parts: [] as unknown[] };
     await plugin['chat.message']?.(
-      { sessionID: 'test-pending-off', parts: [] } as unknown as Parameters<NonNullable<(typeof plugin)['chat.message']>>[0],
+      { sessionID: 'test-pending-off', parts: [] } as unknown as Parameters<
+        NonNullable<(typeof plugin)['chat.message']>
+      >[0],
       offChat as unknown as Parameters<NonNullable<(typeof plugin)['chat.message']>>[1],
     );
     expect(textOf(offChat.parts as TextPart[])).toBe('Tier router disabled.');
 
     const onCommand = { parts: [] as TextPart[] };
-    await plugin['command.execute.before']?.({ command: '/router', sessionID: 'test-pending-on', arguments: 'on' }, onCommand);
+    await plugin['command.execute.before']?.(
+      { command: '/router', sessionID: 'test-pending-on', arguments: 'on' },
+      onCommand,
+    );
 
     const onChat = { message: {}, parts: [] as unknown[] };
     await plugin['chat.message']?.(
-      { sessionID: 'test-pending-on', parts: [] } as unknown as Parameters<NonNullable<(typeof plugin)['chat.message']>>[0],
+      { sessionID: 'test-pending-on', parts: [] } as unknown as Parameters<
+        NonNullable<(typeof plugin)['chat.message']>
+      >[0],
       onChat as unknown as Parameters<NonNullable<(typeof plugin)['chat.message']>>[1],
     );
     expect(textOf(onChat.parts as TextPart[])).toBe('Tier router enabled.');
@@ -606,17 +629,16 @@ describe('tierRouterPlugin', () => {
     expect(systemOut.system.join('\n')).not.toContain('Task Delegation Reference');
   });
 
-  it('hard-block blocks denied tools before execution for main sessions', async () => {
-    const plugin = await tierRouterPlugin(makeCtx(projectDir));
-    await classifyHardBlocked(plugin, 'main-tool-before');
+  it('hard-block returns the exact deny contract for every denied native tool', async () => {
+    for (const tool of HARD_BLOCK_DENIED_TOOLS) {
+      const plugin = await tierRouterPlugin(makeCtx(projectDir));
+      await classifyHardBlocked(plugin, `main-${tool}`);
 
-    const toolOut = { args: { path: 'src/index.ts' } };
-    await plugin['tool.execute.before']?.(
-      { sessionID: 'main-tool-before', tool: 'read', callID: 'call-read' },
-      toolOut,
-    );
+      const toolOut = { allow: true, message: 'allowed', args: { path: 'src/index.ts' } };
+      await plugin['tool.execute.before']?.({ sessionID: `main-${tool}`, tool, callID: `call-${tool}` }, toolOut);
 
-    expect(toolOut).toEqual({ allow: false, message: 'Delegue para @heavy. Esta ferramenta esta bloqueada para execucao direta.' });
+      expect(toolOut).toEqual({ allow: false, message: HARD_BLOCK_DELEGATION_MESSAGE });
+    }
   });
 
   it('hard-block leaves non-denied tools before execution for main sessions', async () => {
@@ -632,7 +654,7 @@ describe('tierRouterPlugin', () => {
     expect(toolOut).toEqual({ args: { task: 'write docs', sessionID: 'main-task-before' } });
   });
 
-  it('hard-block lets subagent sessions pass through denied tools before execution', async () => {
+  it('hard-block returns allow for subagent sessions before execution', async () => {
     const plugin = await tierRouterPlugin(makeCtx(projectDir));
     await plugin['chat.message']?.(
       { sessionID: 'sub-tool-before', agent: 'fast' },
@@ -649,13 +671,34 @@ describe('tierRouterPlugin', () => {
       },
     );
 
-    const toolOut = { args: { path: 'src/index.ts' } };
+    const toolOut = { allow: true, message: 'allowed', args: { path: 'src/index.ts' } };
     await plugin['tool.execute.before']?.(
       { sessionID: 'sub-tool-before', tool: 'read', callID: 'call-read-sub' },
       toolOut,
     );
 
-    expect(toolOut).toEqual({ args: { path: 'src/index.ts' } });
+    expect(toolOut).toEqual({ allow: true, args: { path: 'src/index.ts' } });
+  });
+
+  it('hard-block records denied tool attempts through FileLogger', async () => {
+    const plugin = await tierRouterPlugin(makeCtx(projectDir));
+    await classifyHardBlocked(plugin, 'main-tool-audit');
+
+    const toolOut = { args: { path: 'src/index.ts' } };
+    const infoSpy = vi.spyOn(FileLogger.prototype, 'info');
+    await plugin['tool.execute.before']?.(
+      { sessionID: 'main-tool-audit', tool: 'read', callID: 'call-read-audit' },
+      toolOut,
+    );
+
+    expect(toolOut).toEqual({ allow: false, message: HARD_BLOCK_DELEGATION_MESSAGE });
+
+    expect(infoSpy).toHaveBeenCalledWith('Denied tool blocked before execution', {
+      sessionID: 'main-tool-audit',
+      callID: 'call-read-audit',
+      tool: 'read',
+    });
+    infoSpy.mockRestore();
   });
 
   it('hard-block denies direct tool permissions for mapped build agent sessions', async () => {
