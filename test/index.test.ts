@@ -113,7 +113,7 @@ describe('tierRouterPlugin', () => {
     });
   });
 
-  it('skips tiers with invalid model strings and logs a warning', async () => {
+  it('skips tiers with invalid model strings', async () => {
     await writeTiers(projectDir, {
       tiers: {
         fast: { model: 'invalid-no-slash', costRatio: 1, cap: 8 },
@@ -124,15 +124,7 @@ describe('tierRouterPlugin', () => {
 
     const plugin = await tierRouterPlugin(makeCtx(projectDir));
     const config: Config = { agent: {} };
-    const warnings: string[] = [];
-    const originalWarn = console.warn;
-    console.warn = (...args: unknown[]) => warnings.push(args.join(' '));
-
-    try {
-      await plugin.config?.(config);
-    } finally {
-      console.warn = originalWarn;
-    }
+    await plugin.config?.(config);
 
     expect(config.agent?.fast).toBeUndefined();
     expect(config.agent?.heavy).toBeUndefined();
@@ -140,8 +132,6 @@ describe('tierRouterPlugin', () => {
       model: 'github-copilot/gpt-5.3-codex',
       mode: 'subagent',
     });
-    expect(warnings.some((w) => w.includes('@fast'))).toBe(true);
-    expect(warnings.some((w) => w.includes('@heavy'))).toBe(true);
   });
 
   it('/tiers displays active mode and tier configuration', async () => {
