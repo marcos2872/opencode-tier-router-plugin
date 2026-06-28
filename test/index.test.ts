@@ -27,6 +27,24 @@ function textOf(parts: TextPart[] | undefined): string {
   return parts?.map((p) => p.text).join('\n') ?? '';
 }
 
+async function classifyHardBlocked(plugin: Awaited<ReturnType<typeof tierRouterPlugin>>, sessionID: string): Promise<void> {
+  await plugin['chat.message']?.(
+    { sessionID, agent: 'build' },
+    {
+      message: {
+        role: 'user',
+        id: `m-${sessionID}`,
+        sessionID,
+        time: { created: 0 },
+        agent: 'build',
+        model: { providerID: 'github-copilot', modelID: 'gpt-5.3-codex' },
+        summary: { title: 'review architecture thoroughly', diffs: [] },
+      },
+      parts: [{ type: 'text', text: 'review architecture thoroughly' } as unknown as TextPart],
+    },
+  );
+}
+
 async function setupProject(): Promise<string> {
   const dir = join('/tmp', `tier-router-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
   await mkdir(dir, { recursive: true });
@@ -586,6 +604,58 @@ describe('tierRouterPlugin', () => {
     );
     expect(systemOut.system.join('\n')).toContain('HARD-BLOCK');
     expect(systemOut.system.join('\n')).not.toContain('Task Delegation Reference');
+  });
+
+  it('hard-block blocks denied tools before execution for main sessions', async () => {
+    const plugin = await tierRouterPlugin(makeCtx(projectDir));
+    await classifyHardBlocked(plugin, 'main-tool-before');
+
+    const toolOut = { args: { path: 'src/index.ts' } };
+    await plugin['tool.execute.before']?.(
+      { sessionID: 'main-tool-before', tool: 'read', callID: 'call-read' },
+      toolOut,
+    );
+
+    expect(toolOut).toEqual({ allow: false, message: 'Delegue para @heavy. Esta ferramenta esta bloqueada para execucao direta.' });
+  });
+
+  it('hard-block leaves non-denied tools before execution for main sessions', async () => {
+    const plugin = await tierRouterPlugin(makeCtx(projectDir));
+    await classifyHardBlocked(plugin, 'main-task-before');
+
+    const toolOut = { args: { task: 'write docs', sessionID: 'main-task-before' } };
+    await plugin['tool.execute.before']?.(
+      { sessionID: 'main-task-before', tool: 'task', callID: 'call-task' },
+      toolOut,
+    );
+
+    expect(toolOut).toEqual({ args: { task: 'write docs', sessionID: 'main-task-before' } });
+  });
+
+  it('hard-block lets subagent sessions pass through denied tools before execution', async () => {
+    const plugin = await tierRouterPlugin(makeCtx(projectDir));
+    await plugin['chat.message']?.(
+      { sessionID: 'sub-tool-before', agent: 'fast' },
+      {
+        message: {
+          role: 'user',
+          id: 'm-sub-tool-before',
+          sessionID: 'sub-tool-before',
+          time: { created: 0 },
+          agent: 'fast',
+          model: { providerID: 'github-copilot', modelID: 'claude-haiku-4.5' },
+        },
+        parts: [],
+      },
+    );
+
+    const toolOut = { args: { path: 'src/index.ts' } };
+    await plugin['tool.execute.before']?.(
+      { sessionID: 'sub-tool-before', tool: 'read', callID: 'call-read-sub' },
+      toolOut,
+    );
+
+    expect(toolOut).toEqual({ args: { path: 'src/index.ts' } });
   });
 
   it('hard-block denies direct tool permissions for mapped build agent sessions', async () => {

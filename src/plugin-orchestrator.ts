@@ -166,13 +166,13 @@ export class PluginOrchestrator {
         assertEnforcement(cfg);
         this.log.info('Enforcement validation passed');
       } catch (enforcementErr) {
-      await this.logObservable('error', 'Hook failed', {
-        hook: 'config.enforcement-validation',
-        error: enforcementErr instanceof Error ? enforcementErr.message : String(enforcementErr),
-      });
-      this.log.error('CRITICAL: Enforcement validation failed. Config is invalid for 100% delegation.');
-      this.log.warn(reportEnforcement(cfg));
-    }
+        await this.logObservable('error', 'Hook failed', {
+          hook: 'config.enforcement-validation',
+          error: enforcementErr instanceof Error ? enforcementErr.message : String(enforcementErr),
+        });
+        this.log.error('CRITICAL: Enforcement validation failed. Config is invalid for 100% delegation.');
+        this.log.warn(reportEnforcement(cfg));
+      }
 
       input.agent = input.agent ?? {};
       for (const tier of TIER_NAMES) {
@@ -528,6 +528,20 @@ export class PluginOrchestrator {
     }
   }
 
+  private readonly HARD_BLOCK_DENIED_TOOLS = new Set([
+    'grep',
+    'glob',
+    'read',
+    'list',
+    'bash',
+    'edit',
+    'write',
+    'webfetch',
+    'websearch',
+  ]);
+  private readonly HARD_BLOCK_DELEGATION_MESSAGE =
+    'Delegue para @heavy. Esta ferramenta esta bloqueada para execucao direta.';
+
   // Map of tools → contextual hint. The router (which has the delegation
   // protocol in its system prompt) reads "Router:" and chooses to delegate.
   // Subagents ignore the hint because they are not in "router mode".
@@ -542,6 +556,30 @@ export class PluginOrchestrator {
     webfetch: 'Router: delegate web fetch to @medium.',
     websearch: 'Router: delegate web search to @medium.',
   };
+
+  async handleToolExecuteBefore(
+    input: { sessionID?: string; tool: string; callID?: string },
+    output: { allow?: boolean; message?: string; args?: unknown },
+  ): Promise<void> {
+    try {
+      if (!this.enabled) return;
+      if (!input.sessionID) return;
+      if (this.subagentSessions.has(input.sessionID)) return;
+
+      const tier = this.hardBlockedSessions.get(input.sessionID);
+      if (!tier || !this.HARD_BLOCK_DENIED_TOOLS.has(input.tool)) return;
+
+      delete output.args;
+      output.allow = false;
+      output.message = this.HARD_BLOCK_DELEGATION_MESSAGE;
+    } catch (err) {
+      await this.logObservable('error', 'Hook failed', {
+        hook: 'tool.execute.before',
+        error: err instanceof Error ? err.message : String(err),
+      });
+      this.log.warn('tool.execute.before hook failed:', err instanceof Error ? err.message : String(err));
+    }
+  }
 
   async handleToolDefinition(
     input: { toolID: string },

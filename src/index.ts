@@ -174,6 +174,7 @@ const tierRouterPlugin: Plugin = async (ctx) => {
     event: (input: any) => orchestrator.handleEvent(input),
     'permission.ask': (input: any, output: any) => orchestrator.handlePermissionAsk(input, output),
     'tool.definition': (input: any, output: any) => orchestrator.handleToolDefinition(input, output),
+    'tool.execute.before': (input: any, output: any) => orchestrator.handleToolExecuteBefore(input, output),
     'tool.execute.after': (input: any, output: any) => orchestrator.handleToolExecuteAfter(input, output),
     'experimental.text.complete': (input: any, output: any) => orchestrator.handleTextComplete(input, output),
     'command.execute.before': (input: any, output: any) => orchestrator.handleCommandExecuteBefore(input, output),
