@@ -574,6 +574,32 @@ describe('tierRouterPlugin', () => {
     expect(out.output).toContain('[cap: 4/8]');
   });
 
+  it('records subagent routing state through FileLogger', async () => {
+    const plugin = await tierRouterPlugin(makeCtx(projectDir));
+    const infoSpy = vi.spyOn(FileLogger.prototype, 'info');
+
+    await plugin['chat.message']?.(
+      { sessionID: 'sub-log', agent: 'fast' },
+      {
+        message: {
+          role: 'user',
+          id: 'm-sub-log',
+          sessionID: 'sub-log',
+          time: { created: 0 },
+          agent: 'fast',
+          model: { providerID: 'github-copilot', modelID: 'claude-haiku-4.5' },
+        },
+        parts: [],
+      },
+    );
+
+    expect(infoSpy).toHaveBeenCalledWith('subagent routing state registered', {
+      sessionID: 'sub-log',
+      tier: 'fast',
+    });
+    infoSpy.mockRestore();
+  });
+
   it('hard-block denies direct tool permissions for non-trivial classified requests', async () => {
     await writeTiers(projectDir, {
       enforcement: {

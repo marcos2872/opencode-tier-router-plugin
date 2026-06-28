@@ -81,6 +81,16 @@ Sem cobertura → tarefas podem cair em "nenhum tier" → fallback inseguro.
 
 ---
 
+## 📡 Hierarquia de Logging
+
+O plugin usa duas camadas de log para separar eventos observáveis do usuário de auditoria local:
+
+1. **`client.app.log()` é o logger primário** para eventos observáveis e de erro: inicialização do plugin, tier selecionado, hard-block acionado e falhas de hooks.
+2. **`FileLogger` é o logger secundário** para auditoria local e diagnóstico: validação de enforcement, tentativas de ferramentas bloqueadas e estados internos de subagentes.
+3. **`src/` não deve emitir `console.warn`, `console.log` ou `console.error`**. Logs de runtime pertencem ao OpenCode/app log e ao arquivo `router-debug.log`.
+
+---
+
 ## 🔍 Validação (Enforcement Validator)
 
 Arquivo: `src/router/enforcement-validator.ts`

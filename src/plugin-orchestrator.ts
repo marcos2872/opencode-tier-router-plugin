@@ -308,6 +308,7 @@ export class PluginOrchestrator {
       if (isTier) {
         this.subagentSessions.add(input.sessionID);
         this.subagentTierMap.set(input.sessionID, agent);
+        this.log.info('subagent routing state registered', { sessionID: input.sessionID, tier: agent });
         this.hardBlockedSessions.delete(input.sessionID);
         this.hardBlockReasons.delete(input.sessionID);
         this.preferredTierSessions.delete(input.sessionID);
