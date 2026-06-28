@@ -16,7 +16,8 @@
     "precommit": "npm run typecheck && npm run lint && npm run format"
   },
   "peerDependencies": {
-    "@opencode-ai/plugin": ">=1.0.0"
+    "@opencode-ai/plugin": ">=1.0.0",
+    "@opencode-ai/sdk": ">=1.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
