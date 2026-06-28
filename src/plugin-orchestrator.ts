@@ -157,7 +157,6 @@ export class PluginOrchestrator {
             lsp: 'allow',
             skill: 'allow',
             question: 'allow',
-            task: 'allow',
           } as Record<string, string>,
           description: `Tier router @${tier} subagent`,
         };
