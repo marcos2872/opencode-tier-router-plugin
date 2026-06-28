@@ -8,7 +8,7 @@
 
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import type { Plugin, Config } from '@opencode-ai/plugin';
+import { tool, type Config, type Plugin } from '@opencode-ai/plugin';
 import { loadTiers, ConfigError, type RouterConfig } from './router/config.js';
 import { PluginOrchestrator } from './plugin-orchestrator.js';
 import { FileLogger } from './utils/logger.js';
@@ -151,6 +151,14 @@ async function loadConfig(projectDir: string): Promise<RouterConfig> {
   }
 }
 
+function routerStatusTool(orchestrator: PluginOrchestrator) {
+  return tool({
+    description: 'router_status returns the current tier router state as JSON.',
+    args: {},
+    execute: async () => JSON.stringify(orchestrator.getRoutingState(), null, 2),
+  });
+}
+
 /**
  * Cria o plugin de roteamento de tiers do OpenCode.
  *
@@ -166,6 +174,9 @@ const tierRouterPlugin: Plugin = async (ctx) => {
   return {
     get enabled(): boolean {
       return orchestrator.enabledState;
+    },
+    tool: {
+      router_status: routerStatusTool(orchestrator),
     },
     config: (input: Config) => orchestrator.handleConfig(input),
     'chat.message': (input: any, output: any) => orchestrator.handleChatMessage(input, output),

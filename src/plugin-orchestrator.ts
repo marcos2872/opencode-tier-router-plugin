@@ -119,6 +119,26 @@ type ShellEnvOutput = {
   env?: Record<string, string>;
 };
 
+export type RouterStatus = {
+  enabled: boolean;
+  mode: string;
+  tiers: Record<string, { model: string; costRatio: number; cap: number }>;
+  hardBlockCount: number;
+};
+
+export function buildRouterStatus(
+  config: Pick<RouterConfig, 'mode' | 'tiers'>,
+  enabled: boolean,
+  hardBlockCount: number,
+): RouterStatus {
+  return {
+    enabled,
+    mode: config.mode,
+    tiers: config.tiers,
+    hardBlockCount,
+  };
+}
+
 export class PluginOrchestrator {
   private capTracker = createCapTracker();
   private subagentSessions = new Set<string>();
@@ -295,6 +315,11 @@ export class PluginOrchestrator {
 
   get enabledState(): boolean {
     return this.enabled;
+  }
+
+  getRoutingState(): RouterStatus {
+    this.cleanupSessions();
+    return buildRouterStatus(this.config, this.enabled, this.hardBlockedSessions.size);
   }
 
   async handleConfig(input: Config): Promise<void> {

@@ -415,6 +415,41 @@ describe('tierRouterPlugin', () => {
     expect(textOf(statusOut.parts)).toContain('off');
   });
 
+  it('expoe ferramenta customizada router_status com estado atual do roteador', async () => {
+    const plugin = await tierRouterPlugin(makeCtx(projectDir));
+    const routerStatusTool = (plugin as unknown as { tool?: { router_status?: { description?: string; execute: () => Promise<string> } } }).tool
+      ?.router_status;
+
+    expect(routerStatusTool?.description).toContain('router_status');
+    const raw = await routerStatusTool?.execute();
+    const state = JSON.parse(raw ?? '{}');
+
+    expect(state).toEqual(
+      expect.objectContaining({
+        enabled: true,
+        mode: 'normal',
+        hardBlockCount: 0,
+        tiers: {
+          fast: expect.objectContaining({ model: 'github-copilot/claude-haiku-4.5', costRatio: 1, cap: 8 }),
+          medium: expect.objectContaining({ model: 'github-copilot/gpt-5.3-codex', costRatio: 5, cap: 12 }),
+          heavy: expect.objectContaining({ model: 'github-copilot/claude-sonnet-4.5', costRatio: 20, cap: 20 }),
+        },
+      }),
+    );
+  });
+
+  it('router_status conta sessoes hard-blockadas', async () => {
+    const plugin = await tierRouterPlugin(makeCtx(projectDir));
+    await classifyHardBlocked(plugin, 'status-hard');
+    const routerStatusTool = (plugin as unknown as { tool?: { router_status?: { description?: string; execute: () => Promise<string> } } }).tool
+      ?.router_status;
+
+    const raw = await routerStatusTool?.execute();
+    const state = JSON.parse(raw ?? '{}');
+
+    expect(state.hardBlockCount).toBe(1);
+  });
+
   it('/router on reabilita roteamento', async () => {
     const plugin = await tierRouterPlugin(makeCtx(projectDir));
     await plugin['command.execute.before']?.({ command: '/router', sessionID: 's1', arguments: 'off' }, { parts: [] });
