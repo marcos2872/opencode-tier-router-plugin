@@ -1,7 +1,7 @@
-import { mkdir, writeFile, rm, readFile } from 'node:fs/promises';
+import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import type { PluginInput, Config } from '@opencode-ai/plugin';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Config, PluginInput } from '@opencode-ai/plugin';
 import type { TextPart } from '@opencode-ai/sdk';
 import tierRouterPlugin from '../src/index.js';
 import {
@@ -69,7 +69,7 @@ async function setupProject(): Promise<string> {
 }
 
 async function writeTiers(dir: string, overrides: Record<string, unknown> = {}): Promise<void> {
-  const base = {
+  const base: Record<string, unknown> = {
     mode: 'normal',
     tiers: {
       fast: { model: 'github-copilot/claude-haiku-4.5', costRatio: 1, cap: 8 },
@@ -94,6 +94,7 @@ async function writeTiers(dir: string, overrides: Record<string, unknown> = {}):
       selectorMaxTokens: 16,
     },
   };
+
   await writeFile(join(dir, 'tiers.json'), JSON.stringify({ ...base, ...overrides }, null, 2));
 }
 
@@ -106,11 +107,12 @@ describe('tierRouterPlugin', () => {
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     await rm(projectDir, { recursive: true, force: true });
     await rm(join(process.cwd(), 'src', 'router-debug.log'), { force: true });
   });
 
-  it('logs plugin init to client.app.log when available', async () => {
+  it('registra inicializacao do plugin em client.app.log quando disponivel', async () => {
     const appLog = vi.fn(async () => true);
     const plugin = await tierRouterPlugin(makeCtx(projectDir, makeClient(appLog)));
 
@@ -126,7 +128,7 @@ describe('tierRouterPlugin', () => {
     });
   });
 
-  it('skips app logging silently when client.app.log is unavailable', async () => {
+  it('ignora app logging silenciosamente quando client.app.log nao esta disponivel', async () => {
     const plugin = await tierRouterPlugin(makeCtx(projectDir, {} as unknown as PluginInput['client']));
     const config: Config = { agent: {} };
 
@@ -135,7 +137,7 @@ describe('tierRouterPlugin', () => {
     expect(config.agent?.fast).toBeDefined();
   });
 
-  it('logs tier selection and hard-block events to client.app.log', async () => {
+  it('registra selecao de tier e eventos de hard-block em client.app.log', async () => {
     const appLog = vi.fn(async () => true);
     const plugin = await tierRouterPlugin(makeCtx(projectDir, makeClient(appLog)));
 
@@ -190,7 +192,7 @@ describe('tierRouterPlugin', () => {
     });
   });
 
-  it('logs hook failures to client.app.log', async () => {
+  it('registra falhas de hook em client.app.log', async () => {
     const appLog = vi.fn(async () => true);
     const plugin = await tierRouterPlugin(makeCtx(projectDir, makeClient(appLog)));
 
@@ -213,27 +215,24 @@ describe('tierRouterPlugin', () => {
     );
   });
 
-  it('uses defaults silently when tiers.json is missing', async () => {
+  it('usa pads silenciosamente quando tiers.json esta ausente', async () => {
     const emptyDir = join('/tmp', `tier-router-empty-${Date.now()}`);
     await mkdir(emptyDir, { recursive: true });
-
-    const warnings: string[] = [];
-    const originalWarn = console.warn;
-    console.warn = (...args: unknown[]) => warnings.push(args.join(' '));
+    const warnSpy = vi.spyOn(console, 'warn');
 
     try {
       const plugin = await tierRouterPlugin(makeCtx(emptyDir));
       const config: Config = { agent: {} };
       await plugin.config?.(config);
+
       expect(config.agent?.fast).toBeDefined();
-      expect(warnings).toHaveLength(0);
+      expect(warnSpy).not.toHaveBeenCalled();
     } finally {
-      console.warn = originalWarn;
       await rm(emptyDir, { recursive: true, force: true });
     }
   });
 
-  it('registers fast/medium/heavy subagent agents from tiers.json', async () => {
+  it('registra subagentes fast, medium e heavy a partir de tiers.json', async () => {
     const plugin = await tierRouterPlugin(makeCtx(projectDir));
     const config: Config = { agent: {} };
     await plugin.config?.(config);
@@ -258,7 +257,7 @@ describe('tierRouterPlugin', () => {
     });
   });
 
-  it('skips tiers with invalid model strings', async () => {
+  it('ignora tiers com strings de modelo invalidas', async () => {
     await writeTiers(projectDir, {
       tiers: {
         fast: { model: 'invalid-no-slash', costRatio: 1, cap: 8 },
@@ -279,7 +278,7 @@ describe('tierRouterPlugin', () => {
     });
   });
 
-  it('/tiers displays active mode and tier configuration', async () => {
+  it('/tiers exibe modo ativo e configuracao de tier', async () => {
     const plugin = await tierRouterPlugin(makeCtx(projectDir));
     const input = { command: '/tiers', sessionID: 's1', arguments: '' };
     const output = { parts: [] as TextPart[] };
@@ -294,7 +293,7 @@ describe('tierRouterPlugin', () => {
     expect(text).toContain('github-copilot/claude-haiku-4.5');
   });
 
-  it('tracks preferred tier dynamically by intent, overriding mapped build tier when needed', async () => {
+  it('rastreia tier preferido dinamicamente por intencao', async () => {
     const plugin = await tierRouterPlugin(makeCtx(projectDir));
     await plugin['chat.message']?.(
       { sessionID: 's-dyn', agent: 'build' },
@@ -315,10 +314,11 @@ describe('tierRouterPlugin', () => {
     const tiersOut = { parts: [] as TextPart[] };
     await plugin['command.execute.before']?.({ command: '/tiers', sessionID: 's-dyn', arguments: '' }, tiersOut);
     const text = textOf(tiersOut.parts);
+
     expect(text).toContain('Preferred tier (current session): @fast via keyword');
   });
 
-  it('/budget lists modes with active one highlighted', async () => {
+  it('/budget lista modos com ativo destacado', async () => {
     const plugin = await tierRouterPlugin(makeCtx(projectDir));
     const input = { command: '/budget', sessionID: 's1', arguments: '' };
     const output = { parts: [] as TextPart[] };
@@ -331,7 +331,7 @@ describe('tierRouterPlugin', () => {
     expect(text).toContain('deep:');
   });
 
-  it('/budget <mode> persists mode to tiers.json', async () => {
+  it('/budget <mode> persiste modo em tiers.json', async () => {
     const plugin = await tierRouterPlugin(makeCtx(projectDir));
     const input = { command: '/budget', sessionID: 's1', arguments: 'budget' };
     const output = { parts: [] as TextPart[] };
@@ -340,6 +340,7 @@ describe('tierRouterPlugin', () => {
     expect(textOf(output.parts)).toContain('Switched to budget mode');
     const raw = await import('node:fs/promises').then((m) => m.readFile(join(projectDir, 'tiers.json'), 'utf8'));
     const saved = JSON.parse(raw);
+
     expect(saved.mode).toBe('budget');
   });
 
@@ -367,7 +368,7 @@ describe('tierRouterPlugin', () => {
             sessionID: 's-quality',
             messageID: 'm-quality',
             type: 'text',
-            text: 'melhore a navegação',
+            text: 'melhore a navegacao',
           },
         ],
       } as unknown as Parameters<NonNullable<(typeof plugin)['chat.message']>>[0],
@@ -390,7 +391,7 @@ describe('tierRouterPlugin', () => {
     expect(text).toContain('Preferred tier (current session): @medium via fallback-default');
   });
 
-  it('/budget with invalid mode shows available modes and keeps current', async () => {
+  it('/budget com modo invalido mostra modos disponiveis e mantem atual', async () => {
     const plugin = await tierRouterPlugin(makeCtx(projectDir));
     const input = { command: '/budget', sessionID: 's1', arguments: 'unknown' };
     const output = { parts: [] as TextPart[] };
@@ -401,7 +402,7 @@ describe('tierRouterPlugin', () => {
     expect(text).toContain('normal, budget, quality, deep');
   });
 
-  it('/router off disables routing and reports status', async () => {
+  it('/router off desabilita roteamento e reporta status', async () => {
     const plugin = await tierRouterPlugin(makeCtx(projectDir));
     const off = { command: '/router', sessionID: 's1', arguments: 'off' };
     const output = { parts: [] as TextPart[] };
@@ -414,7 +415,7 @@ describe('tierRouterPlugin', () => {
     expect(textOf(statusOut.parts)).toContain('off');
   });
 
-  it('/router on re-enables routing', async () => {
+  it('/router on reabilita roteamento', async () => {
     const plugin = await tierRouterPlugin(makeCtx(projectDir));
     await plugin['command.execute.before']?.({ command: '/router', sessionID: 's1', arguments: 'off' }, { parts: [] });
 
@@ -436,7 +437,7 @@ describe('tierRouterPlugin', () => {
     expect(systemOut.system.length).toBeGreaterThan(0);
   });
 
-  it('intercepts /router off via chat.message', async () => {
+  it('intercepta /router off via chat.message', async () => {
     await writeTiers(projectDir, { enforcement: { mode: 'hard-block', trivialDirectAllowed: true } });
     const plugin = await tierRouterPlugin(makeCtx(projectDir));
 
@@ -477,7 +478,7 @@ describe('tierRouterPlugin', () => {
     expect(askOut.status).toBe('allow');
   });
 
-  it('replays command.execute.before router responses when chat.message parts are empty', async () => {
+  it('replaya respostas de command.execute.before quando chat.message nao tem partes', async () => {
     const plugin = await tierRouterPlugin(makeCtx(projectDir));
 
     const offCommand = { parts: [] as TextPart[] };
@@ -513,7 +514,7 @@ describe('tierRouterPlugin', () => {
     expect((plugin as unknown as { enabled: boolean }).enabled).toBe(true);
   });
 
-  it('when router is off, system transform, caps, and narration hooks are no-ops', async () => {
+  it('quando roteador esta off, hooks system, caps e narration sao nop', async () => {
     const plugin = await tierRouterPlugin(makeCtx(projectDir));
     await plugin['command.execute.before']?.({ command: '/router', sessionID: 's1', arguments: 'off' }, { parts: [] });
 
@@ -541,22 +542,24 @@ describe('tierRouterPlugin', () => {
     expect(textOut.text).toBe('Still writing the function');
   });
 
-  it('appends narration banner on experimental.text.complete', async () => {
+  it('anexa banner de narracao em experimental.text.complete', async () => {
     const plugin = await tierRouterPlugin(makeCtx(projectDir));
     const output = { text: 'Still writing the auth function' };
     await plugin['experimental.text.complete']?.({ sessionID: 's1', messageID: 'm1', partID: 'p1' }, output);
+
     expect(output.text).toContain('[⚠ narration detected:');
     expect(output.text).toContain('Still writing the auth function');
   });
 
-  it('does not append narration banner for clean text', async () => {
+  it('nao anexa banner de narracao para texto limpo', async () => {
     const plugin = await tierRouterPlugin(makeCtx(projectDir));
     const output = { text: 'The implementation is complete and tested.' };
     await plugin['experimental.text.complete']?.({ sessionID: 's1', messageID: 'm1', partID: 'p1' }, output);
+
     expect(output.text).not.toContain('[⚠ narration detected:');
   });
 
-  it('appends cap banner to read-only tool results in subagent sessions', async () => {
+  it('anexa banner de cap para resultados de ferramenta somente leitura em sessoes de subagentes', async () => {
     const plugin = await tierRouterPlugin(makeCtx(projectDir));
     const config: Config = { agent: {} };
     await plugin.config?.(config);
@@ -586,7 +589,7 @@ describe('tierRouterPlugin', () => {
     expect(out.output).toContain('[cap: 4/8]');
   });
 
-  it('injects router env vars into subagent shells and leaves main shells untouched', async () => {
+  it('injeta variaveis de ambiente do router em shells de subagentes', async () => {
     const plugin = await tierRouterPlugin(makeCtx(projectDir));
     await plugin['chat.message']?.(
       { sessionID: 'sub-shell-env', agent: 'fast' },
@@ -636,7 +639,7 @@ describe('tierRouterPlugin', () => {
     });
   });
 
-  it('preserves router state in session compaction output context', async () => {
+  it('preserva estado de roteamento no contexto de compactacao', async () => {
     const plugin = await tierRouterPlugin(makeCtx(projectDir));
     await classifyHardBlocked(plugin, 'main-compaction');
 
@@ -666,7 +669,7 @@ describe('tierRouterPlugin', () => {
     });
   });
 
-  it('records subagent routing state through FileLogger', async () => {
+  it('registra estado de roteamento de subagentes no FileLogger', async () => {
     const plugin = await tierRouterPlugin(makeCtx(projectDir));
     const infoSpy = vi.spyOn(FileLogger.prototype, 'info');
 
@@ -689,10 +692,9 @@ describe('tierRouterPlugin', () => {
       sessionID: 'sub-log',
       tier: 'fast',
     });
-    infoSpy.mockRestore();
   });
 
-  it('hard-block denies direct tool permissions for non-trivial classified requests', async () => {
+  it('hard-block nega permissao direta de ferramentas em solicitacoes nao triviais', async () => {
     await writeTiers(projectDir, {
       enforcement: {
         mode: 'hard-block',
@@ -747,7 +749,7 @@ describe('tierRouterPlugin', () => {
     expect(systemOut.system.join('\n')).not.toContain('Task Delegation Reference');
   });
 
-  it('hard-block returns the exact deny contract for every denied native tool', async () => {
+  it('hard-block retorna contrato exato para cada ferramenta nativa bloqueada', async () => {
     for (const tool of HARD_BLOCK_DENIED_TOOLS) {
       const plugin = await tierRouterPlugin(makeCtx(projectDir));
       await classifyHardBlocked(plugin, `main-${tool}`);
@@ -759,7 +761,7 @@ describe('tierRouterPlugin', () => {
     }
   });
 
-  it('notifies the TUI when hard-block blocks a denied tool before execution', async () => {
+  it('notifica TUI quando hard-block bloqueia ferramenta antes da execucao', async () => {
     const tuiShowToast = vi.fn(async () => true);
     const plugin = await tierRouterPlugin(makeCtx(projectDir, makeClient(undefined, tuiShowToast)));
     await classifyHardBlocked(plugin, 'main-tool-toast');
@@ -781,7 +783,7 @@ describe('tierRouterPlugin', () => {
     });
   });
 
-  it('hard-block leaves non-denied tools before execution for main sessions', async () => {
+  it('hard-block deixa ferramentas nao bloqueadas antes da execucao para sessoes principais', async () => {
     const plugin = await tierRouterPlugin(makeCtx(projectDir));
     await classifyHardBlocked(plugin, 'main-task-before');
 
@@ -794,7 +796,7 @@ describe('tierRouterPlugin', () => {
     expect(toolOut).toEqual({ args: { task: 'write docs', sessionID: 'main-task-before' } });
   });
 
-  it('hard-block returns allow for subagent sessions before execution', async () => {
+  it('hard-block retorna allow para sessoes de subagentes antes da execucao', async () => {
     const plugin = await tierRouterPlugin(makeCtx(projectDir));
     await plugin['chat.message']?.(
       { sessionID: 'sub-tool-before', agent: 'fast' },
@@ -820,7 +822,7 @@ describe('tierRouterPlugin', () => {
     expect(toolOut).toEqual({ allow: true, args: { path: 'src/index.ts' } });
   });
 
-  it('hard-block records denied tool attempts through FileLogger', async () => {
+  it('hard-block registra tentativas de ferramentas bloqueadas no FileLogger', async () => {
     const plugin = await tierRouterPlugin(makeCtx(projectDir));
     await classifyHardBlocked(plugin, 'main-tool-audit');
 
@@ -838,10 +840,9 @@ describe('tierRouterPlugin', () => {
       callID: 'call-read-audit',
       tool: 'read',
     });
-    infoSpy.mockRestore();
   });
 
-  it('hard-block denies direct tool permissions for mapped build agent sessions', async () => {
+  it('hard-block nega permissao direta de ferramentas em sessoes build mapeadas', async () => {
     await writeTiers(projectDir, {
       enforcement: {
         mode: 'hard-block',
@@ -882,7 +883,7 @@ describe('tierRouterPlugin', () => {
     expect(askOut.status).toBe('deny');
   });
 
-  it('auto-allows permissions when router is disabled', async () => {
+  it('auto-permite permissao quando roteador esta desabilitado', async () => {
     await writeTiers(projectDir, {
       enforcement: {
         mode: 'hard-block',
@@ -943,7 +944,7 @@ describe('tierRouterPlugin', () => {
     expect(disabledAskOut.status).toBe('allow');
   });
 
-  it('allows trivial fast requests for non-hard-blocked primary sessions when configured', async () => {
+  it('permite fast trivial para sessoes principais nao hard-blockadas quando configurado', async () => {
     await writeTiers(projectDir, {
       enforcement: {
         mode: 'hard-block',
@@ -985,7 +986,7 @@ describe('tierRouterPlugin', () => {
     expect(askOut.status).toBe('allow');
   });
 
-  it('allows task and custom permissions for hard-blocked primary sessions', async () => {
+  it('permite task e custom permissoes para sessoes principais hard-blockadas', async () => {
     const plugin = await tierRouterPlugin(makeCtx(projectDir));
     await classifyHardBlocked(plugin, 'main-permission-allow');
 
@@ -1008,7 +1009,7 @@ describe('tierRouterPlugin', () => {
     }
   });
 
-  it('denies task permissions for subagent sessions', async () => {
+  it('nega permissao task para sessoes de subagentes', async () => {
     const plugin = await tierRouterPlugin(makeCtx(projectDir));
     await plugin['chat.message']?.(
       { sessionID: 'sub-permission-task', agent: 'fast' },
@@ -1042,7 +1043,7 @@ describe('tierRouterPlugin', () => {
     expect(askOut.status).toBe('deny');
   });
 
-  it('events reject denied permissions and allow allowed permissions', async () => {
+  it('eventos rejeitam permissao negada e permitem permissao autorizada', async () => {
     const postPermission = vi.fn(async () => true);
     const plugin = await tierRouterPlugin(makeCtx(projectDir, makeClient(undefined, undefined, postPermission)));
 
