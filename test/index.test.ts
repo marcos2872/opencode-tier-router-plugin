@@ -1,4 +1,4 @@
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Config, PluginInput } from '@opencode-ai/plugin';
@@ -114,7 +114,8 @@ describe('tierRouterPlugin', () => {
 
   it('registra inicializacao do plugin em client.app.log quando disponivel', async () => {
     const appLog = vi.fn(async () => true);
-    const plugin = await tierRouterPlugin(makeCtx(projectDir, makeClient(appLog)));
+
+    await tierRouterPlugin(makeCtx(projectDir, makeClient(appLog)));
 
     expect(appLog).toHaveBeenCalledTimes(1);
     expect(appLog).toHaveBeenCalledWith({
@@ -417,8 +418,9 @@ describe('tierRouterPlugin', () => {
 
   it('expoe ferramenta customizada router_status com estado atual do roteador', async () => {
     const plugin = await tierRouterPlugin(makeCtx(projectDir));
-    const routerStatusTool = (plugin as unknown as { tool?: { router_status?: { description?: string; execute: () => Promise<string> } } }).tool
-      ?.router_status;
+    const routerStatusTool = (
+      plugin as unknown as { tool?: { router_status?: { description?: string; execute: () => Promise<string> } } }
+    ).tool?.router_status;
 
     expect(routerStatusTool?.description).toContain('router_status');
     const raw = await routerStatusTool?.execute();
@@ -438,11 +440,20 @@ describe('tierRouterPlugin', () => {
     );
   });
 
+  it('cria modelos de comando esperados para opencode', async () => {
+    const commands = await readdir(join(process.cwd(), '.opencode', 'commands'));
+    const tools = await readdir(join(process.cwd(), '.opencode', 'tools'));
+
+    expect(commands).toEqual(expect.arrayContaining(['tiers.md', 'budget.md', 'router.md']));
+    expect(tools).toEqual(expect.arrayContaining(['router_status.js']));
+  });
+
   it('router_status conta sessoes hard-blockadas', async () => {
     const plugin = await tierRouterPlugin(makeCtx(projectDir));
     await classifyHardBlocked(plugin, 'status-hard');
-    const routerStatusTool = (plugin as unknown as { tool?: { router_status?: { description?: string; execute: () => Promise<string> } } }).tool
-      ?.router_status;
+    const routerStatusTool = (
+      plugin as unknown as { tool?: { router_status?: { description?: string; execute: () => Promise<string> } } }
+    ).tool?.router_status;
 
     const raw = await routerStatusTool?.execute();
     const state = JSON.parse(raw ?? '{}');
@@ -697,7 +708,8 @@ describe('tierRouterPlugin', () => {
           preferredTier: 'heavy',
           selectionSource: 'keyword',
           hardBlockedTier: 'heavy',
-          hardBlockReason: 'Current agent maps to @medium, but this request was classified as @heavy. Redirect to @heavy.',
+          hardBlockReason:
+            'Current agent maps to @medium, but this request was classified as @heavy. Redirect to @heavy.',
           kept: 'output-router-state',
         },
       },
@@ -818,6 +830,21 @@ describe('tierRouterPlugin', () => {
     });
   });
 
+  it('ignora notificacao de hard-block quando tui nao esta disponivel', async () => {
+    const plugin = await tierRouterPlugin(
+      makeCtx(projectDir, { app: { log: vi.fn(async () => true) } } as unknown as PluginInput['client']),
+    );
+    await classifyHardBlocked(plugin, 'main-tool-toast-missing-tui');
+
+    const toolOut = { args: { path: 'src/index.ts' } };
+    await plugin['tool.execute.before']?.(
+      { sessionID: 'main-tool-toast-missing-tui', tool: 'read', callID: 'call-read-missing-tui' },
+      toolOut,
+    );
+
+    expect(toolOut).toEqual({ allow: false, message: HARD_BLOCK_DELEGATION_MESSAGE });
+  });
+
   it('hard-block deixa ferramentas nao bloqueadas antes da execucao para sessoes principais', async () => {
     const plugin = await tierRouterPlugin(makeCtx(projectDir));
     await classifyHardBlocked(plugin, 'main-task-before');
@@ -874,12 +901,19 @@ describe('tierRouterPlugin', () => {
       },
     );
 
-    const toolOut = { allow: true, message: 'allowed', args: { path: 'src/index.ts   \n', nested: { filePath: 'README.md\t   ' } } };
+    const toolOut = {
+      allow: true,
+      message: 'allowed',
+      args: { path: 'src/index.ts   \n', nested: { filePath: 'README.md\t   ' } },
+    };
     const infoSpy = vi.spyOn(FileLogger.prototype, 'info');
     await plugin['tool.execute.before']?.(
-      { sessionID: 'sub-tool-normalize', tool: 'read', callID: 'call-read-normalize', args: toolOut.args } as unknown as Parameters<
-        NonNullable<(typeof plugin)['tool.execute.before']>
-      >[0],
+      {
+        sessionID: 'sub-tool-normalize',
+        tool: 'read',
+        callID: 'call-read-normalize',
+        args: toolOut.args,
+      } as unknown as Parameters<NonNullable<(typeof plugin)['tool.execute.before']>>[0],
       toolOut,
     );
 

@@ -31,7 +31,7 @@ export class FileLogger {
         return;
       }
     }
-    const msg = args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
+    const msg = args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ');
     try {
       appendFileSync(this.path, `${this.ts()} [${level}] ${msg}\n`, 'utf-8');
     } catch {
@@ -39,8 +39,16 @@ export class FileLogger {
     }
   }
 
-  debug(...args: unknown[]) { this.write('DEBUG', ...args); }
-  info(...args: unknown[]) { this.write('INFO', ...args); }
-  warn(...args: unknown[]) { this.write('WARN', ...args); }
-  error(...args: unknown[]) { this.write('ERROR', ...args); }
+  debug(...args: unknown[]) {
+    this.write('DEBUG', ...args);
+  }
+  info(...args: unknown[]) {
+    this.write('INFO', ...args);
+  }
+  warn(...args: unknown[]) {
+    this.write('WARN', ...args);
+  }
+  error(...args: unknown[]) {
+    this.write('ERROR', ...args);
+  }
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { assertEnforcement, reportEnforcement, validateEnforcement, type RouterConfig } from '../src/router/enforcement-validator.js';
+import { assertEnforcement, reportEnforcement, validateEnforcement } from '../src/router/enforcement-validator.js';
+import type { RouterConfig } from '../src/router/config.js';
 
 const validConfig: RouterConfig = {
   mode: 'normal',
@@ -257,9 +258,7 @@ describe('assertEnforcement', () => {
       enforcement: { mode: 'advisory', trivialDirectAllowed: false },
     };
 
-    expect(() => assertEnforcement(badConfig)).toThrow(
-      '[Enforcement] Configuration invalid for 100% delegation:',
-    );
+    expect(() => assertEnforcement(badConfig)).toThrow('[Enforcement] Configuration invalid for 100% delegation:');
   });
 
   it('lança erro para trivialDirectAllowed=true', () => {
@@ -268,9 +267,7 @@ describe('assertEnforcement', () => {
       enforcement: { mode: 'hard-block', trivialDirectAllowed: true },
     };
 
-    expect(() => assertEnforcement(badConfig)).toThrow(
-      '[Enforcement] Configuration invalid for 100% delegation:',
-    );
+    expect(() => assertEnforcement(badConfig)).toThrow('[Enforcement] Configuration invalid for 100% delegation:');
   });
 });
 

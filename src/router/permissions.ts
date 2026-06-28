@@ -1,5 +1,3 @@
-import { HARD_BLOCK_DENIED_TOOLS } from '../constants.js';
-
 export type PermissionName = string;
 
 export type PermissionKind = 'task' | 'native' | 'custom';
@@ -13,8 +11,6 @@ export interface PermissionDecision {
 }
 
 const CUSTOM_PERMISSIONS = new Set(['skill', 'question', 'todowrite', 'doom_loop', 'external_directory']);
-const NATIVE_PERMISSIONS = new Set(HARD_BLOCK_DENIED_TOOLS);
-
 export function classifyPermission(permissionName: PermissionName): PermissionKind {
   if (permissionName === 'task') return 'task';
   if (CUSTOM_PERMISSIONS.has(permissionName)) return 'custom';

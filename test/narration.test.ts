@@ -65,5 +65,4 @@ describe('detectNarration', () => {
     expect(detectNarration('add the parser here')).toBeNull();
     expect(detectNarration('the writing is good')).toBeNull();
   });
-
 });

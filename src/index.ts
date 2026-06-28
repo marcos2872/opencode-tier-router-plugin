@@ -179,18 +179,39 @@ const tierRouterPlugin: Plugin = async (ctx) => {
       router_status: routerStatusTool(orchestrator),
     },
     config: (input: Config) => orchestrator.handleConfig(input),
-    'chat.message': (input: any, output: any) => orchestrator.handleChatMessage(input, output),
-    'experimental.chat.system.transform': (input: any, output: any) =>
-      orchestrator.handleSystemTransform(input, output),
-    event: (input: any) => orchestrator.handleEvent(input),
-    'permission.ask': (input: any, output: any) => orchestrator.handlePermissionAsk(input, output),
-    'tool.definition': (input: any, output: any) => orchestrator.handleToolDefinition(input, output),
-    'tool.execute.before': (input: any, output: any) => orchestrator.handleToolExecuteBefore(input, output),
-    'tool.execute.after': (input: any, output: any) => orchestrator.handleToolExecuteAfter(input, output),
-    'experimental.text.complete': (input: any, output: any) => orchestrator.handleTextComplete(input, output),
-    'command.execute.before': (input: any, output: any) => orchestrator.handleCommandExecuteBefore(input, output),
-    'shell.env': (input: any, output: any) => orchestrator.handleShellEnv(input, output),
-    'experimental.session.compacting': (input: any, output: any) => orchestrator.handleSessionCompacting(input, output),
+    'chat.message': (input: unknown, output: unknown) =>
+      orchestrator.handleChatMessage(input as never, output as never),
+    'experimental.chat.system.transform': (input: unknown, output: unknown) =>
+      orchestrator.handleSystemTransform(input as { sessionID?: string }, output as { system?: string[] }),
+    event: (input: unknown) =>
+      orchestrator.handleEvent(input as { event: { type: string; properties?: Record<string, unknown> } }),
+    'permission.ask': (input: unknown, output: unknown) =>
+      orchestrator.handlePermissionAsk(input as { sessionID?: string; type?: string }, output as { status?: string }),
+    'tool.definition': (input: unknown, output: unknown) =>
+      orchestrator.handleToolDefinition(
+        input as { toolID: string },
+        output as { description?: string; parameters?: unknown },
+      ),
+    'tool.execute.before': (input: unknown, output: unknown) =>
+      orchestrator.handleToolExecuteBefore(
+        input as { sessionID?: string; tool: string; callID?: string; args?: Record<string, unknown> },
+        output as { allow?: boolean; message?: string; args?: unknown },
+      ),
+    'tool.execute.after': (input: unknown, output: unknown) =>
+      orchestrator.handleToolExecuteAfter(
+        input as { sessionID?: string; tool: string; args?: Record<string, unknown> },
+        output as { output?: string; metadata?: Record<string, unknown> },
+      ),
+    'experimental.text.complete': (input: unknown, output: unknown) =>
+      orchestrator.handleTextComplete(input, output as { text: string }),
+    'command.execute.before': (input: unknown, output: unknown) =>
+      orchestrator.handleCommandExecuteBefore(
+        input as { sessionID: string; command: string; arguments: string },
+        output as never,
+      ),
+    'shell.env': (input: unknown, output: unknown) => orchestrator.handleShellEnv(input as never, output as never),
+    'experimental.session.compacting': (input: unknown, output: unknown) =>
+      orchestrator.handleSessionCompacting(input as never, output as never),
   };
 };
 

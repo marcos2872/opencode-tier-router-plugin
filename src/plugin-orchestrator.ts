@@ -221,7 +221,7 @@ export class PluginOrchestrator {
     }
   }
 
-  private async notifyToolBlocked(tier: TierName): Promise<void> {
+  private async notifyToolBlocked(): Promise<void> {
     const client = this.ctx.client as TuiShowToastClient;
     if (typeof client.tui?.showToast !== 'function') return;
 
@@ -261,7 +261,8 @@ export class PluginOrchestrator {
     const hardBlockedTier = sessionID ? this.hardBlockedSessions.get(sessionID) : undefined;
 
     return {
-      [OPENCODE_ROUTER_TIER]: preferredTier ?? mappedSubagentTier ?? hardBlockedTier ?? cfg.modes[cfg.mode]?.defaultTier ?? cfg.mode,
+      [OPENCODE_ROUTER_TIER]:
+        preferredTier ?? mappedSubagentTier ?? hardBlockedTier ?? cfg.modes[cfg.mode]?.defaultTier ?? cfg.mode,
       [OPENCODE_ROUTER_MODE]: cfg.mode,
       [OPENCODE_ROUTER_HARD_BLOCKED]: hardBlockedTier ? 'true' : 'false',
     };
@@ -438,7 +439,12 @@ export class PluginOrchestrator {
   }
 
   async handleChatMessage(
-    input: { agent?: string; sessionID: string; parts?: Array<{ type?: string; text?: string }> },
+    input: {
+      agent?: string;
+      sessionID: string;
+      parts?: Array<{ type?: string; text?: string }>;
+      message?: Record<string, unknown>;
+    },
     output: { message: { summary?: { title?: string; body?: string } }; parts?: unknown[] },
   ): Promise<void> {
     try {
@@ -446,16 +452,17 @@ export class PluginOrchestrator {
       this.touchSession(input.sessionID);
 
       // DEBUG: dump full input structure for slash-command investigation
+      const messageSummary = input.message?.summary as Record<string, unknown> | undefined;
       this.log.info('chat.message input', {
         keys: Object.keys(input),
         agent: input.agent,
         sessionID: input.sessionID,
-        partsCount: (input as any).parts?.length,
-        partsFirst: JSON.stringify((input as any).parts?.[0]),
-        partsFull: JSON.stringify((input as any).parts),
-        messageText: (input as any).message?.text,
-        messageSummaryTitle: (input as any).message?.summary?.title,
-        messageRaw: JSON.stringify((input as any).message),
+        partsCount: input.parts?.length,
+        partsFirst: JSON.stringify(input.parts?.[0]),
+        partsFull: JSON.stringify(input.parts),
+        messageText: input.message?.text,
+        messageSummaryTitle: messageSummary?.title,
+        messageRaw: JSON.stringify(input.message),
         inputRaw: JSON.stringify(input).slice(0, 500),
       });
 
@@ -605,7 +612,6 @@ export class PluginOrchestrator {
         const rulesLine = Object.entries(cfg.taskPatterns)
           .map(([tierName, patterns]) => `@${tierName}→${patterns.join('/')}`)
           .join(' ');
-        const activeMode = cfg.modes[cfg.mode];
         const emphasis = MODE_EMPHASIS[cfg.mode] ?? `mode ${cfg.mode}`;
         const reason = input.sessionID ? this.hardBlockReasons.get(input.sessionID) : undefined;
         output.system.push(buildHardBlockMessage(tier, tiersLine, rulesLine, emphasis, reason));
@@ -683,11 +689,28 @@ export class PluginOrchestrator {
         | undefined;
       if (!props?.sessionID) return;
 
-      const client = (this.ctx as { client?: { postSessionIdPermissionsPermissionId?: Function } }).client;
+      type PermissionPostClient = {
+        postSessionIdPermissionsPermissionId?: (options: {
+          path: { id: string; permissionID: string };
+          body: { response: 'reject' | 'once' };
+        }) => Promise<unknown>;
+      };
+      type PermissionTuiClient = {
+        tui?: {
+          showToast?: (options: {
+            body: {
+              message: string;
+              variant: 'error';
+              duration?: number;
+            };
+          }) => Promise<unknown>;
+        };
+      };
+      const client = (this.ctx as { client?: PermissionPostClient & PermissionTuiClient }).client;
       if (!client?.postSessionIdPermissionsPermissionId || !props.id) {
         this.log.warn('cannot reply:', {
           hasClient: !!client,
-          hasMethod: !!(client as any)?.postSessionIdPermissionsPermissionId,
+          hasMethod: !!client?.postSessionIdPermissionsPermissionId,
           hasId: !!props.id,
           sessionID: props.sessionID,
         });
@@ -708,8 +731,8 @@ export class PluginOrchestrator {
         decision: decision.status,
       });
       if (!isAllowed(decision)) {
-        if (decision.kind === 'native') {
-          void (client as any).tui?.showToast({
+        if (decision.kind === 'native' && client.tui?.showToast) {
+          void client.tui.showToast({
             body: {
               message: `[Router] Tool blocked. Delegate to @${tier} via task().`,
               variant: 'error',
@@ -789,7 +812,7 @@ export class PluginOrchestrator {
       });
       if (!tier || decision.status !== 'deny' || decision.kind !== 'native') return;
 
-      await this.notifyToolBlocked(tier);
+      await this.notifyToolBlocked();
       this.log.info('Denied tool blocked before execution', {
         sessionID: input.sessionID,
         callID: input.callID,
@@ -931,9 +954,8 @@ export class PluginOrchestrator {
       if (command === 'budget') {
         const cfg = await this.loadConfig();
         const raw = input.command.replace(/^\//, '').toLowerCase();
-        const parts = raw.split(/\s+/);
-        const command = parts[0];
-        const args = (parts.slice(1).join(' ') + ' ' + (input.arguments ?? '')).trim();
+        const rawParts = raw.split(/\s+/);
+        const args = (rawParts.slice(1).join(' ') + ' ' + (input.arguments ?? '')).trim();
 
         if (!args) {
           const modeLines = Object.entries(cfg.modes).map(([name, mode]) => {

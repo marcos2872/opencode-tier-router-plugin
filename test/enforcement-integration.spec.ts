@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { assertEnforcement, reportEnforcement, type RouterConfig } from '../src/router/enforcement-validator.js';
+import { assertEnforcement, reportEnforcement } from '../src/router/enforcement-validator.js';
+import type { RouterConfig } from '../src/router/config.js';
 
 const ROUTING_CONFIG = {
   strategy: 'keyword' as const,
@@ -23,9 +24,7 @@ describe('integracao de aplicacao - inicializacao', () => {
       routing: ROUTING_CONFIG,
     };
 
-    expect(() => assertEnforcement(badConfig)).toThrow(
-      '[Enforcement] Configuration invalid for 100% delegation:',
-    );
+    expect(() => assertEnforcement(badConfig)).toThrow('[Enforcement] Configuration invalid for 100% delegation:');
   });
 
   it('rejeita config com trivialDirectAllowed=true', () => {
@@ -42,9 +41,7 @@ describe('integracao de aplicacao - inicializacao', () => {
       routing: ROUTING_CONFIG,
     };
 
-    expect(() => assertEnforcement(badConfig)).toThrow(
-      '[Enforcement] Configuration invalid for 100% delegation:',
-    );
+    expect(() => assertEnforcement(badConfig)).toThrow('[Enforcement] Configuration invalid for 100% delegation:');
   });
 
   it('aceita config hard-block valida', () => {
@@ -154,9 +151,7 @@ describe('integracao de aplicacao - validacao de runtime', () => {
       routing: ROUTING_CONFIG,
     };
 
-    expect(() => assertEnforcement(bypassConfig)).toThrow(
-      '[Enforcement] Configuration invalid for 100% delegation:',
-    );
+    expect(() => assertEnforcement(bypassConfig)).toThrow('[Enforcement] Configuration invalid for 100% delegation:');
   });
 
   it('garante modelos validos para todos os tiers', () => {
@@ -177,9 +172,7 @@ describe('integracao de aplicacao - validacao de runtime', () => {
       routing: ROUTING_CONFIG,
     };
 
-    expect(() => assertEnforcement(missingModel)).toThrow(
-      '[Enforcement] Configuration invalid for 100% delegation:',
-    );
+    expect(() => assertEnforcement(missingModel)).toThrow('[Enforcement] Configuration invalid for 100% delegation:');
   });
 });
 
