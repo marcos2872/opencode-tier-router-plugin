@@ -7,9 +7,13 @@ import tierRouterPlugin from '../src/index.js';
 import { HARD_BLOCK_DELEGATION_MESSAGE, HARD_BLOCK_DENIED_TOOLS } from '../src/constants.js';
 import { FileLogger } from '../src/utils/logger.js';
 
-function makeClient(appLog: ReturnType<typeof vi.fn> = vi.fn(async () => true)): PluginInput['client'] {
+function makeClient(
+  appLog: ReturnType<typeof vi.fn> = vi.fn(async () => true),
+  tuiShowToast: ReturnType<typeof vi.fn> = vi.fn(async () => true),
+): PluginInput['client'] {
   return {
     app: { log: appLog },
+    tui: { showToast: tuiShowToast },
   } as unknown as PluginInput['client'];
 }
 
@@ -665,6 +669,28 @@ describe('tierRouterPlugin', () => {
 
       expect(toolOut).toEqual({ allow: false, message: HARD_BLOCK_DELEGATION_MESSAGE });
     }
+  });
+
+  it('notifies the TUI when hard-block blocks a denied tool before execution', async () => {
+    const tuiShowToast = vi.fn(async () => true);
+    const plugin = await tierRouterPlugin(makeCtx(projectDir, makeClient(undefined, tuiShowToast)));
+    await classifyHardBlocked(plugin, 'main-tool-toast');
+
+    const toolOut = { args: { path: 'src/index.ts' } };
+    await plugin['tool.execute.before']?.(
+      { sessionID: 'main-tool-toast', tool: 'read', callID: 'call-read-toast' },
+      toolOut,
+    );
+
+    expect(toolOut).toEqual({ allow: false, message: HARD_BLOCK_DELEGATION_MESSAGE });
+    expect(tuiShowToast).toHaveBeenCalledWith({
+      body: {
+        title: 'Acao bloqueada',
+        message: 'Delegue para @heavy.',
+        variant: 'warning',
+        duration: 8000,
+      },
+    });
   });
 
   it('hard-block leaves non-denied tools before execution for main sessions', async () => {

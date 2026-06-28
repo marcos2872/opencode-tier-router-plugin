@@ -89,6 +89,19 @@ type ObservableClient = {
   };
 };
 
+type TuiShowToastClient = {
+  tui?: {
+    showToast?: (options: {
+      body: {
+        title: string;
+        message: string;
+        variant: 'warning';
+        duration?: number;
+      };
+    }) => Promise<unknown>;
+  };
+};
+
 export class PluginOrchestrator {
   private capTracker = createCapTracker();
   private subagentSessions = new Set<string>();
@@ -129,6 +142,24 @@ export class PluginOrchestrator {
       await client.app.log({
         body: { service: 'opencode-tier-router', level, message, extra: data },
         query: { directory: this.ctx.directory },
+      });
+    } catch {
+      return;
+    }
+  }
+
+  private async notifyToolBlocked(tier: TierName): Promise<void> {
+    const client = this.ctx.client as TuiShowToastClient;
+    if (typeof client.tui?.showToast !== 'function') return;
+
+    try {
+      await client.tui.showToast({
+        body: {
+          title: 'Acao bloqueada',
+          message: 'Delegue para @heavy.',
+          variant: 'warning',
+          duration: 8000,
+        },
       });
     } catch {
       return;
@@ -583,6 +614,7 @@ export class PluginOrchestrator {
       const tier = this.hardBlockedSessions.get(input.sessionID);
       if (!tier || !this.HARD_BLOCK_DENIED_TOOLS.has(input.tool as (typeof HARD_BLOCK_DENIED_TOOLS)[number])) return;
 
+      await this.notifyToolBlocked(tier);
       this.log.info('Denied tool blocked before execution', {
         sessionID: input.sessionID,
         callID: input.callID,
