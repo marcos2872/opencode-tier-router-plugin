@@ -2,7 +2,7 @@
 
 ## Visão Arquitetural
 
-O **opencode-tier-router-plugin** é implementado como um **plugin OpenCode** que intercepta hooks do ciclo de vida de chat e execução de ferramentas para realizar **roteamento inteligente baseado em tiers de modelos**.
+O **opencode-tier-router-plugin** é implementado como um **plugin OpenCode** que intercepta hooks do ciclo de vida de chat, permissão e execução de ferramentas para realizar **roteamento inteligente baseado em tiers de modelos**.
 
 A arquitetura segue os princípios de:
 
@@ -10,6 +10,7 @@ A arquitetura segue os princípios de:
 - **Zero latência adicional**: roteamento via prompt injection, não chamada de modelo separado
 - **Fail-safe**: todos os hooks envolvidos em `try/catch` com comportamento best-effort
 - **Configuração declarativa**: um único arquivo `tiers.json` controla todo o comportamento
+- **Prompt em dois níveis**: protocolo informativo para todos, hard-block message só para sessão principal
 
 ## Decisões Arquiteturais (ADRs)
 
@@ -114,63 +115,70 @@ As decisões arquiteturais estão documentadas em `.specs/STATE.md`. Resumo das 
 graph TD
     subgraph OpenCode["OpenCode Host"]
         subgraph Plugin["opencode-tier-router-plugin (Plugin)"]
-            Index["src/index.ts<br/>━━━━━━━━━━━━━━━<br/>• Hooks: config, chat.message,<br/>  system.transform, permission.ask,<br/>  tool.execute.before/after<br/>• Comandos: /tiers, /budget, /router<br/>• Estado: config, capTracker, routerOn"]
+            Index["src/index.ts<br/>━━━━━━━━━━━━━━━<br/>• Hooks: config, chat.message,<br/>  system.transform, permission.ask,<br/>  event, tool.definition,<br/>  tool.execute.after,<br/>  command.execute.before<br/>• Comandos: /tiers, /budget, /router<br/>• Estado: config, capTracker, routerOn"]
 
-            Orchestrator["src/plugin-orchestrator.ts<br/>━━━━━━━━━━━━━━━<br/>• Hook orchestration<br/>• Chat message handling<br/>• Subagent session tracking"]
+            Orchestrator["src/plugin-orchestrator.ts<br/>━━━━━━━━━━━━━━━<br/>• Hook orchestration<br/>• Chat message handling<br/>• Subagent session tracking<br/>• Permission deny/allow<br/>• Event: reject/auto-allow"]
 
             Config["router/config.ts<br/>━━━━━━━━━━━━━━━<br/>• loadTiers (3 layers)<br/>• saveMode<br/>• validateTiersConfig"]
 
-            Protocol["router/protocol.ts<br/>━━━━━━━━━━━━━━━<br/>• buildDelegationProtocol<br/>• ~210 tokens injection"]
+            Prompts["src/prompts.ts<br/>━━━━━━━━━━━━━━━<br/>• buildDelegationProtocol (info)<br/>• buildHardBlockMessage (hard-block)<br/>• buildRoutingHint"]
 
             Selector["router/selector.ts<br/>━━━━━━━━━━━━━━━<br/>• selectTierByStrategy<br/>• keyword/llm modes<br/>• fallback chain"]
 
             Classifier["router/classifier.ts<br/>━━━━━━━━━━━━━━━<br/>• classifyTask<br/>• taskPatterns match<br/>• keyword stemming"]
 
-            Caps["router/caps.ts<br/>━━━━━━━━━━━━━━━<br/>• createCapTracker<br/>• trackToolExecution<br/>• getCapBanner<br/>• redundancy detection"]
+            Caps["router/caps.ts<br/>━━━━━━━━━━━━━━━<br/>• createCapTracker<br/>• trackToolExecution<br/>• getCapBanner<br/>• redundancy detection<br/>• cleanup per session"]
 
             Narration["narration.ts<br/>━━━━━━━━━━━━━━━<br/>• detectNarration<br/>• heuristic analysis"]
 
-
-
             EnfValidator["router/enforcement-validator.ts<br/>━━━━━━━━━━━━━━━<br/>• validateEnforcement<br/>• assertEnforcement<br/>• reportEnforcement"]
+
+            Logger["utils/logger.ts<br/>━━━━━━━━━━━━━━━<br/>• FileLogger<br/>• router-debug.log<br/>• Lazy init file"]
 
             Utils["utils/safe-json.ts<br/>━━━━━━━━━━━━━━━<br/>• Safe JSON parse<br/>• Size limits"]
 
-            Constants["constants.ts<br/>━━━━━━━━━━━━━━━<br/>• FALLBACK_CONFIG<br/>• Named constants"]
+            Constants["constants.ts<br/>━━━━━━━━━━━━━━━<br/>• FALLBACK_CONFIG<br/>• Named constants<br/>• SESSION_TTL_MS"]
         end
     end
 
     TiersJSON["tiers.json<br/>━━━━━━━━━━━━━━━<br/>• tiers (fast/medium/heavy)<br/>• modes (normal/budget/quality/deep)<br/>• taskPatterns<br/>• enforcement<br/>• routing"]
 
-    Subagents["Subagents<br/>━━━━━━━━━━━━━━━<br/>• @fast (opencode/big-pickle)<br/>• @medium (llama.cpp/Nex-N2-mini)<br/>• @heavy (llama.cpp/Nex-N2-mini)"]
+    Subagents["Subagents<br/>━━━━━━━━━━━━━━━<br/>• @fast (opencode/big-pickle)<br/>• @medium (llama.cpp/Nex-N2-mini)<br/>• @heavy (llama.cpp/Nex-N2-mini)<br/>Permissions: ALLOW for all tools"]
     Config --> TiersJSON
-    Protocol --> Subagents
+    Orchestrator --> Prompts
+    Orchestrator --> Logger
 
     style Index fill:#e1f5ff
-    style Protocol fill:#fff4e1
+    style Prompts fill:#fff4e1
     style Selector fill:#ffe1ff
     style TiersJSON fill:#e1ffe1
     style Subagents fill:#ffe1e1
+    style Logger fill:#f0e6ff
 ```
 
 ### 1. `src/index.ts` — Plugin Entry Point
 
 **Responsabilidades**:
-- Registrar hooks do plugin: `config`, `chat.message`, `chat.system.transform`, `permission.ask`, `tool.execute.before`, `tool.execute.after`, `command.execute.before`
+- Registrar hooks do plugin: `config`, `chat.message`, `experimental.chat.system.transform`, `permission.ask`, `event`, `tool.definition`, `tool.execute.after`, `experimental.text.complete`, `command.execute.before`
 - Implementar comandos do plugin: `/tiers`, `/budget`, `/router`
 - Manter estado global do plugin (config, cap tracker, router on/off)
 - Mapear agentes nativos OpenCode para tiers (`explore → @fast`, `build → @medium`, etc.)
+- Configurar per-agent permissions (ALLOW para subagentes tier)
+- Configurar permissões globais (`ask` para tools em hard-block mode)
 
 **Hooks registrados**:
 
 | Hook | Função |
 |------|--------|
-| `config` | Carrega tiers.json e inicializa plugin |
-| `chat.message` | Classifica tarefa e determina tier |
-| `chat.system.transform` | Injeta protocolo de delegação no system prompt |
-| `permission.ask` | Controla enforcement (hard-block vs advisory) |
-| `tool.execute.before` | Rastreia caps antes de execução |
+| `config` | Carrega tiers.json, valida enforcement, configura tier agents com permissions |
+| `chat.message` | Classifica tarefa, marca sessão como hard-blocked ou subagent |
+| `experimental.chat.system.transform` | Injeta protocolo informativo e hard-block message |
+| `permission.ask` | Auto-allow para subagentes, deny para hard-blocked |
+| `event` | Escuta `permission.asked`: reject hard-blocked, auto-allow (once) os demais |
+| `tool.definition` | Injeta routing hints nas descrições das ferramentas |
 | `tool.execute.after` | Atualiza caps e limites após execução |
+| `experimental.text.complete` | Processa saída do modelo |
+| `command.execute.before` | Processa comandos `/tiers`, `/budget`, `/router` |
 
 **Referência**: src/index.ts
 
@@ -179,17 +187,24 @@ graph TD
 ### 2. `src/plugin-orchestrator.ts` — Hook Orchestration
 
 **Responsabilidades**:
-- Orquestrar hooks de chat e transformação
-- Rastrear sessões de subagentes
-- Gerenciar decisões de roteamento
+- Orquestrar hooks de chat, transformação, permissão e eventos
+- Rastrear sessões de subagentes, hard-blocked, preferred tiers
+- Gerenciar decisões de roteamento e enforcement
+- Logar eventos via FileLogger para `router-debug.log`
+- Cleanup automático de sessões stale (TTL de 30 minutos)
 
 **Principais funções**:
 
 | Função | O que faz |
 |--------|-----------|
-| `handleChatMessage` | Processa mensagem e determina tier |
-| `handleSystemTransform` | Aplica transformações no system prompt |
-| `handlePermissionAsk` | Gerencia permissões com base no enforcement |
+| `handleChatMessage` | Processa mensagem, classifica, marca sessão (subagent ou hard-blocked) |
+| `handleSystemTransform` | Injeta protocolo informativo + hard-block message para sessões bloqueadas |
+| `handlePermissionAsk` | Auto-allow para subagentes, deny para hard-blocked, normal para demais |
+| `handleEvent` | Escuta `permission.asked`: reject para hard-blocked, auto-allow once para outros |
+| `handleToolDefinition` | Injeta routing hints nas tool descriptions |
+| `handleToolExecuteAfter` | Atualiza cap tracking |
+| `handleTextComplete` | Processa saída do modelo |
+| `handleCommandExecuteBefore` | Processa comandos `/tiers`, `/budget`, `/router` |
 
 **Referência**: src/plugin-orchestrator.ts
 
@@ -215,30 +230,64 @@ graph TD
 
 ---
 
-### 4. `src/router/protocol.ts` — Protocol Injection
+### 4. `src/prompts.ts` — Prompt Injection (Dois Níveis)
 
 **Responsabilidades**:
-- Construir protocolo de delegação compacto (~210 tokens)
-- Incluir tiers, modos, routing strategy, enforcement rules, cost signals
-- Informar ao modelo orquestrador como delegar
+- `buildDelegationProtocol`: Protocolo **informativo** (~210 tokens) com tiers, custos, regras. **Sem** "MUST delegate" ou "BLOCKED TOOLS"
+- `buildHardBlockMessage`: Mensagem **imperativa** com "ALL TOOLS EXCEPT task ARE DENIED", "YOU ARE A ROUTER"
+- `buildRoutingHint`: Dica de roteamento para a sessão atual
 
-**Estrutura do protocolo** (gerado por `buildDelegationProtocol`):
+**Estratégia de dois níveis**:
+
+| Prompt | Conteúdo | Quem recebe |
+|--------|----------|-------------|
+| `buildDelegationProtocol` | Referência: tiers, custos, regras de delegação, proibição de subagente delegar | **Todas** as sessões (main + subagentes) |
+| `buildHardBlockMessage` | "ALL TOOLS DENIED", "YOU ARE A ROUTER", lista de ferramentas bloqueadas | **Só** sessões hard-blocked (main session) |
+
+**Estrutura do protocolo informativo** (`buildDelegationProtocol`):
 
 ```
-## Model Delegation Protocol
+--- Task Delegation Reference ---
+
 Tiers: @fast=opencode/big-pickle(1x) @medium=llama.cpp/Nex-N2-mini(5x) @heavy=llama.cpp/Nex-N2-mini(20x) mode:normal
 Default: @medium
 Routing: strategy=llm selector=opencode/big-pickle
 R: @fast→find/grep/search/... @medium→refactor/implement/... @heavy→design/architecture/...
 Mode: normal (balanced — use cheapest matching tier, fallback to default)
-Rule: Classify user intent by keywords. For non-trivial requests, delegate to the cheapest matching tier. If no tier matches, use the default.
-Rule: Trivial requests MUST also delegate.
-Rule: Enforcement: HARD-BLOCK enabled. Non-trivial requests MUST delegate to @fast/@medium/@heavy; direct execution is not allowed.
-Rule: Respect [cap:N/MAX], [⚠ CAP WARNING], [⚠ CAP REACHED], and [⚠ REDUNDANT] banners; they signal read-limit fatigue and repeated work.
-Cost signal: @fast≈1x, @medium≈5x, @heavy≈20x. Minimize cost while preserving task adequacy.
+Cost signal: @fast≈1x, @medium≈5x, @heavy≈20x.
+
+--- Recommended Delegation ---
+Rule: Respect cap/redundancy banners from subagents; they signal read-limit fatigue.
+Rule: When a task matches a tier's patterns, delegate to the cheapest matching tier via "task".
+Rule: Subagents have isolated context and full tool access. They execute the work and return results. Subagents cannot delegate to other subagents — only the main session can delegate.
+---
 ```
 
-**Referência**: src/router/protocol.ts:10-51
+**Estrutura do hard-block message** (`buildHardBlockMessage`, só para main session hard-blocked):
+
+```
+❗ HARD-BLOCK ACTIVE — YOU ARE A ROUTER, NOT AN EXECUTOR
+
+This request is classified as @medium tier and MUST be delegated.
+
+ALL TOOLS EXCEPT "task" ARE DENIED:
+  grep    → DENIED — delegate search to @fast via "task"
+  glob    → DENIED — delegate search to @fast via "task"
+  read    → DENIED — delegate search to @fast via "task"
+  bash    → DENIED — delegate execution to @medium/@heavy via "task"
+  edit    → DENIED — delegate edits to @medium via "task"
+  write   → DENIED — delegate writes to @medium via "task"
+  ...
+
+REQUIRED ACTION:
+  1. Call "task" with subagent_type="medium" and a description of the work
+  2. The subagent has full tool access and will execute the request
+  3. WAIT for the subagent result
+```
+
+**Separação de responsabilidades**: O protocolo informativo nunca diz "você é um router" — subagentes que o recebem entendem que devem executar ferramentas diretamente, não delegar. Apenas a main session hard-blocked recebe instruções imperativas.
+
+**Referência**: src/prompts.ts
 
 ---
 
@@ -309,19 +358,31 @@ Cost signal: @fast≈1x, @medium≈5x, @heavy≈20x. Minimize cost while preserv
 ### 10. `src/router/enforcement-validator.ts` — Validação de Enforcement
 
 **Responsabilidades**:
-- Validar se uma tarefa pode executar no tier atual com base no enforcement mode
-- `validateEnforcement`: verifica se execução é permitida
-- `assertEnforcement`: bloqueia execuções não autorizadas
-- `reportEnforcement`: gera relatório de violações
+- Validar configuração de enforcement (mode, trivialDirectAllowed, tiers, cost hierarchy)
+- `validateEnforcement`: verifica se config é válida para 100% delegação
+- `assertEnforcement`: lança erro se config viola regras
+- `reportEnforcement`: gera relatório de auditoria
 
 **Referência**: src/router/enforcement-validator.ts
+
+---
+
+### 11. `src/utils/logger.ts` — FileLogger
+
+**Responsabilidades**:
+- Escrever logs do plugin em `{plugin_dir}/router-debug.log`
+- Lazy init: arquivo só é criado na primeira escrita
+- Níveis: DEBUG, INFO, WARN, ERROR (todos só arquivo, nada no terminal)
+
+**Referência**: src/utils/logger.ts
 
 ### 13. Utilitários
 
 | Módulo | Função |
 |--------|--------|
-| `constants.ts` | Constantes nomeadas (FALLBACK_CONFIG, regex, thresholds) |
+| `constants.ts` | Constantes nomeadas (FALLBACK_CONFIG, regex, thresholds, SESSION_TTL_MS, CAP_WARNING_THRESHOLD) |
 | `utils/safe-json.ts` | Parsing JSON seguro com limite de tamanho |
+| `utils/logger.ts` | FileLogger — logs em `{plugin_dir}/router-debug.log`, lazy init, níveis DEBUG/INFO/WARN/ERROR |
 
 ---
 
@@ -342,25 +403,32 @@ flowchart TD
     LLMSelector --> TierResult
 
     TierResult --> StoreState[Armazena tier no<br/>estado global]
+    StoreState --> MarkHard[Mark session as<br/>hard-blocked → @medium]
 
-    StoreState --> SysTransform[Hook: chat.system.transform]
-    SysTransform --> Protocol[buildDelegationProtocol<br/>Injeta ~210 tokens no system]
+    MarkHard --> SysTransform[Hook: chat.system.transform]
+    SysTransform --> Protocol[buildDelegationProtocol (info)<br/>Todas as sessões]
+    SysTransform --> HardMsg[buildHardBlockMessage<br/>Só main session hard-blocked]
 
-    Protocol --> Orchestrator[Modelo Orquestrador<br/>Lê protocolo]
+    Protocol --> Orchestrator[Modelo Orquestrador<br/>Lê protocolo + hard-block]
+    HardMsg --> Orchestrator
     Orchestrator --> Decision{Decisão:<br/>refatore → @medium}
 
     Decision --> TaskCall[Task agent: @medium,<br/>message: refatore...]
 
-    TaskCall --> PermissionAsk[Hook: permission.ask]
+    TaskCall --> PAsk[Hook: permission.ask]
 
-    PermissionAsk --> Enforcement{Enforcement Mode}
-    Enforcement -->|hard-block| EnfValidator[enforcement-validator.ts<br/>validateEnforcement]
-    EnfValidator -->|bloqueado| Block[DENY + mensagem]
-    EnfValidator -->|permitido| Allow[ALLOW]
-    Enforcement -->|advisory| Allow
+    PAsk --> Subagent{É subagent?}
+    Subagent -->|sim| AllowTool[status = allow<br/>Sem diálogo]
+    Subagent -->|não| HardBlocked{É hard-blocked?}
+    HardBlocked -->|sim| DenyTool[status = deny<br/>Sem diálogo]
+    HardBlocked -->|não| NormalFlow[Runtime segue padrão]
 
-    Allow --> ToolBefore[Hook: tool.execute.before]
-    Block --> End[Fim: bloqueado]
+    DenyTool --> Event[Hook: event<br/>permission.asked]
+    Event --> Reject[Reject + Toast<br/>'Tool blocked. Delegate']
+    Reject --> End[Fim: bloqueado]
+
+    AllowTool --> ToolBefore[Hook: tool.execute.before]
+    NormalFlow --> ToolBefore
 
     ToolBefore --> CapTracker[Cap Tracker<br/>Incrementa contador]
     CapTracker --> ToolExec[Execução da Tool<br/>read/grep/bash...]
@@ -384,6 +452,8 @@ flowchart TD
     style Orchestrator fill:#fff4e1
     style Block fill:#ffe1e1
     style Output fill:#e1ffe1
+    style Event fill:#ffe1ff
+    style Reject fill:#ffe1e1
 ```
 
 ### Detalhamento Passo a Passo
@@ -403,20 +473,31 @@ User: "refatore a função de login"
 
 #### 3. Hook `chat.system.transform` (src/plugin-orchestrator.ts)
 
-1. Constrói protocolo de delegação via `buildDelegationProtocol(cfg)`
-2. Injeta protocolo no system prompt
-3. Modelo orquestrador recebe:
+1. Constrói protocolo informativo via `buildDelegationProtocol(cfg)` — **todas as sessões**
+2. Se sessão hard-blocked, também injeta `buildHardBlockMessage(tier)` — **só main session**
+3. Modelo orquestrador recebe (protocolo informativo):
 
 ```
-## Model Delegation Protocol
+--- Task Delegation Reference ---
+
 Tiers: @fast=opencode/big-pickle(1x) @medium=llama.cpp/Nex-N2-mini(5x) @heavy=llama.cpp/Nex-N2-mini(20x) mode:normal
 Default: @medium
 R: @fast→find/grep/search... @medium→implement/refactor... @heavy→design/architecture...
 Mode: normal (balanced)
-Rule: Classify user intent. For non-trivial requests, delegate to cheapest matching tier.
-Rule: Trivial requests MUST also delegate.
-Rule: Enforcement: HARD-BLOCK enabled. Non-trivial MUST delegate.
-Cost signal: @fast≈1x, @medium≈5x, @heavy≈20x.
+
+--- Recommended Delegation ---
+Rule: When a task matches a tier's patterns, delegate via "task".
+Rule: Subagents cannot delegate to other subagents.
+---
+```
+
+4. Se hard-blocked, também recebe:
+
+```
+❗ HARD-BLOCK ACTIVE — YOU ARE A ROUTER, NOT AN EXECUTOR
+
+This request is classified as @medium tier and MUST be delegated.
+ALL TOOLS EXCEPT "task" ARE DENIED: read→DENIED, bash→DENIED, edit→DENIED, ...
 ```
 
 #### 4. Modelo orquestrador decide
@@ -433,12 +514,18 @@ Task({ agent: "@medium", message: "refatore a função de login" })
 
 #### 5. Hook `permission.ask` (src/plugin-orchestrator.ts)
 
-Se enforcement for `hard-block`:
-- `enforcement-validator.ts` verifica se execução é permitida
-- Se sessão principal tenta executar tools diretamente: **bloqueia**
-- Se permitido: delega para o tier correto
+Executa **antes** do diálogo de permissão aparecer:
+- Subagent (`subagentSessions`): `output.status = 'allow'` → sem diálogo
+- Hard-blocked (`hardBlockedSessions`): `output.status = 'deny'` → sem diálogo
+- Sessão normal: não modifica `output.status` → runtime segue fluxo padrão
 
-#### 6. Hook `tool.execute.after` (src/plugin-orchestrator.ts)
+#### 6. Hook `event` — resposta de permissão (src/plugin-orchestrator.ts)
+
+Executa **após** o diálogo de permissão ser resolvido (evento `permission.asked`):
+- Hard-blocked: rejeita a permissão via API + mostra toast "Tool blocked. Delegate to @tier"
+- Subagent ou normal: auto-allow com `response: 'once'` (não adiciona regra permanente)
+
+#### 7. Hook `tool.execute.after` (src/plugin-orchestrator.ts)
 1. Cap tracker atualiza limites após execução
 2. Injeta banners conforme limite
 
@@ -671,9 +758,12 @@ Controla estratégia de seleção de tier.
 
 | Comando | Descrição |
 |---------|-----------|
-| `/tiers` | Exibe configuração ativa |
-| `/budget` | Lista modos ou troca modo |
-| `/router on\|off` | Liga/desliga o plugin |
+| `/tiers` | Exibe configuração ativa (modo, enforcement, tiers, mapeamento de agentes) |
+| `/budget` | Lista modos disponíveis |
+| `/budget <mode>` | Troca modo e atualiza `tiers.json` |
+| `/router` | Mostra status do plugin (`on/off`) |
+| `/router on` | Liga o roteador |
+| `/router off` | Desliga o roteador |
 
 ---
 
@@ -681,7 +771,7 @@ Controla estratégia de seleção de tier.
 
 - [Documentação do Projeto](./projeto.md) — visão geral, stack, estrutura, comandos
 - [AGENTS.md](../AGENTS.md) — workflow de desenvolvimento TLC
-- [STATE.md](../.specs/STATE.md) — decisões ativas (AD-001 a AD-006)
+- [STATE.md](../.specs/STATE.md) — decisões ativas (AD-001 a AD-007)
 - [README.md](../README.md) — overview rápido e instalação
 
 ---

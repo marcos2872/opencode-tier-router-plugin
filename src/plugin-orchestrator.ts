@@ -16,6 +16,7 @@ import {
   buildRoutingHint,
   buildHardBlockMessage,
   buildNarrationAnnotation,
+  MODE_EMPHASIS,
 } from './prompts.js';
 import { selectTierByStrategy, type SelectionSource } from './router/selector.js';
 import { createCapTracker } from './router/caps.js';
@@ -77,6 +78,7 @@ export class PluginOrchestrator {
   private selectionSourceSessions = new Map<string, SelectionSource>();
   private sessionActivity = new Map<string, number>();
   private enabled = true;
+  private pendingCommandResponses = new Map<string, TextPart[]>();
   private log: FileLogger;
 
   constructor(
@@ -100,6 +102,7 @@ export class PluginOrchestrator {
       this.hardBlockReasons.delete(id);
       this.preferredTierSessions.delete(id);
       this.selectionSourceSessions.delete(id);
+      this.pendingCommandResponses.delete(id);
       this.capTracker.cleanup(id);
     }
   }
@@ -110,6 +113,10 @@ export class PluginOrchestrator {
 
   private async loadConfig(): Promise<RouterConfig> {
     return this.config;
+  }
+
+  get enabledState(): boolean {
+    return this.enabled;
   }
 
   async handleConfig(input: Config): Promise<void> {
@@ -166,22 +173,6 @@ export class PluginOrchestrator {
         };
       }
 
-      // Only force permission overrides in hard-block mode.
-      // In advisory mode, default permissions (native tools auto-allowed) are fine.
-      // task is intentionally excluded — it is the delegation mechanism itself
-      // and must remain available for the model to call.
-      if (cfg.enforcement.mode === 'hard-block') {
-        const ALL_TOOLS = [
-          'read', 'edit', 'glob', 'grep', 'list', 'bash',
-          'webfetch', 'websearch', 'todowrite', 'doom_loop',
-          'external_directory', 'lsp', 'skill', 'question',
-        ];
-        input.permission ??= {};
-        for (const tool of ALL_TOOLS) {
-          (input.permission as Record<string, unknown>)[tool] = 'ask';
-        }
-      }
-
       input.command = input.command ?? {};
       input.command.tiers = {
         template: '/tiers',
@@ -208,6 +199,58 @@ export class PluginOrchestrator {
       this.cleanupSessions();
       this.touchSession(input.sessionID);
 
+      // DEBUG: dump full input structure for slash-command investigation
+      this.log.info('chat.message input', {
+        keys: Object.keys(input),
+        agent: input.agent,
+        sessionID: input.sessionID,
+        partsCount: (input as any).parts?.length,
+        partsFirst: JSON.stringify((input as any).parts?.[0]),
+        partsFull: JSON.stringify((input as any).parts),
+        messageText: (input as any).message?.text,
+        messageSummaryTitle: (input as any).message?.summary?.title,
+        messageRaw: JSON.stringify((input as any).message),
+        inputRaw: JSON.stringify(input).slice(0, 500),
+      });
+
+      // Intercept slash commands that should not be sent to the model
+      const msgText = messageText((input.parts ?? []) as Array<{ type?: string; text?: string }>);
+      if (msgText.startsWith('/')) {
+        const cmdLine = msgText.slice(1).trim().toLowerCase();
+        const [cmdName, ...cmdArgs] = cmdLine.split(/\s+/);
+        const cmdArg = cmdArgs.join(' ');
+
+        if (cmdName === 'router') {
+          if (cmdArg === 'on') {
+            this.enabled = true;
+            output.parts = [makeTextPart(input.sessionID, 'Tier router enabled.')];
+          } else if (cmdArg === 'off') {
+            this.enabled = false;
+            output.parts = [makeTextPart(input.sessionID, 'Tier router disabled.')];
+          } else {
+            output.parts = [makeTextPart(input.sessionID, `Tier router is ${this.enabled ? 'on' : 'off'}.`)];
+          }
+          this.log.info('chat.message command intercepted', { cmdName, cmdArg });
+          return;
+
+        }
+
+        if (cmdName === 'tiers') {
+          const cfg = await this.loadConfig();
+          const lines = [
+            `Mode: ${cfg.mode}`,
+            `Enforcement: ${cfg.enforcement.mode}`,
+            `Tiers:`,
+          ];
+          for (const tier of ['fast', 'medium', 'heavy'] as const) {
+            const t = cfg.tiers[tier];
+            lines.push(`  @${tier}: ${t?.model ?? 'n/a'} (cost ${t?.costRatio ?? 'n/a'}x)`);
+          }
+          output.parts = [makeTextPart(input.sessionID, lines.join('\n'))];
+          return;
+        }
+      }
+
       // Normalize agent name: the runtime may send "@fast" or "fast"
       const agent = input.agent?.replace(/^@/, '');
       const isTier = !!(agent && isTierName(agent));
@@ -226,7 +269,20 @@ export class PluginOrchestrator {
       this.subagentSessions.delete(input.sessionID);
       this.subagentTierMap.delete(input.sessionID);
 
+      this.log.info('chat.message enabled check', { sessionID: input.sessionID, enabled: this.enabled });
+
+      // If a command response is pending for this session (from command.execute.before),
+      // replace the chat message with the command response so the model doesn't
+      // see the original command text.
+      const pendingResponse = this.pendingCommandResponses.get(input.sessionID);
+      if (pendingResponse) {
+        this.pendingCommandResponses.delete(input.sessionID);
+        output.parts = pendingResponse;
+        return;
+      }
+
       if (!this.enabled) {
+        this.log.info('chat.message router disabled, returning early', { sessionID: input.sessionID });
         this.hardBlockedSessions.delete(input.sessionID);
         this.hardBlockReasons.delete(input.sessionID);
         this.preferredTierSessions.delete(input.sessionID);
@@ -291,20 +347,29 @@ export class PluginOrchestrator {
       if (input.sessionID && this.subagentSessions.has(input.sessionID)) return;
 
       const cfg = await this.loadConfig();
-      const protocol = buildDelegationProtocol(cfg);
       output.system = output.system ?? [];
-      output.system.push(protocol);
+
+      const tier = input.sessionID ? this.hardBlockedSessions.get(input.sessionID) : undefined;
+      if (cfg.enforcement.mode === 'hard-block' && tier) {
+        const tiersLine = Object.entries(cfg.tiers)
+          .map(([name, t]) => `@${name}=${t.model}(${t.costRatio}x)`)
+          .join(' ');
+        const rulesLine = Object.entries(cfg.taskPatterns)
+          .map(([tierName, patterns]) => `@${tierName}→${patterns.join('/')}`)
+          .join(' ');
+        const activeMode = cfg.modes[cfg.mode];
+        const emphasis = MODE_EMPHASIS[cfg.mode] ?? `mode ${cfg.mode}`;
+        const reason = input.sessionID ? this.hardBlockReasons.get(input.sessionID) : undefined;
+        output.system.push(buildHardBlockMessage(tier, tiersLine, rulesLine, emphasis, reason));
+      } else {
+        const protocol = buildDelegationProtocol(cfg);
+        output.system.push(protocol);
+      }
 
       const preferredTier = input.sessionID ? this.preferredTierSessions.get(input.sessionID) : undefined;
       if (preferredTier) {
         const source = input.sessionID ? this.selectionSourceSessions.get(input.sessionID) : undefined;
         output.system.push(buildRoutingHint(preferredTier, source));
-      }
-
-      const tier = input.sessionID ? this.hardBlockedSessions.get(input.sessionID) : undefined;
-      if (cfg.enforcement.mode === 'hard-block' && tier) {
-        const reason = input.sessionID ? this.hardBlockReasons.get(input.sessionID) : undefined;
-        output.system.push(buildHardBlockMessage(tier, reason));
       }
     } catch (err) {
       this.log.warn('system.transform hook failed:', err instanceof Error ? err.message : String(err));
@@ -313,7 +378,10 @@ export class PluginOrchestrator {
 
   async handlePermissionAsk(input: { sessionID?: string; type?: string }, output: { status?: string }): Promise<void> {
     try {
-      if (!this.enabled) return;
+      if (!this.enabled) {
+        output.status = 'allow';
+        return;
+      }
       if (!input.sessionID) return;
 
       this.log.info('permission.ask', { sessionID: input.sessionID, type: input.type, isSubagent: this.subagentSessions.has(input.sessionID), isHardBlocked: this.hardBlockedSessions.has(input.sessionID) });
@@ -466,21 +534,36 @@ export class PluginOrchestrator {
     try {
       this.cleanupSessions();
       this.touchSession(input.sessionID);
-      const command = input.command.replace(/^\//, '').toLowerCase();
-      const args = input.arguments.trim();
+
+      // DEBUG: dump command.execute.before input
+      this.log.info('command.execute.before input', {
+        keys: Object.keys(input),
+        command: input.command,
+        arguments: input.arguments,
+        sessionID: input.sessionID,
+        raw: JSON.stringify(input).slice(0, 500),
+      });
+      const raw = input.command.replace(/^\//, '').toLowerCase();
+      const parts = raw.split(/\s+/);
+      const command = parts[0];
+      const args = (parts.slice(1).join(' ') + ' ' + (input.arguments ?? '')).trim();
 
       if (command === 'router') {
         if (args === 'on') {
           this.enabled = true;
           output.parts = [makeTextPart(input.sessionID, 'Tier router enabled.')];
+          this.pendingCommandResponses.set(input.sessionID, output.parts);
           return;
         }
         if (args === 'off') {
           this.enabled = false;
+          this.log.info('router command set enabled', { enabled: this.enabled, sessionID: input.sessionID });
           output.parts = [makeTextPart(input.sessionID, 'Tier router disabled.')];
+          this.pendingCommandResponses.set(input.sessionID, output.parts);
           return;
         }
         output.parts = [makeTextPart(input.sessionID, `Tier router is ${this.enabled ? 'on' : 'off'}.`)];
+        this.log.info('command.execute.before router intercepted', { command, args });
         return;
       }
 
@@ -506,6 +589,10 @@ export class PluginOrchestrator {
 
       if (command === 'budget') {
         const cfg = await this.loadConfig();
+        const raw = input.command.replace(/^\//, '').toLowerCase();
+        const parts = raw.split(/\s+/);
+        const command = parts[0];
+        const args = (parts.slice(1).join(' ') + ' ' + (input.arguments ?? '')).trim();
 
         if (!args) {
           const modeLines = Object.entries(cfg.modes).map(([name, mode]) => {

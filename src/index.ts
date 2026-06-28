@@ -162,6 +162,9 @@ const tierRouterPlugin: Plugin = async (ctx) => {
   const orchestrator = new PluginOrchestrator(ctx, cfg);
 
   return {
+    get enabled(): boolean {
+      return orchestrator.enabledState;
+    },
     config: (input: Config) => orchestrator.handleConfig(input),
     'chat.message': (input: any, output: any) => orchestrator.handleChatMessage(input, output),
     'experimental.chat.system.transform': (input: any, output: any) =>

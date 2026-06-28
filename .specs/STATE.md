@@ -74,8 +74,14 @@ All 17 tasks across 4 phases implemented and verified on branch `feat/code-quali
 
 ## Handoff
 
-### Current Feature: (none — ready for next feature)
-- **Next**: Awaiting next feature specification
+### In Progress
+- **Fix**: Remove global hard-block `input.permission` overrides from `handleConfig`
+- **Status**: Implemented in `src/plugin-orchestrator.ts`; hard-block is now prompt-based
+- **Next**: Verify in real session that `/router off` no longer triggers permission dialogs
+
+### Next Steps
+1. Run `npm run typecheck && npx vitest run`
+2. Verify in a real OpenCode session that `/router off` does not show permission dialogs from `input.permission`
 
 ### Completed Features
 - **RTT-001 Real Token Cost Tracking** — Completed and verified (PASS)

@@ -108,33 +108,38 @@ export function buildRoutingHint(tier: string, source?: string): string {
  * imediatamente para o tier especificado.
  *
  * @param tier - Nome do tier para o qual a solicitação deve ser delegada.
+ * @param tierLines - Linhas resumidas dos tiers disponíveis.
+ * @param routingRules - Regras de roteamento por tier.
+ * @param modeEmphasis - Ênfase do modo de roteamento ativo.
  * @param reason - Razão opcional adicional para o bloqueio.
  * @returns Frase de HARD-BLOCK.
  */
-export function buildHardBlockMessage(tier: string, reason?: string): string {
+export function buildHardBlockMessage(
+  tier: string,
+  tierLines: string,
+  routingRules: string,
+  modeEmphasis: string,
+  reason?: string,
+): string {
   const suffix = reason ? ` ${reason}` : '';
   return [
-    `❗ HARD-BLOCK ACTIVE — YOU ARE A ROUTER, NOT AN EXECUTOR`,
-    ``,
-    `This request is classified as @${tier} tier and MUST be delegated.`,
-    ``,
-    `ALL TOOLS EXCEPT "task" ARE DENIED:`,
-    `  grep    → DENIED — delegate search to @fast via "task"`,
-    `  glob    → DENIED — delegate search to @fast via "task"`,
-    `  read    → DENIED — delegate read to @fast via "task"`,
-    `  list    → DENIED — delegate listing to @fast via "task"`,
-    `  bash    → DENIED — delegate execution to @medium/@heavy via "task"`,
-    `  edit    → DENIED — delegate edits to @medium via "task"`,
-    `  write   → DENIED — delegate writes to @medium via "task"`,
-    `  webfetch→ DENIED — delegate fetch to @medium via "task"`,
-    `  websearch→ DENIED — delegate search to @medium via "task"`,
-    ``,
-    `REQUIRED ACTION:`,
-    `  1. Call "task" with subagent_type="${tier}" and a description of the work`,
-    `  2. The subagent has full tool access and will execute the request`,
-    `  3. WAIT for the subagent result — do NOT try to execute tools yourself`,
-    ``,
-    `If you attempt to call any tool other than "task", it will be REJECTED and you will get a "Permission denied" error. Repeated denials waste context and harm session quality.${suffix}`,
+    '❗ HARD-BLOCK ACTIVE — YOU ARE A ROUTER, NOT AN EXECUTOR',
+    '',
+    `YOUR FIRST AND ONLY ACTION:`,
+    `  Call "task" with subagent_type="${tier}" and a clear description of the work.`,
+    `  The subagent has full tool access and will execute the request.`,
+    '',
+    `Available tiers: ${tierLines} mode:${modeEmphasis}`,
+    `R: ${routingRules}`,
+    `This request is classified as @${tier}. Delegate now.`,
+    '',
+    `ALL TOOLS EXCEPT "task" ARE PERMANENTLY DENIED:`,
+    `  grep → DENIED   glob → DENIED   read → DENIED   list → DENIED`,
+    `  bash → DENIED   edit → DENIED   write → DENIED   webfetch → DENIED`,
+    `  websearch → DENIED`,
+    '',
+    `If you call ANY tool other than "task" you will get PERMISSION DENIED.`,
+    `Repeated denials waste context and harm session quality.${suffix}`,
   ].join('\n');
 }
 

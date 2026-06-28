@@ -244,6 +244,73 @@ describe('tierRouterPlugin', () => {
     expect(systemOut.system.length).toBeGreaterThan(0);
   });
 
+  it('intercepts /router off via chat.message', async () => {
+    await writeTiers(projectDir, { enforcement: { mode: 'hard-block', trivialDirectAllowed: true } });
+    const plugin = await tierRouterPlugin(makeCtx(projectDir));
+
+    const output = {
+      message: {},
+      parts: [] as unknown[],
+    };
+    await plugin['chat.message']?.(
+      {
+        sessionID: 'test-cmd',
+        message: {
+          role: 'user',
+          id: 'm-test-cmd',
+          sessionID: 'test-cmd',
+          time: { created: 0 },
+        },
+        parts: [{ type: 'text', text: '/router off' }],
+      } as unknown as Parameters<NonNullable<(typeof plugin)['chat.message']>>[0],
+      output as unknown as Parameters<NonNullable<(typeof plugin)['chat.message']>>[1],
+    );
+
+    expect(textOf(output.parts as TextPart[])).toContain('disabled');
+    expect((plugin as unknown as { enabled: boolean }).enabled).toBe(false);
+
+    const askOut: { status: 'ask' | 'deny' | 'allow' } = { status: 'ask' };
+    await plugin['permission.ask']?.(
+      {
+        id: 'p-test-cmd',
+        type: 'read',
+        sessionID: 'test-cmd',
+        messageID: 'm-test-cmd',
+        title: 'run command',
+        metadata: {},
+        time: { created: 0 },
+      } as unknown as Parameters<NonNullable<(typeof plugin)['permission.ask']>>[0],
+      askOut,
+    );
+    expect(askOut.status).toBe('allow');
+  });
+
+  it('replays command.execute.before router responses when chat.message parts are empty', async () => {
+    const plugin = await tierRouterPlugin(makeCtx(projectDir));
+
+    const offCommand = { parts: [] as TextPart[] };
+    await plugin['command.execute.before']?.({ command: '/router', sessionID: 'test-pending-off', arguments: 'off' }, offCommand);
+
+    const offChat = { message: {}, parts: [] as unknown[] };
+    await plugin['chat.message']?.(
+      { sessionID: 'test-pending-off', parts: [] } as unknown as Parameters<NonNullable<(typeof plugin)['chat.message']>>[0],
+      offChat as unknown as Parameters<NonNullable<(typeof plugin)['chat.message']>>[1],
+    );
+    expect(textOf(offChat.parts as TextPart[])).toBe('Tier router disabled.');
+
+    const onCommand = { parts: [] as TextPart[] };
+    await plugin['command.execute.before']?.({ command: '/router', sessionID: 'test-pending-on', arguments: 'on' }, onCommand);
+
+    const onChat = { message: {}, parts: [] as unknown[] };
+    await plugin['chat.message']?.(
+      { sessionID: 'test-pending-on', parts: [] } as unknown as Parameters<NonNullable<(typeof plugin)['chat.message']>>[0],
+      onChat as unknown as Parameters<NonNullable<(typeof plugin)['chat.message']>>[1],
+    );
+    expect(textOf(onChat.parts as TextPart[])).toBe('Tier router enabled.');
+    expect(textOf(offChat.parts as TextPart[])).not.toContain('/router off');
+    expect((plugin as unknown as { enabled: boolean }).enabled).toBe(true);
+  });
+
   it('when router is off, system transform, caps, and narration hooks are no-ops', async () => {
     const plugin = await tierRouterPlugin(makeCtx(projectDir));
     await plugin['command.execute.before']?.({ command: '/router', sessionID: 's1', arguments: 'off' }, { parts: [] });
@@ -369,6 +436,7 @@ describe('tierRouterPlugin', () => {
       systemOut,
     );
     expect(systemOut.system.join('\n')).toContain('HARD-BLOCK');
+    expect(systemOut.system.join('\n')).not.toContain('Task Delegation Reference');
   });
 
   it('hard-block denies direct tool permissions for mapped build agent sessions', async () => {
@@ -410,6 +478,67 @@ describe('tierRouterPlugin', () => {
     );
 
     expect(askOut.status).toBe('deny');
+  });
+
+  it('auto-allows permissions when router is disabled', async () => {
+    await writeTiers(projectDir, {
+      enforcement: {
+        mode: 'hard-block',
+        trivialDirectAllowed: true,
+      },
+    });
+
+    const plugin = await tierRouterPlugin(makeCtx(projectDir));
+    await plugin['chat.message']?.(
+      { sessionID: 'main-build', agent: 'build' },
+      {
+        message: {
+          role: 'user',
+          id: 'm-build',
+          sessionID: 'main-build',
+          time: { created: 0 },
+          agent: 'build',
+          model: { providerID: 'github-copilot', modelID: 'gpt-5.3-codex' },
+        },
+        parts: [{ type: 'text', text: 'busque auth no projeto' } as unknown as TextPart],
+      },
+    );
+
+    const askOut: { status: 'ask' | 'deny' | 'allow' } = { status: 'ask' };
+    await plugin['permission.ask']?.(
+      {
+        id: 'p-build',
+        type: 'bash',
+        sessionID: 'main-build',
+        messageID: 'm-build',
+        title: 'run command',
+        metadata: {},
+        time: { created: 0 },
+      },
+      askOut,
+    );
+    expect(askOut.status).toBe('deny');
+
+    await plugin['command.execute.before']?.(
+      { command: '/router', sessionID: 'main-build', arguments: 'off' },
+      { parts: [] },
+    );
+
+    const disabledAskOut: { status: 'ask' | 'deny' | 'allow' } = { status: 'ask' };
+    await plugin['permission.ask']?.(
+      {
+        id: 'p-build-disabled',
+        type: 'bash',
+        sessionID: 'main-build',
+        messageID: 'm-build',
+        title: 'run command',
+        metadata: {},
+        time: { created: 0 },
+      },
+      disabledAskOut,
+    );
+
+    expect(disabledAskOut.status).toBe('allow');
   });
 
   it('hard-block still allows trivial fast requests when configured', async () => {

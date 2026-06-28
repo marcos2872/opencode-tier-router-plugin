@@ -31,35 +31,38 @@ This project uses `tlc-spec-driven` skill (`.agents/skills/tlc-spec-driven/`).
 opencode-tier-router-plugin/
 ├── tiers.json                 # Single config: tiers, modes, taskPatterns, enforcement, routing
 ├── src/
-│   ├── index.ts               # Plugin entry: all hooks wired (config, chat.message, chat.system.transform, tool.execute.after, command.execute.before)
+│   ├── index.ts               # Plugin entry: all hooks wired
 │   ├── plugin-orchestrator.ts # Hook orchestration (SRP extraction)
-│   ├── constants.ts           # Named constants (FALLBACK_CONFIG, regex)
+│   ├── prompts.ts             # Prompt builders (delegation protocol, hard-block, routing hint)
+│   ├── constants.ts           # Named constants (FALLBACK_CONFIG, regex, SESSION_TTL)
 │   ├── narration.ts           # Narration pattern detection
 │   ├── utils/
+│   │   ├── logger.ts          # FileLogger — logs to router-debug.log in plugin dir
 │   │   └── safe-json.ts       # Safe JSON parsing with size limit
 │   └── router/
 │       ├── config.ts          # Load/validate tiers.json, layered resolution
-│       ├── protocol.ts        # ~210 token delegation protocol generator
+│       ├── protocol.ts        # Task classification protocol
 │       ├── classifier.ts      # Keyword → tier classification
 │       ├── selector.ts        # keyword/llm routing selector + fallback chain
 │       ├── caps.ts            # Cap tracker + redundancy detection
-│       ├── enforcement-validator.ts    # Enforcement validation (validateEnforcement, assertEnforcement, reportEnforcement)
+│       └── enforcement-validator.ts    # Enforcement validation
 ├── ENFORCEMENT.md             # Enforcement rules, architecture guarantees, security checklist
 └── test/                      # Unit tests by area
-    ├── phase0-modules.spec.ts          # SRP module tests
-    ├── enforcement-validator.spec.ts   # validation, assertion, reporting
-    ├── phase2-persistence.spec.ts      # load/save + session management
-    ├── phase4-e2e.spec.ts              # full session lifecycle
-    ├── phase5-plugin-integration.spec.ts   # plugin hooks + real usage
-    ├── caps.test.ts                    # Cap tracker unit tests
-    ├── cleanup-versioning.spec.ts      # Cleanup + versioning tests
-    ├── config-thresholds.spec.ts       # Config thresholds tests
-    ├── index.test.ts                   # Index integration tests
-    ├── lru-eviction.spec.ts            # LRU eviction tests
-    └── race-conditions.spec.ts         # Concurrent access tests
+    ├── phase0-modules.spec.ts
+    ├── enforcement-validator.spec.ts
+    ├── phase2-persistence.spec.ts
+    ├── phase4-e2e.spec.ts
+    ├── phase5-plugin-integration.spec.ts
+    ├── protocol.test.ts
+    ├── caps.test.ts
+    ├── cleanup-versioning.spec.ts
+    ├── config-thresholds.spec.ts
+    ├── index.test.ts
+    ├── lru-eviction.spec.ts
+    └── race-conditions.spec.ts
 ```
 
-## Architecture decisions (STATE.md AD-001–005)
+## Architecture decisions
 
 - Plugin, not standalone agent or proxy
 - Single `tiers.json`, no separate state file, no provider presets
@@ -67,6 +70,21 @@ opencode-tier-router-plugin/
 - Enforcement defaults to hard-block (`trivialDirectAllowed=false`), advisory available via config
 - Routing strategy: `llm` selector with fallback (`llm -> keyword -> defaultTier`), `keyword` also available
 - Config resolution: project `tiers.json` > `~/.config/opencode/tiers.json` > create in project dir
+- `buildDelegationProtocol` is purely informational (tiers, costs, rules) — safe for all sessions
+- `buildHardBlockMessage` carries strong delegation instructions — only injected for hard-blocked main sessions
+- Subagents receive only the informational protocol; they cannot delegate to other subagents
+- Permission blocking uses `permission.ask` (deny for hard-blocked, allow for subagents) + event hook (reject for hard-blocked, auto-allow once for others)
+- Logs go to `{plugin_dir}/router-debug.log` via FileLogger, never to terminal
+
+## Hook order
+
+```
+config → chat.message → experimental.chat.system.transform → permission.ask
+  → event → tool.definition → tool.execute.after → experimental.text.complete
+  → command.execute.before
+```
+
+Every hook wrapped in `try/catch` with `// best-effort: never crash a real session`.
 
 ## Commands
 
@@ -93,6 +111,6 @@ npm run typecheck && npx vitest run
 
 ## Reference
 
-- OpenCode plugin API: `@opencode-ai/plugin` — hooks: `config`, `chat.message`, `chat.system.transform`, `permission.ask`, `tool.execute.before/after`, `experimental.text.complete`, `command.execute.before`
-- Key hook order used by plugin: `config → chat.message → chat.system.transform → permission.ask → tool.execute.after → command.execute.before`
-- Every hook wrapped in `try/catch` with `// best-effort: never crash a real session`
+- OpenCode plugin API: `@opencode-ai/plugin`
+- Key hooks: `config`, `chat.message`, `experimental.chat.system.transform`, `permission.ask`, `event`, `tool.definition`, `tool.execute.after`, `experimental.text.complete`, `command.execute.before`
+- FileLogger: `src/utils/logger.ts` — writes to `{plugin_dir}/router-debug.log`

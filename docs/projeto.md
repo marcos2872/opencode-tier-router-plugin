@@ -39,16 +39,17 @@ opencode-tier-router-plugin/
 ├── src/
 │   ├── index.ts               # Entry point: hooks e comandos do plugin
 │   ├── plugin-orchestrator.ts # Orquestração de hooks (SRP extraction)
+│   ├── prompts.ts             # Prompt builders (protocolo info, hard-block, routing hint)
 │   ├── narration.ts           # Detecção de narração vs. trabalho real
-│   ├── constants.ts           # Constantes nomeadas (FALLBACK_CONFIG, regex)
+│   ├── constants.ts           # Constantes nomeadas (FALLBACK_CONFIG, regex, SESSION_TTL)
 │   ├── router/
 │   │   ├── caps.ts            # Rastreamento de caps e detecção de redundância
 │   │   ├── classifier.ts      # Classificação de tarefas por keywords
 │   │   ├── config.ts          # Load/validate/save de tiers.json
 │   │   ├── enforcement-validator.ts # Validação e bloqueio de enforcement
-│   │   ├── protocol.ts        # Construção do protocolo de delegação
 │   │   └── selector.ts        # Seleção de tier (keyword ou LLM) com fallback
 │   └── utils/
+│       ├── logger.ts          # FileLogger — logs em router-debug.log
 │       └── safe-json.ts       # Parsing JSON seguro com limite de tamanho
 ├── test/                      # Testes unitários
 ├── tiers.json                 # Configuração principal (tiers, modos, enforcement, routing)
@@ -69,26 +70,24 @@ opencode-tier-router-plugin/
    - Determina o tier adequado (`@fast`, `@medium`, `@heavy`)
 
 3. **Transformação do system prompt** (hook `chat.system.transform`):
-   - Injeta o protocolo de delegação no system prompt
-   - Protocolo informa ao modelo orquestrador:
-     - Tiers disponíveis e seus custos relativos
-     - Regras de classificação (keywords por tier)
-     - Modo ativo (normal/budget/quality/deep)
-     - Enforcement (advisory ou hard-block)
+   - Injeta protocolo **informativo** (`buildDelegationProtocol`) em **todas as sessões**
+   - Se sessão hard-blocked, também injeta **hard-block message** (`buildHardBlockMessage`)
+   - Dois níveis: info para todos, imperativo só para main session
 
 4. **Controle de permissões** (hook `permission.ask`):
-   - Se `enforcement.mode = "hard-block"`:
-     - `enforcement-validator.ts` valida se execução é permitida
-     - Bloqueia execução direta de tools em tarefas não-triviais
-     - Força delegação via `Task()` para o tier correto
-   - Se `enforcement.mode = "advisory"`:
-     - Apenas orienta, não bloqueia
+   - Subagent → `output.status = 'allow'` (sem diálogo)
+   - Hard-blocked → `output.status = 'deny'` (sem diálogo)
+   - Sessão normal → runtime segue fluxo padrão
 
-5. **Controle de caps** (hooks `tool.execute.before/after`):
+5. **Evento de permissão** (hook `event`, escuta `permission.asked`):
+   - Hard-blocked → reject + toast "Tool blocked. Delegate to @tier"
+   - Subagent ou normal → auto-allow com `response: 'once'`
+
+6. **Controle de caps** (hooks `tool.execute.after`):
    - Rastreia caps de leitura e detecta redundância
    - Injeta banners `[cap:N/MAX]`, `[⚠ CAP WARNING]`, `[⚠ CAP REACHED]`
 
-6. **Comandos disponíveis**:
+7. **Comandos disponíveis**:
    - `/tiers` — exibe configuração ativa
    - `/budget` — lista modos ou troca modo
    - `/router on|off` — liga/desliga o plugin

@@ -58,7 +58,6 @@ Cada tier DEVE ter:
 - Modelo válido (`"provider/model"` format)
 - costRatio positivo e diferente
 - Cap positivo (limite de sessões)
-- Thresholds (min/max tokens para classificação)
 
 Se falta tier → rota para um tier pode não ter modelo → fallback broken.
 
@@ -158,24 +157,21 @@ mode: normal
     "fast": {
       "model": "opencode/big-pickle",
       "costRatio": 1,
-      "cap": 8,
-      "thresholds": { "min": 0, "max": 2000 }
+      "cap": 8
     },
     "medium": {
       "model": "llama.cpp/Nex-N2-mini",
       "costRatio": 5,
-      "cap": 12,
-      "thresholds": { "min": 2000, "max": 10000 }
+      "cap": 12
     },
     "heavy": {
       "model": "llama.cpp/Nex-N2-mini",
       "costRatio": 20,
-      "cap": 20,
-      "thresholds": { "min": 10000, "max": null }
+      "cap": 20
     }
   },
   "routing": {
-    "strategy": "llm",
+    "strategy": "keyword",
     "selectorModel": "opencode/big-pickle",
     "selectorTimeoutMs": 1200,
     "selectorMaxTokens": 16
@@ -190,63 +186,106 @@ mode: normal
 ### Janela Principal (OpenCode)
 
 ```
-┌─────────────────────────────────────┐
-│  Main Window (User Input)           │
-│                                     │
-│  - Chat.message hook               │
-│  - Classify task → @tier           │
-│  - System.transform hook           │
-│  - Inject delegation protocol      │
-│  - Permission.ask hook             │
-│  - DENY bash/edit/fetch if blocked │
-│                                     │
-│  ❌ NUNCA executa tarefas           │
-│  ✅ SEMPRE delega a subagentes      │
-└──────┬──────────────────────────────┘
-       │ delegation
-       ├──→ @fast   [1x cost] ─→ @explore
-       ├──→ @medium [5x cost] ─→ @build
-       └──→ @heavy  [20x cost] ─→ @general/@plan
+┌──────────────────────────────────────┐
+│  Main Window (User Input)            │
+│                                      │
+│  - Chat.message hook                 │
+│  - Classify task → @tier             │
+│  - System.transform hook             │
+│  - Injects hard-block message        │
+│  - Permission.ask hook               │
+│  - DENY all tools if hard-blocked    │
+│  - Event hook: reject permission     │
+│                                      │
+│  ❌ NUNCA executa tarefas             │
+│  ✅ SEMPRE delega a subagentes        │
+└──────┬───────────────────────────────┘
+       │ delegation via task()
+       ├──→ @fast   [1x cost]
+       ├──→ @medium [5x cost]
+       └──→ @heavy  [20x cost]
+```
+
+### Subagentes
+
+```
+┌──────────────────────────────────────┐
+│  Subagent @fast/@medium/@heavy       │
+│                                      │
+│  - Recebe protocolo INFORMATIVO       │
+│    (só tiers, custos, regras)        │
+│  - NÃO recebe hard-block message     │
+│  - Permissions: ALLOW para todas     │
+│    as ferramentas                    │
+│  - NÃO pode delegar via task()       │
+│    (protocolo informativo proíbe)    │
+│                                      │
+│  ✅ EXECUTA tarefas diretamente       │
+│  ❌ NÃO delega para outro subagente   │
+└──────────────────────────────────────┘
 ```
 
 ### Hard-Block Logic
 
 ```typescript
 // chat.message hook
-if (!enabled) return; // Router desabilitado? Sem bloqueio
-
+if (!enabled) return;
 const cfg = await loadConfig(...);
 const selection = await selectTierByStrategy(text, cfg);
 const desiredTier = selection.tier;
 
-// Validação 1: Mode MUST be hard-block
-if (cfg.enforcement.mode !== 'hard-block') {
-  return; // Advisory mode → sem bloqueio (INSEGURO)
+// Mark session as hard-blocked
+if (cfg.enforcement.mode === 'hard-block') {
+  hardBlockedSessions.set(input.sessionID, desiredTier);
+  hardBlockReasons.set(input.sessionID, `This request requires @${desiredTier}.`);
 }
 
-// Validação 2: Nenhuma tarefa trivial permite bypass
-if (desiredTier === 'fast' && cfg.enforcement.trivialDirectAllowed && isTrivialFastTask(text)) {
-  return; // NUNCA: trivialDirectAllowed DEVE ser false
+// permission.ask hook — runs BEFORE the permission dialog
+if (subagentSessions.has(sessionID)) {
+  output.status = 'allow';  // Subagent → auto-allow, no dialog
+} else if (hardBlockedSessions.has(sessionID)) {
+  output.status = 'deny';   // Hard-blocked → deny, no dialog
 }
 
-// Validação 3: Mark session como bloqueado
-hardBlockedSessions.set(input.sessionID, desiredTier);
-hardBlockReasons.set(input.sessionID, `This request requires @${desiredTier}.`);
-
-// permission.ask hook
-if (tier = hardBlockedSessions.get(sessionID)) {
-  if (tool === 'bash' || 'edit' || 'webfetch') {
-    output.status = 'deny'; // ✅ Bloqueado
-  }
+// event hook — runs AFTER permission is asked (permission.asked event)
+if (hardBlockedSessions.has(sessionID)) {
+  // Reject + show toast notification
+  client.postSessionIdPermissionsPermissionId({
+    path: { id: sessionID, permissionID: props.id },
+    body: { response: 'reject' }
+  });
+  client.tui.showToast({
+    body: {
+      message: `[Router] Tool blocked. Delegate to @${tier} via task().`,
+      variant: 'error',
+      duration: 8000
+    }
+  });
+} else {
+  // Auto-allow once for all other sessions (subagent + normal)
+  client.postSessionIdPermissionsPermissionId({
+    path: { id: sessionID, permissionID: props.id },
+    body: { response: 'once' }
+  });
 }
 
-// system.transform hook
-if (tier = hardBlockedSessions.get(sessionID)) {
-  output.system.push(
-    `HARD-BLOCK: This request MUST be delegated to @${tier}. Do not execute tools directly.`
-  );
+// system.transform hook — injects instructions
+output.system.push(buildDelegationProtocol(cfg)); // Informational: all sessions
+
+const tier = hardBlockedSessions.get(sessionID);
+if (cfg.enforcement.mode === 'hard-block' && tier) {
+  output.system.push(buildHardBlockMessage(tier)); // Strong: only hard-blocked main
 }
 ```
+
+### Two-Level Prompt Strategy
+
+| Prompt | Conteúdo | Quem recebe |
+|--------|----------|-------------|
+| `buildDelegationProtocol` | Referência info: tiers, custos, regras. **Sem** "MUST delegate" ou "BLOCKED TOOLS" | **Todas** as sessões (main + subagentes) |
+| `buildHardBlockMessage` | "ALL TOOLS EXCEPT task ARE DENIED", "YOU ARE A ROUTER" | **Só** sessões hard-blocked (main session) |
+
+A separação garante que subagentes **nunca** recebam instruções conflitantes — eles usam ferramentas diretamente sem tentar delegar.
 
 ---
 
@@ -324,12 +363,15 @@ Antes de fazer deploy:
 2. **Config faltando**: Copiar `tiers.json` padrão da raiz
 3. **Teste falhando**: Rodar `reportEnforcement()` → ver qual rule violou
 4. **Advisory mode ligado**: MUDAR PARA `hard-block` IMEDIATAMENTE
+5. **Subagente delegando**: Verificar se `buildDelegationProtocol` contém "MUST delegate" — se sim, remover (deve ser só informativo)
 
 ---
 
 ## 📚 Referência
 
 - `src/router/enforcement-validator.ts` — Lógica de validação
+- `src/prompts.ts` — `buildDelegationProtocol` (info) e `buildHardBlockMessage` (hard-block)
+- `src/plugin-orchestrator.ts` — Hook orchestration (permission.ask, event)
 - `test/enforcement-validator.spec.ts` — Testes completos
 - `src/index.ts` (config hook) — Plugin init
 - `tiers.json` — Config example

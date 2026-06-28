@@ -7,9 +7,10 @@ Objetivo: manter a qualidade das respostas e delegar trabalho ao modelo mais ade
 ## ✨ Principais Recursos
 
 - 🎯 **Roteamento por tier**: Classifica automaticamente e delega para o modelo mais adequado
-- 🔒 **Hard-block enforcement**: Garante 100% delegação para tiers (sem execução direta)
+- 🔒 **Hard-block enforcement**: Bloqueio real de ferramentas via `permission.ask` + `event` hook, com toast de notificação
 - ⚡ **Caps & redundância**: Monitora uso de leitura e detecta trabalho redundante
 - 🧩 **Plugin hooks**: Integração nativa com OpenCode via hooks existentes
+- 🚫 **Sem corrente de delegação**: Subagentes não podem delegar para outros subagentes — executam diretamente
 
 ---
 
@@ -203,9 +204,11 @@ Ordem de resolução:
 
 ### `hard-block`
 
-- Tenta forçar delegação para tier correto
-- Se sessão principal tentar executar tools direto em tarefa não trivial, nega permissão
-- Com `trivialDirectAllowed=false` (padrão), **toda** tarefa precisa delegar — mesmo tarefas triviais
+- Força delegação via **dois mecanismos**:
+  1. **`permission.ask`**: nega permissão (deny) antes do diálogo aparecer
+  2. **`event` hook**: escuta `permission.asked`, rejeita a permissão e mostra toast
+- `buildHardBlockMessage` injeta "ALL TOOLS EXCEPT task ARE DENIED" no system prompt
+- Com `trivialDirectAllowed=false` (padrão), **toda** tarefa precisa delegar
 - Com `trivialDirectAllowed=true`, tarefas triviais fast podem executar direto
 
 ---
@@ -255,19 +258,24 @@ Estrutura principal:
 
 ### Core
 
-- `src/index.ts` → hooks e comandos do plugin
+- `src/index.ts` → hooks e comandos do plugin (config, chat.message, system.transform, permission.ask, event, tool.definition, tool.execute.after, command.execute.before)
 - `src/plugin-orchestrator.ts` → orquestração de hooks (SRP extraction)
-- `src/constants.ts` → constantes nomeadas (FALLBACK_CONFIG, regex)
+- `src/prompts.ts` → prompt builders (protocolo info, hard-block, routing hint)
+- `src/constants.ts` → constantes nomeadas (FALLBACK_CONFIG, regex, SESSION_TTL)
 - `src/narration.ts` → detecção de narração
 
 ### Roteamento & Delegação
 
 - `src/router/config.ts` → load/validate/save de config
-- `src/router/protocol.ts` → protocolo injetado no system prompt
 - `src/router/classifier.ts` → classificação de tarefas por keywords
 - `src/router/selector.ts` → seletor de tier (keyword/LLM + fallback)
-- `src/router/caps.ts` → cap tracker + redundância
+- `src/router/caps.ts` → cap tracker + redundância + cleanup por sessão
 - `src/router/enforcement-validator.ts` → validação de enforcement
+
+### Utilitários
+
+- `src/utils/logger.ts` → FileLogger (router-debug.log)
+- `src/utils/safe-json.ts` → parsing JSON seguro
 
 ### Testes
 
