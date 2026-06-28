@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { selectTierByStrategy } from '../src/router/selector.js';
 import type { RouterConfig } from '../src/router/config.js';
 
@@ -33,7 +33,7 @@ const cfg: RouterConfig = {
 };
 
 describe('selectTierByStrategy', () => {
-  it('classifies with keyword strategy', async () => {
+  it('classifica com estratégia keyword', async () => {
     await expect(selectTierByStrategy('find auth files', cfg)).resolves.toEqual({
       tier: 'fast',
       source: 'keyword',
@@ -50,7 +50,7 @@ describe('selectTierByStrategy', () => {
     });
   });
 
-  it('matches conjugated portuguese verbs via lexicon stems', async () => {
+  it('combina verbos portugueses conjugados pelo léxico', async () => {
     await expect(selectTierByStrategy('procure sobre autenticacao no projeto', cfg)).resolves.toEqual({
       tier: 'fast',
       source: 'keyword',
@@ -67,7 +67,7 @@ describe('selectTierByStrategy', () => {
     });
   });
 
-  it('uses llm strategy when selector returns a valid tier', async () => {
+  it('usa estratégia llm quando o selector retorna um tier válido', async () => {
     const llmCfg: RouterConfig = {
       ...cfg,
       routing: {
@@ -75,10 +75,10 @@ describe('selectTierByStrategy', () => {
         strategy: 'llm',
       },
     };
-
+    const prompt = vi.fn().mockResolvedValue('fast');
     const client = {
       session: {
-        prompt: async () => ({ tier: 'fast' }),
+        prompt,
       },
     };
 
@@ -86,9 +86,17 @@ describe('selectTierByStrategy', () => {
       tier: 'fast',
       source: 'llm',
     });
+    expect(prompt).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: expect.objectContaining({
+          model: cfg.routing.selectorModel,
+          parts: [expect.objectContaining({ text: expect.stringContaining('Classify the user request') })],
+        }),
+      }),
+    );
   });
 
-  it('falls back from llm to keyword', async () => {
+  it('faz fallback para keyword quando o selector llm falha', async () => {
     const llmCfg: RouterConfig = {
       ...cfg,
       routing: {
@@ -96,18 +104,66 @@ describe('selectTierByStrategy', () => {
         strategy: 'llm',
       },
     };
-
+    const prompt = vi.fn().mockRejectedValue(new Error('selector failed'));
     const client = {
       session: {
-        prompt: async () => {
-          throw new Error('selector failed');
-        },
+        prompt,
       },
     };
 
     await expect(selectTierByStrategy('find auth files', llmCfg, client)).resolves.toEqual({
       tier: 'fast',
       source: 'fallback-keyword',
+    });
+    expect(prompt).toHaveBeenCalled();
+  });
+
+  it('faz fallback para keyword quando o selector llm não retorna tier', async () => {
+    const llmCfg: RouterConfig = {
+      ...cfg,
+      routing: {
+        ...cfg.routing,
+        strategy: 'llm',
+      },
+    };
+    const prompt = vi.fn().mockResolvedValue('slow');
+    const client = {
+      session: {
+        prompt,
+      },
+    };
+
+    await expect(selectTierByStrategy('find auth files', llmCfg, client)).resolves.toEqual({
+      tier: 'fast',
+      source: 'fallback-keyword',
+    });
+  });
+
+  it('usa fallback-default quando nenhuma estratégia encontra tier', async () => {
+    await expect(selectTierByStrategy('plain maintenance', cfg)).resolves.toEqual({
+      tier: 'medium',
+      source: 'fallback-default',
+    });
+  });
+
+  it('usa fallback-default quando strategy llm não encontra tier', async () => {
+    const llmCfg: RouterConfig = {
+      ...cfg,
+      routing: {
+        ...cfg.routing,
+        strategy: 'llm',
+      },
+    };
+    const prompt = vi.fn().mockResolvedValue('slow');
+    const client = {
+      session: {
+        prompt,
+      },
+    };
+
+    await expect(selectTierByStrategy('plain maintenance', llmCfg, client)).resolves.toEqual({
+      tier: 'medium',
+      source: 'fallback-default',
     });
   });
 });
