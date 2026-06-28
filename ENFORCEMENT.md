@@ -55,6 +55,7 @@ Se violado → modelo barato pode fazer trabalho de modelo caro → economia fal
 ### 4. **Todos os 3 Tiers Configurados**
 
 Cada tier DEVE ter:
+
 - Modelo válido (`"provider/model"` format)
 - costRatio positivo e diferente
 - Cap positivo (limite de sessões)
@@ -88,6 +89,24 @@ O plugin usa duas camadas de log para separar eventos observáveis do usuário d
 1. **`client.app.log()` é o logger primário** para eventos observáveis e de erro: inicialização do plugin, tier selecionado, hard-block acionado e falhas de hooks.
 2. **`FileLogger` é o logger secundário** para auditoria local e diagnóstico: validação de enforcement, tentativas de ferramentas bloqueadas e estados internos de subagentes.
 3. **`src/` não deve emitir `console.warn`, `console.log` ou `console.error`**. Logs de runtime pertencem ao OpenCode/app log e ao arquivo `router-debug.log`.
+
+---
+
+## 🔐 Matriz de Permissões
+
+A matriz é implementada em `src/router/permissions.ts` e aplicada nos hooks `permission.ask` e `event`.
+
+| Tipo de sessão            | `task()` | ferramentas nativas | ferramentas customizadas |
+| ------------------------- | -------: | ------------------: | -----------------------: |
+| Primária não hard-blocked |    allow |               allow |                    allow |
+| Primária hard-blocked     |    allow |                deny |                    allow |
+| Subagent                  |     deny |               allow |                    allow |
+
+**Regras derivadas:**
+
+- `permission.ask` decide o status inicial (`allow` ou `deny`) sem abrir diálogo para subagentes ou permissões nativas bloqueadas.
+- `event` converte `deny` em `reject` e `allow` em `once`, preservando a matriz mesmo quando a interface publica o evento depois da pergunta inicial.
+- `tool.execute.before` usa a mesma matriz para bloquear ferramentas nativas sensíveis antes da execução.
 
 ---
 
@@ -141,15 +160,15 @@ mode: normal
 
 ## 🚫 Violações Detectadas
 
-| Violação | Erro | Impacto |
-|----------|------|--------|
-| `enforcement.mode != "hard-block"` | ❌ CRITICAL | Janela principal pode ignorar routing |
-| `trivialDirectAllowed = true` | ❌ CRITICAL | Tarefas "triviais" executam diretamente |
-| Tier faltando | ❌ CRITICAL | Rota quebrada sem modelo |
-| Modelo inválido `"xyzzy"` | ❌ CRITICAL | Fallback quebrado |
-| Cost não crescente | ❌ CRITICAL | Economia falsa |
-| `costRatio <= 0` | ❌ CRITICAL | Cálculo de cost quebrado |
-| Poucos padrões de tarefa | ⚠️ WARNING | Rota cai em default arriscado |
+| Violação                           | Erro        | Impacto                                 |
+| ---------------------------------- | ----------- | --------------------------------------- |
+| `enforcement.mode != "hard-block"` | ❌ CRITICAL | Janela principal pode ignorar routing   |
+| `trivialDirectAllowed = true`      | ❌ CRITICAL | Tarefas "triviais" executam diretamente |
+| Tier faltando                      | ❌ CRITICAL | Rota quebrada sem modelo                |
+| Modelo inválido `"xyzzy"`          | ❌ CRITICAL | Fallback quebrado                       |
+| Cost não crescente                 | ❌ CRITICAL | Economia falsa                          |
+| `costRatio <= 0`                   | ❌ CRITICAL | Cálculo de cost quebrado                |
+| Poucos padrões de tarefa           | ⚠️ WARNING  | Rota cai em default arriscado           |
 
 ---
 
@@ -266,10 +285,10 @@ if (hardBlockedSessions.has(sid)) { output.status = 'deny'; return; }
 
 ### Two-Level Prompt Strategy
 
-| Prompt | Conteúdo | Quem recebe |
-|--------|----------|-------------|
-| `buildDelegationProtocol` | Referência info: tiers, custos, regras. **Sem** "MUST delegate" ou "BLOCKED TOOLS" | Sessões **não hard-blocked** |
-| `buildHardBlockMessage` | "ALL TOOLS EXCEPT task ARE DENIED", "YOU ARE A ROUTER" | Sessões hard-blocked (main session) |
+| Prompt                    | Conteúdo                                                                           | Quem recebe                         |
+| ------------------------- | ---------------------------------------------------------------------------------- | ----------------------------------- |
+| `buildDelegationProtocol` | Referência info: tiers, custos, regras. **Sem** "MUST delegate" ou "BLOCKED TOOLS" | Sessões **não hard-blocked**        |
+| `buildHardBlockMessage`   | "ALL TOOLS EXCEPT task ARE DENIED", "YOU ARE A ROUTER"                             | Sessões hard-blocked (main session) |
 
 Subagents receive no router prompts (guard bypasses them).
 

@@ -22,6 +22,7 @@ import { selectTierByStrategy, type SelectionSource } from './router/selector.js
 import { createCapTracker } from './router/caps.js';
 import { detectNarration } from './narration.js';
 import { assertEnforcement, reportEnforcement } from './router/enforcement-validator.js';
+import { evaluateSessionPermission, isAllowed } from './router/permissions.js';
 import { FileLogger } from './utils/logger.js';
 import {
   HARD_BLOCK_DELEGATION_MESSAGE,
@@ -482,23 +483,19 @@ export class PluginOrchestrator {
         isHardBlocked: this.hardBlockedSessions.has(input.sessionID),
       });
 
-      // Subagent → auto-allow without showing the permission dialog.
-      // The event hook used to respond with 'once' AFTER the dialog appeared,
-      // which caused a visual flash. Running before the dialog, this hook
-      // prevents it entirely.
-      if (this.subagentSessions.has(input.sessionID)) {
-        output.status = 'allow';
+      const tier = this.hardBlockedSessions.get(input.sessionID);
+      const decision = evaluateSessionPermission({
+        sessionIsSubagent: this.subagentSessions.has(input.sessionID),
+        hardBlockedTier: tier,
+        permissionName: input.type ?? '',
+      });
+
+      if (!isAllowed(decision)) {
+        output.status = 'deny';
         return;
       }
 
-      // Normal (non-hard-blocked) session → let the runtime fall through
-      // to the event hook for the standard dialog flow.
-      const tier = this.hardBlockedSessions.get(input.sessionID);
-      if (!tier) return;
-
-      // Hard-blocked → deny before the dialog appears, so the user
-      // never sees a permission popup that will be rejected.
-      output.status = 'deny';
+      output.status = 'allow';
     } catch (err) {
       await this.logObservable('error', 'Hook failed', {
         hook: 'permission.ask',
@@ -538,39 +535,44 @@ export class PluginOrchestrator {
       }
 
       const tier = this.hardBlockedSessions.get(props.sessionID);
+      const decision = evaluateSessionPermission({
+        sessionIsSubagent: this.subagentSessions.has(props.sessionID),
+        hardBlockedTier: tier,
+        permissionName: props.permission ?? props.type ?? '',
+      });
       this.log.info('event', {
         sessionID: props.sessionID,
         permission: props.permission,
         tier: tier ?? null,
         isSubagent: this.subagentSessions.has(props.sessionID),
+        decision: decision.status,
       });
-      if (tier) {
-        // Show a visible toast notification so the user understands the block,
-        // even if the permission dialog is hidden behind the input prompt.
-        void (client as any).tui?.showToast({
-          body: {
-            message: `[Router] Tool blocked. Delegate to @${tier} via task().`,
-            variant: 'error',
-            duration: 8000,
-          },
-        });
-        // Hard-blocked main session → reject, so the model receives a
-        // DeniedError/RejectedError and learns it must delegate via task().
+      if (!isAllowed(decision)) {
+        if (decision.kind === 'native') {
+          void (client as any).tui?.showToast({
+            body: {
+              message: `[Router] Tool blocked. Delegate to @${tier} via task().`,
+              variant: 'error',
+              duration: 8000,
+            },
+          });
+        }
         await client.postSessionIdPermissionsPermissionId({
           path: { id: props.sessionID, permissionID: props.id },
           body: { response: 'reject' },
         });
-      } else {
-        this.log.info('auto-allow', { sessionID: props.sessionID, permission: props.permission });
-        // Non-hard-blocked session (subagent OR normal conversation) →
-        // auto-allow with "once" so the tool executes without user dialog.
-        // Using "once" (not "always") avoids adding permanent global allow rules
-        // that would persist across sessions.
-        await client.postSessionIdPermissionsPermissionId({
-          path: { id: props.sessionID, permissionID: props.id },
-          body: { response: 'once' },
-        });
+        return;
       }
+
+      this.log.info('auto-allow', { sessionID: props.sessionID, permission: props.permission });
+      // Non-hard-blocked session (subagent OR normal conversation) →
+      // auto-allow with "once" so the tool executes without user dialog.
+      // Using "once" (not "always") avoids adding permanent global allow rules
+      // that would persist across sessions.
+      await client.postSessionIdPermissionsPermissionId({
+        path: { id: props.sessionID, permissionID: props.id },
+        body: { response: 'once' },
+      });
     } catch (err) {
       await this.logObservable('error', 'Hook failed', {
         hook: 'event',
@@ -612,7 +614,12 @@ export class PluginOrchestrator {
       }
 
       const tier = this.hardBlockedSessions.get(input.sessionID);
-      if (!tier || !this.HARD_BLOCK_DENIED_TOOLS.has(input.tool as (typeof HARD_BLOCK_DENIED_TOOLS)[number])) return;
+      const decision = evaluateSessionPermission({
+        sessionIsSubagent: false,
+        hardBlockedTier: tier,
+        permissionName: input.tool,
+      });
+      if (!tier || decision.status !== 'deny' || decision.kind !== 'native') return;
 
       await this.notifyToolBlocked(tier);
       this.log.info('Denied tool blocked before execution', {

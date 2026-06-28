@@ -10,10 +10,12 @@ import { FileLogger } from '../src/utils/logger.js';
 function makeClient(
   appLog: ReturnType<typeof vi.fn> = vi.fn(async () => true),
   tuiShowToast: ReturnType<typeof vi.fn> = vi.fn(async () => true),
+  postPermission: ReturnType<typeof vi.fn> = vi.fn(async () => true),
 ): PluginInput['client'] {
   return {
     app: { log: appLog },
     tui: { showToast: tuiShowToast },
+    postSessionIdPermissionsPermissionId: postPermission,
   } as unknown as PluginInput['client'];
 }
 
@@ -855,7 +857,7 @@ describe('tierRouterPlugin', () => {
     expect(disabledAskOut.status).toBe('allow');
   });
 
-  it('hard-block still allows trivial fast requests when configured', async () => {
+  it('allows trivial fast requests for non-hard-blocked primary sessions when configured', async () => {
     await writeTiers(projectDir, {
       enforcement: {
         mode: 'hard-block',
@@ -894,6 +896,106 @@ describe('tierRouterPlugin', () => {
       askOut,
     );
 
-    expect(askOut.status).toBe('ask');
+    expect(askOut.status).toBe('allow');
+  });
+
+  it('allows task and custom permissions for hard-blocked primary sessions', async () => {
+    const plugin = await tierRouterPlugin(makeCtx(projectDir));
+    await classifyHardBlocked(plugin, 'main-permission-allow');
+
+    for (const permission of ['task', 'skill'] as const) {
+      const askOut: { status: 'ask' | 'deny' | 'allow' } = { status: 'ask' };
+      await plugin['permission.ask']?.(
+        {
+          id: `p-${permission}`,
+          type: permission,
+          sessionID: 'main-permission-allow',
+          messageID: 'm-permission-allow',
+          title: permission,
+          metadata: {},
+          time: { created: 0 },
+        },
+        askOut,
+      );
+
+      expect(askOut.status).toBe('allow');
+    }
+  });
+
+  it('denies task permissions for subagent sessions', async () => {
+    const plugin = await tierRouterPlugin(makeCtx(projectDir));
+    await plugin['chat.message']?.(
+      { sessionID: 'sub-permission-task', agent: 'fast' },
+      {
+        message: {
+          role: 'user',
+          id: 'm-sub-permission-task',
+          sessionID: 'sub-permission-task',
+          time: { created: 0 },
+          agent: 'fast',
+          model: { providerID: 'github-copilot', modelID: 'claude-haiku-4.5' },
+        },
+        parts: [],
+      },
+    );
+
+    const askOut: { status: 'ask' | 'deny' | 'allow' } = { status: 'ask' };
+    await plugin['permission.ask']?.(
+      {
+        id: 'p-sub-task',
+        type: 'task',
+        sessionID: 'sub-permission-task',
+        messageID: 'm-sub-permission-task',
+        title: 'delegate',
+        metadata: {},
+        time: { created: 0 },
+      },
+      askOut,
+    );
+
+    expect(askOut.status).toBe('deny');
+  });
+
+  it('events reject denied permissions and allow allowed permissions', async () => {
+    const postPermission = vi.fn(async () => true);
+    const plugin = await tierRouterPlugin(makeCtx(projectDir, makeClient(undefined, undefined, postPermission)));
+
+    await classifyHardBlocked(plugin, 'main-event-native');
+    await plugin['event']?.({
+      event: {
+        type: 'permission.asked',
+        properties: {
+          id: 'p-native',
+          sessionID: 'main-event-native',
+          type: 'bash',
+          permission: 'bash',
+        },
+      },
+    } as unknown as Parameters<NonNullable<(typeof plugin)['event']>>[0]);
+    expect(postPermission).toHaveBeenLastCalledWith({
+      path: { id: 'main-event-native', permissionID: 'p-native' },
+      body: { response: 'reject' },
+    });
+
+    const postPermissionAllow = vi.fn(async () => true);
+    const pluginAllow = await tierRouterPlugin(
+      makeCtx(projectDir, makeClient(undefined, undefined, postPermissionAllow)),
+    );
+    await classifyHardBlocked(pluginAllow, 'main-event-task');
+    await pluginAllow['event']?.({
+      event: {
+        type: 'permission.asked',
+        properties: {
+          id: 'p-task',
+          sessionID: 'main-event-task',
+          type: 'task',
+          permission: 'task',
+        },
+      },
+    } as unknown as Parameters<NonNullable<(typeof pluginAllow)['event']>>[0]);
+    expect(postPermissionAllow).toHaveBeenLastCalledWith({
+      path: { id: 'main-event-task', permissionID: 'p-task' },
+      body: { response: 'once' },
+    });
   });
 });
