@@ -31,6 +31,14 @@ export interface CapTracker {
    * @returns Uma string de aviso/banner, ou uma string vazia quando nenhum banner se aplica.
    */
   getBanner(sessionId: string, tool: string, args: Record<string, unknown>): string;
+
+  /**
+   * Remove os dados de rastreamento de uma sessão.
+   *
+   * @param sessionId - Identificador da sessão a ser limpa.
+   * @returns Nada.
+   */
+  cleanup(sessionId: string): void;
 }
 
 /**
@@ -90,6 +98,10 @@ export function createCapTracker(max = DEFAULT_MAX): CapTracker {
       }
 
       return banners.join(' ');
+    },
+
+    cleanup(sessionId) {
+      sessions.delete(sessionId);
     },
   };
 }

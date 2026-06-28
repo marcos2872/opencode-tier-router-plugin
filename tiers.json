@@ -122,12 +122,5 @@
     "selectorModel": "opencode/big-pickle",
     "selectorTimeoutMs": 1200,
     "selectorMaxTokens": 16
-  },
-  "tokenTracking": {
-    "enabled": true,
-    "maxHistoryFiles": 50,
-    "maxHistoryDays": 30,
-    "sessionTTLMinutes": 30,
-    "maxSessionsMemory": 100
   }
 }

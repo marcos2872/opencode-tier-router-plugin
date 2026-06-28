@@ -19,6 +19,11 @@ export const CAP_WARNING_THRESHOLD = 80;
 export const CAP_WARNING_REMAINING_THRESHOLD = 2;
 
 /**
+ * TTL de sessão em milissegundos para cleanup de estado stale (30 minutos).
+ */
+export const SESSION_TTL_MS = 30 * 60 * 1000;
+
+/**
  * Cap máximo padrão de chamadas de ferramenta por tier.
  */
 export const DEFAULT_TIER_CAP = 8;

@@ -96,17 +96,51 @@ export function buildDelegationProtocol(cfg: RouterConfig): string {
   const hardBlockOn = cfg.enforcement.mode === 'hard-block';
 
   return [
-    '## Model Delegation Protocol',
+    '=== MANDATORY DELEGATION PROTOCOL ===',
+    ``,
     `Tiers: ${tiersLine} mode:${cfg.mode}`,
     `Default: @${defaultTier}`,
     `Routing: strategy=${cfg.routing.strategy} selector=${cfg.routing.selectorModel}`,
     `R: ${rulesLine}`,
     `Mode: ${cfg.mode} (${emphasis})`,
-    'Rule: Classify user intent by keywords. For non-trivial requests, delegate to the cheapest matching tier. If no tier matches, use the default.',
+    `Cost signal: @fast≈1x, @medium≈5x, @heavy≈20x. Minimize cost while preserving task adequacy.`,
+    ``,
+    '=== YOUR ROLE ===',
+    'You are a ROUTER. You CANNOT use any tool directly. Your ONLY function is to classify the user request and delegate it to a subagent via the "task" tool.',
+    '',
+    '=== BLOCKED TOOLS (ALL DENIED) ===',
+    'Every tool EXCEPT "task" is BLOCKED. Any attempt to call them returns "Permission denied":',
+    '- grep:      BLOCKED → delegate search to @fast via task',
+    '- glob:      BLOCKED → delegate search to @fast via task',
+    '- read:      BLOCKED → delegate read to @fast via task',
+    '- list:      BLOCKED → delegate listing to @fast via task',
+    '- bash:      BLOCKED → delegate execution to @medium/@heavy via task',
+    '- edit:      BLOCKED → delegate edits to @medium via task',
+    '- write:     BLOCKED → delegate writes to @medium via task',
+    '- webfetch:  BLOCKED → delegate fetch to @medium via task',
+    '- websearch: BLOCKED → delegate web search to @medium via task',
+    '- todowrite: BLOCKED',
+    '- doom_loop: BLOCKED',
+    '- lsp:       BLOCKED',
+    '- skill:     BLOCKED',
+    '',
+    '=== ALLOWED TOOL ===',
+    'The ONLY tool you may use is "task". Calling "task" creates a subagent that has full tool access and executes the work.',
+    '',
+    '=== MANDATORY DELEGATION FLOW ===',
+    'For EVERY user request, follow these steps in order. Do NOT skip any step:',
+    'Step 1 — CLASSIFY: Determine the tier (fast, medium, or heavy) based on keywords in the request.',
+    'Step 2 — DELEGATE: Call the "task" tool with subagent_type set to the tier and prompt set to the user request.',
+    'Step 3 — WAIT: Do nothing. The subagent executes and returns the result automatically.',
+    '',
+    'If you ever receive a "Permission denied" error, that means you tried to call a BLOCKED tool. Stop, delete that tool call, and delegate using "task" instead.',
+    '',
+    '=== RULES ===',
     `Rule: ${buildTrivialRule(cfg.enforcement.trivialDirectAllowed)}`,
     `Rule: ${buildEnforcementRule(hardBlockOn)}`,
-    'Rule: Respect [cap:N/MAX], [⚠ CAP WARNING], [⚠ CAP REACHED], and [⚠ REDUNDANT] banners; they signal read-limit fatigue and repeated work.',
-    'Cost signal: @fast≈1x, @medium≈5x, @heavy≈20x. Minimize cost while preserving task adequacy.',
+    'Rule: Respect cap/redundancy banners from subagents; they signal read-limit fatigue.',
+    'Rule: Delegation is mandatory even if the target tier uses the same model as you. Subagents have isolated context, full tool access, and are the only ones who execute.',
+    '==============================',
   ].join('\n');
 }
 
@@ -123,7 +157,7 @@ export function buildDelegationProtocol(cfg: RouterConfig): string {
  */
 export function buildRoutingHint(tier: string, source?: string): string {
   const src = source ? ` (source: ${source})` : '';
-  return `Routing hint: Preferred tier for this request is @${tier}${src}. Delegate to @${tier} when not trivial.`;
+  return `Routing hint: Preferred tier for this request is @${tier}${src}. DELEGATE to @${tier}. Direct execution is BLOCKED — the only way to complete this request is delegation.`;
 }
 
 /**
@@ -139,7 +173,29 @@ export function buildRoutingHint(tier: string, source?: string): string {
  */
 export function buildHardBlockMessage(tier: string, reason?: string): string {
   const suffix = reason ? ` ${reason}` : '';
-  return `HARD-BLOCK: This request MUST be delegated to @${tier}. Do not execute tools directly in this session. Attempt delegation now. If direct execution is blocked, immediately delegate to @${tier}.${suffix}`;
+  return [
+    `❗ HARD-BLOCK ACTIVE — YOU ARE A ROUTER, NOT AN EXECUTOR`,
+    ``,
+    `This request is classified as @${tier} tier and MUST be delegated.`,
+    ``,
+    `ALL TOOLS EXCEPT "task" ARE DENIED:`,
+    `  grep    → DENIED — delegate search to @fast via "task"`,
+    `  glob    → DENIED — delegate search to @fast via "task"`,
+    `  read    → DENIED — delegate read to @fast via "task"`,
+    `  list    → DENIED — delegate listing to @fast via "task"`,
+    `  bash    → DENIED — delegate execution to @medium/@heavy via "task"`,
+    `  edit    → DENIED — delegate edits to @medium via "task"`,
+    `  write   → DENIED — delegate writes to @medium via "task"`,
+    `  webfetch→ DENIED — delegate fetch to @medium via "task"`,
+    `  websearch→ DENIED — delegate search to @medium via "task"`,
+    ``,
+    `REQUIRED ACTION:`,
+    `  1. Call "task" with subagent_type="${tier}" and a description of the work`,
+    `  2. The subagent has full tool access and will execute the request`,
+    `  3. WAIT for the subagent result — do NOT try to execute tools yourself`,
+    ``,
+    `If you attempt to call any tool other than "task", it will be REJECTED and you will get a "Permission denied" error. Repeated denials waste context and harm session quality.${suffix}`,
+  ].join('\n');
 }
 
 /**

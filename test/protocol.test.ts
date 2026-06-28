@@ -35,7 +35,7 @@ const validConfig: RouterConfig = {
 describe('buildDelegationProtocol', () => {
   it('returns a protocol string starting with the header', () => {
     const protocol = buildDelegationProtocol(validConfig);
-    expect(protocol.startsWith('## Model Delegation Protocol')).toBe(true);
+    expect(protocol.startsWith('=== MANDATORY DELEGATION PROTOCOL ===')).toBe(true);
   });
 
   it('includes tier models and cost ratios', () => {

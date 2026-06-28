@@ -166,7 +166,9 @@ const tierRouterPlugin: Plugin = async (ctx) => {
     'chat.message': (input: any, output: any) => orchestrator.handleChatMessage(input, output),
     'experimental.chat.system.transform': (input: any, output: any) =>
       orchestrator.handleSystemTransform(input, output),
+    event: (input: any) => orchestrator.handleEvent(input),
     'permission.ask': (input: any, output: any) => orchestrator.handlePermissionAsk(input, output),
+    'tool.definition': (input: any, output: any) => orchestrator.handleToolDefinition(input, output),
     'tool.execute.after': (input: any, output: any) => orchestrator.handleToolExecuteAfter(input, output),
     'experimental.text.complete': (input: any, output: any) => orchestrator.handleTextComplete(input, output),
     'command.execute.before': (input: any, output: any) => orchestrator.handleCommandExecuteBefore(input, output),
