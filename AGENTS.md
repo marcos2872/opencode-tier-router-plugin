@@ -70,10 +70,10 @@ opencode-tier-router-plugin/
 - Enforcement defaults to hard-block (`trivialDirectAllowed=false`), advisory available via config
 - Routing strategy: `llm` selector with fallback (`llm -> keyword -> defaultTier`), `keyword` also available
 - Config resolution: project `tiers.json` > `~/.config/opencode/tiers.json` > create in project dir
-- `buildDelegationProtocol` is purely informational (tiers, costs, rules) — safe for all sessions
+- `buildDelegationProtocol` is purely informational (tiers, costs, rules) — injected only for non-hard-blocked sessions. Hard-blocked sessions receive only `buildHardBlockMessage`
 - `buildHardBlockMessage` carries strong delegation instructions — only injected for hard-blocked main sessions
-- Subagents receive only the informational protocol; they cannot delegate to other subagents
-- Permission blocking uses `permission.ask` (deny for hard-blocked, allow for subagents) + event hook (reject for hard-blocked, auto-allow once for others)
+- Subagents receive no router prompts (guard in handleSystemTransform skips them entirely)
+- Permission blocking is prompt-based via `buildHardBlockMessage`. The `permission.ask` hook denies hard-blocked and allows subagents for tools the runtime checks (e.g., `bash`); `event` hook rejects `permission.asked` events for hard-blocked sessions
 - Logs go to `{plugin_dir}/router-debug.log` via FileLogger, never to terminal
 
 ## Hook order

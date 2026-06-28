@@ -193,12 +193,15 @@ mode: normal
 │  - Classify task → @tier             │
 │  - System.transform hook             │
 │  - Injects hard-block message        │
+│    (prompt-based, self-contained)    │
 │  - Permission.ask hook               │
-│  - DENY all tools if hard-blocked    │
-│  - Event hook: reject permission     │
+│  - Denies tools runtime checks       │
+│    (sensitive tools only)            │
+│  - Event hook: rejects permission    │
+│    asked events for hard-blocked     │
 │                                      │
-│  ❌ NUNCA executa tarefas             │
-│  ✅ SEMPRE delega a subagentes        │
+│  NUNCA executa tarefas               │
+│  SEMPRE delega a subagentes           │
 └──────┬───────────────────────────────┘
        │ delegation via task()
        ├──→ @fast   [1x cost]
@@ -212,13 +215,13 @@ mode: normal
 ┌──────────────────────────────────────┐
 │  Subagent @fast/@medium/@heavy       │
 │                                      │
-│  - Recebe protocolo INFORMATIVO       │
-│    (só tiers, custos, regras)        │
-│  - NÃO recebe hard-block message     │
-│  - Permissions: ALLOW para todas     │
-│    as ferramentas                    │
+│  - NÃO recebe prompt do router        │
+│    (guard bypassa/ignora)            │
+│  - NÃO recebe protocolo hard-block   │
+│  - Permissions: runtime decide       │
+│    (native tools auto-allowed)       │
 │  - NÃO pode delegar via task()       │
-│    (protocolo informativo proíbe)    │
+│    (sem protocolo de subagentes)     │
 │                                      │
 │  ✅ EXECUTA tarefas diretamente       │
 │  ❌ NÃO delega para outro subagente   │
@@ -228,64 +231,37 @@ mode: normal
 ### Hard-Block Logic
 
 ```typescript
-// chat.message hook
-if (!enabled) return;
-const cfg = await loadConfig(...);
+// chat.message hook — simplified
+if (!this.enabled) { clear state; return; }
 const selection = await selectTierByStrategy(text, cfg);
-const desiredTier = selection.tier;
-
-// Mark session as hard-blocked
-if (cfg.enforcement.mode === 'hard-block') {
+if (cfg.enforcement.mode === 'hard-block' && desiredTier) {
   hardBlockedSessions.set(input.sessionID, desiredTier);
-  hardBlockReasons.set(input.sessionID, `This request requires @${desiredTier}.`);
 }
 
-// permission.ask hook — runs BEFORE the permission dialog
-if (subagentSessions.has(sessionID)) {
-  output.status = 'allow';  // Subagent → auto-allow, no dialog
-} else if (hardBlockedSessions.has(sessionID)) {
-  output.status = 'deny';   // Hard-blocked → deny, no dialog
-}
-
-// event hook — runs AFTER permission is asked (permission.asked event)
-if (hardBlockedSessions.has(sessionID)) {
-  // Reject + show toast notification
-  client.postSessionIdPermissionsPermissionId({
-    path: { id: sessionID, permissionID: props.id },
-    body: { response: 'reject' }
-  });
-  client.tui.showToast({
-    body: {
-      message: `[Router] Tool blocked. Delegate to @${tier} via task().`,
-      variant: 'error',
-      duration: 8000
-    }
-  });
-} else {
-  // Auto-allow once for all other sessions (subagent + normal)
-  client.postSessionIdPermissionsPermissionId({
-    path: { id: sessionID, permissionID: props.id },
-    body: { response: 'once' }
-  });
-}
-
-// system.transform hook — injects instructions
-output.system.push(buildDelegationProtocol(cfg)); // Informational: all sessions
-
-const tier = hardBlockedSessions.get(sessionID);
+// system.transform hook
 if (cfg.enforcement.mode === 'hard-block' && tier) {
-  output.system.push(buildHardBlockMessage(tier)); // Strong: only hard-blocked main
+  // Inject ONLY hard-block message (self-contained, includes tiers info)
+  output.system.push(buildHardBlockMessage(tier, tiersLine, rulesLine, emphasis, reason));
+  output.system.push(buildRoutingHint(tier, source));
+} else {
+  // Non-hard-blocked: inject informational protocol only
+  output.system.push(buildDelegationProtocol(cfg));
 }
+
+// permission.ask hook
+if (!this.enabled) { output.status = 'allow'; return; }
+if (subagentSessions.has(sid)) { output.status = 'allow'; return; }
+if (hardBlockedSessions.has(sid)) { output.status = 'deny'; return; }
 ```
 
 ### Two-Level Prompt Strategy
 
 | Prompt | Conteúdo | Quem recebe |
 |--------|----------|-------------|
-| `buildDelegationProtocol` | Referência info: tiers, custos, regras. **Sem** "MUST delegate" ou "BLOCKED TOOLS" | **Todas** as sessões (main + subagentes) |
-| `buildHardBlockMessage` | "ALL TOOLS EXCEPT task ARE DENIED", "YOU ARE A ROUTER" | **Só** sessões hard-blocked (main session) |
+| `buildDelegationProtocol` | Referência info: tiers, custos, regras. **Sem** "MUST delegate" ou "BLOCKED TOOLS" | Sessões **não hard-blocked** |
+| `buildHardBlockMessage` | "ALL TOOLS EXCEPT task ARE DENIED", "YOU ARE A ROUTER" | Sessões hard-blocked (main session) |
 
-A separação garante que subagentes **nunca** recebam instruções conflitantes — eles usam ferramentas diretamente sem tentar delegar.
+Subagents receive no router prompts (guard bypasses them).
 
 ---
 

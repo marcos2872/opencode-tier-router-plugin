@@ -27,9 +27,9 @@
 - **Status**: active
 
 ### AD-004
-- **Decision**: Enforcement defaults to hard-block with `trivialDirectAllowed=true`; advisory remains available via config
+- **Decision**: Enforcement defaults to hard-block with `trivialDirectAllowed=false`; advisory remains available via config
 - **Reason**: Real sessions showed advisory-only drift (wrong agent/model despite hints). Hard-block by default increases deterministic delegation and cost control.
-- **Trade-off**: Stricter default can interrupt direct tool execution until delegation occurs. Mitigation: trivial fast tasks remain allowed and users can switch to advisory mode.
+- **Trade-off**: Stricter default can interrupt direct tool execution until delegation occurs. Mitigation: users can switch to advisory mode when they prefer direct execution.
 - **Scope**: enforcement layer
 - **Date**: 2026-06-26
 - **Status**: active
@@ -74,14 +74,12 @@ All 17 tasks across 4 phases implemented and verified on branch `feat/code-quali
 
 ## Handoff
 
-### In Progress
-- **Fix**: Remove global hard-block `input.permission` overrides from `handleConfig`
-- **Status**: Implemented in `src/plugin-orchestrator.ts`; hard-block is now prompt-based
-- **Next**: Verify in real session that `/router off` no longer triggers permission dialogs
+### Completed
+- **Remove global `input.permission` overrides** — hard-block is now prompt-based (`buildHardBlockMessage`). Tested in real session (121 tests pass).
+- **`/router off` command** — handled in both `command.execute.before` and `chat.message` with `pendingCommandResponses` mechanism. The model sees "Tier router disabled." instead of the raw `/router off` text.
 
 ### Next Steps
 1. Run `npm run typecheck && npx vitest run`
-2. Verify in a real OpenCode session that `/router off` does not show permission dialogs from `input.permission`
 
 ### Completed Features
 - **RTT-001 Real Token Cost Tracking** — Completed and verified (PASS)

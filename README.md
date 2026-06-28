@@ -204,10 +204,10 @@ Ordem de resolução:
 
 ### `hard-block`
 
-- Força delegação via **dois mecanismos**:
-  1. **`permission.ask`**: nega permissão (deny) antes do diálogo aparecer
-  2. **`event` hook**: escuta `permission.asked`, rejeita a permissão e mostra toast
-- `buildHardBlockMessage` injeta "ALL TOOLS EXCEPT task ARE DENIED" no system prompt
+- Força delegação via **prompt** — `buildHardBlockMessage` injeta instruções imperativas no system prompt:
+  "YOUR FIRST AND ONLY ACTION: Call task. ALL TOOLS EXCEPT 'task' ARE PERMANENTLY DENIED."
+- Hooks `permission.ask` e `event` atuam como fallback para ferramentas que o runtime considera sensíveis
+- Native tools (`read`, `edit`, `glob`, `grep`, etc.) são auto-allowed pelo runtime
 - Com `trivialDirectAllowed=false` (padrão), **toda** tarefa precisa delegar
 - Com `trivialDirectAllowed=true`, tarefas triviais fast podem executar direto
 
