@@ -7,7 +7,7 @@ Implement with `tlc-spec-driven` skill.
 ---
 
 **Design**: none
-**Status**: Draft
+**Status**: Complete
 
 ---
 
@@ -42,6 +42,7 @@ Phase 4 (P4 — Polish + N/A scope):
 ### T1: Fix config reload after `/budget` mode switch
 **Onde**: `src/plugin-orchestrator.ts:613`
 **Req**: ALIGN-01
+**Status**: Complete
 
 ```diff
   await saveMode(modeName, this.ctx.directory);
@@ -57,6 +58,7 @@ Phase 4 (P4 — Polish + N/A scope):
 ### T2: Add test for in-memory config update after mode switch
 **Onde**: `test/index.test.ts` (após teste `/budget <mode> persists mode`)
 **Req**: ALIGN-02
+**Status**: Complete
 
 Test: `/budget quality` → simulated `chat.message` → verify preferred tier reflects quality mode defaults.
 
@@ -68,6 +70,7 @@ Test: `/budget quality` → simulated `chat.message` → verify preferred tier r
 ### T3: Remove `task: 'allow'` from subagent permissions
 **Onde**: `src/plugin-orchestrator.ts:160`
 **Req**: ALIGN-03
+**Status**: Complete
 
 Delete line `task: 'allow',` from the subagent permission block in `handleConfig`.
 
@@ -79,6 +82,7 @@ Delete line `task: 'allow',` from the subagent permission block in `handleConfig
 ### T4: Replace `console.warn` with FileLogger in enforcement-validator
 **Onde**: `src/router/enforcement-validator.ts:136`, `src/plugin-orchestrator.ts:122-132`
 **Req**: ALIGN-04
+**Status**: Complete
 
 - Remove `console.warn` call from `assertEnforcement`
 - `handleConfig` should log enforcement warnings via `this.log.warn()`
@@ -91,6 +95,7 @@ Delete line `task: 'allow',` from the subagent permission block in `handleConfig
 ### T5: Add `@opencode-ai/sdk` to peerDependencies
 **Onde**: `package.json:18-20`
 **Req**: ALIGN-05
+**Status**: Complete
 
 ```diff
   "peerDependencies": {
@@ -108,6 +113,7 @@ Delete line `task: 'allow',` from the subagent permission block in `handleConfig
 ### T6: Expand PluginOrchestrator context
 **Onde**: `src/plugin-orchestrator.ts:84-89`, `src/index.ts:161-162`
 **Req**: ALIGN-06
+**Status**: Complete
 
 Expand constructor type to accept `project`, `$`, `worktree`. Pass full ctx from `index.ts`.
 
@@ -129,6 +135,7 @@ Call at:
 - All catch blocks: `'Hook failed', { hook, error }`
 
 **Done when**: Called at all 4 points; skipped silently when client unavailable
+**Status**: Complete
 **Gate**: `npm run typecheck && npx vitest run`
 
 ---
@@ -140,6 +147,7 @@ Call at:
 Block denied tools (`grep|glob|read|list|bash|edit|write|webfetch|websearch`) for hard-blocked main sessions via `tool.execute.before`. Subagent sessions pass through.
 
 **Done when**: Blocked tools return delegation hints for hard-blocked sessions; subagent sessions unaffected
+**Status**: Complete
 **Gate**: `npm run typecheck && npx vitest run`
 
 ---
@@ -151,7 +159,11 @@ Block denied tools (`grep|glob|read|list|bash|edit|write|webfetch|websearch`) fo
 Inject `OPENCODE_ROUTER_TIER`, `OPENCODE_ROUTER_MODE`, `OPENCODE_ROUTER_HARD_BLOCKED` into subagent shells.
 
 **Done when**: Subagent shells receive env vars; non-subagent shells unaffected
-**Gate**: `npm run typecheck && npx vitest run`
+**Status**: Complete
+**Gate**: `npm run typecheck && npx vitest run` — passed
+**Commit**: `feat(wiki-alignment): add shell env hook`
+
+---
 
 ---
 
@@ -162,7 +174,11 @@ Inject `OPENCODE_ROUTER_TIER`, `OPENCODE_ROUTER_MODE`, `OPENCODE_ROUTER_HARD_BLO
 Preserve `preferredTier`, `selectionSource`, `hardBlockedTier`, `hardBlockReason` in `output.context.router`.
 
 **Done when**: Routing state survives session compaction (verified in unit test)
-**Gate**: `npm run typecheck && npx vitest run`
+**Status**: Complete
+**Gate**: `npm run typecheck && npx vitest run` — passed
+**Commit**: `feat(wiki-alignment): preserve router state during compaction`
+
+---
 
 ---
 
@@ -196,6 +212,18 @@ Apply ALL applicable guidelines per file:
 
 **Done when**: All 9 files pass lint + tests with same behavior (verified by `git diff --stat`)
 **Gate**: `npx vitest run`
+**Status**: Complete
+
+Phase 3 commits:
+- T11: `test(wiki-alignment): align cap tracker tests`
+- T12: `test(wiki-alignment): align classifier tests`
+- T13: `test(wiki-alignment): align protocol tests`
+- T14: `test(wiki-alignment): align narration tests`
+- T15: `test(wiki-alignment): align selector tests`
+- T16: `test(wiki-alignment): align config tests`
+- T17: `test(wiki-alignment): align enforcement validator tests`
+- T18: `test(wiki-alignment): align enforcement integration tests`
+- T19: `test(wiki-alignment): align plugin integration tests`
 
 ---
 
@@ -257,6 +285,7 @@ Expand T8 to include:
 - **Return format**: `{ allow: false, message: "Delegue para @heavy. Esta ferramenta esta bloqueada para execucao direta." }`
 
 **Done when**: Contract documented in code + tests cover denied set, subagent bypass, sensitive-file logging
+**Status**: Complete
 **Gate**: `npm run typecheck && npx vitest run`
 
 ---
@@ -272,7 +301,11 @@ Expand T9 to include:
 - **Test**: verify env vars present in subagent shell, absent in main shell
 
 **Done when**: All three env vars injected for subagent shells; zero injection for main shells
-**Gate**: `npm run typecheck && npx vitest run`
+**Status**: Complete
+**Gate**: `npm run typecheck && npx vitest run` — passed
+**Commit**: `test(wiki-alignment): add shell env contract assertions`
+
+---
 
 ---
 
@@ -294,7 +327,11 @@ Expand T10 to include:
 - **Merge logic**: spread existing `output.context.router` first, then overwrite with current state
 
 **Done when**: Compaction round-trip preserves all 4 fields; test verifies state survives compression
-**Gate**: `npm run typecheck && npx vitest run`
+**Status**: Complete
+**Gate**: `npm run typecheck && npx vitest run` — passed
+**Commit**: `feat(wiki-alignment): type session compaction contract`
+
+---
 
 ---
 
@@ -308,6 +345,7 @@ Refine logging (evolui T4, T7):
 - Ensure zero `console.warn` in `src/` (already covered by T4 — verify via `grep -r "console\.\(warn\|log\|error\)" src/`)
 
 **Done when**: Logging hierarchy documented and enforced; grep for `console.` in `src/` returns zero
+**Status**: Complete
 **Gate**: `npm run typecheck && npx vitest run`
 
 ---
@@ -321,6 +359,7 @@ When a hard-blocked session attempts a denied tool:
 - Fall back silently if `client.tui` unavailable (embed in try/catch, best-effort)
 
 **Done when**: Toast triggered on hard-blocked tool invocation; no crash if `tui` missing
+**Status**: Complete
 **Gate**: `npm run typecheck && npx vitest run`
 
 ---
@@ -341,6 +380,7 @@ Create a permissions matrix:
 - Document matrix in `ENFORCEMENT.md`
 
 **Done when**: Matrix enforced in `permission.ask` + `event` hooks; documented in `ENFORCEMENT.md`
+**Status**: Complete
 **Gate**: `npm run typecheck && npx vitest run`
 
 ---
