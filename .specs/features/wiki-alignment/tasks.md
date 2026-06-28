@@ -234,6 +234,7 @@ Phase 3 commits:
 Create 3 Markdown files with YAML frontmatter describing command usage per wiki template pattern.
 
 **Done when**: All 3 files exist with valid template format
+**Status**: Complete
 **Gate**: N/A
 
 ---
@@ -245,7 +246,8 @@ Create 3 Markdown files with YAML frontmatter describing command usage per wiki 
 Expose `router_status` tool that returns current routing state (enabled, mode, tiers, hard-block count).
 
 **Done when**: Tool registered and returns routing state JSON
-**Gate**: `npm run typecheck && npx vitest run`
+**Status**: Complete
+**Gate**: `npm run typecheck && npx vitest run` — passed
 
 ---
 
@@ -256,7 +258,8 @@ Expose `router_status` tool that returns current routing state (enabled, mode, t
 Normalize subagent tool args (trim trailing whitespace from paths). Audit via FileLogger.
 
 **Done when**: Subagent paths are trimmed; audit logged
-**Gate**: `npm run typecheck && npx vitest run`
+**Status**: Complete
+**Gate**: `npm run typecheck && npx vitest run` — passed
 
 ---
 
@@ -270,7 +273,8 @@ Normalize subagent tool args (trim trailing whitespace from paths). Audit via Fi
 ```
 
 **Done when**: `npm run typecheck && npx vitest run && npm run build` pass
-**Gate**: full
+**Status**: Complete
+**Gate**: full — passed
 
 ---
 
@@ -396,6 +400,7 @@ Per wiki `.opencode/tools/` conventions:
 - Move logic from T21 (in-source `getRoutingState`) to standalone tool
 
 **Done when**: `opencode` detects tool as `router_status`; returns routing state JSON
+**Status**: Complete
 **Gate**: N/A (requires manual `opencode` session)
 
 ---
@@ -407,6 +412,7 @@ Per wiki `.opencode/tools/` conventions:
 Add note: "SDK OpenCode (`createOpencode()` / `createOpencodeClient()`) — N/A. Este plugin usa apenas runtime hooks e não instancia clients SDK."
 
 **Done when**: Documented in all relevant docs
+**Status**: Complete
 **Gate**: N/A
 
 ---
@@ -418,6 +424,7 @@ Add note: "SDK OpenCode (`createOpencode()` / `createOpencodeClient()`) — N/A.
 Add note: "Skills de agentes (`SKILL.md`) — N/A. Este plugin não define skills customizadas. A skill `tlc-spec-driven` é carregada por nome via skill tool, não via SKILL.md."
 
 **Done when**: Documented in all relevant docs
+**Status**: Complete
 **Gate**: N/A
 
 ---
