@@ -622,7 +622,7 @@ describe('tierRouterPlugin', () => {
       },
     });
 
-    const mainOut = {};
+    const mainOut = { env: { PATH: '/bin', [OPENCODE_ROUTER_MODE]: 'legacy' } };
     await plugin['shell.env']?.(
       {
         env: { PATH: '/bin', [OPENCODE_ROUTER_MODE]: 'legacy' },
@@ -631,7 +631,9 @@ describe('tierRouterPlugin', () => {
       mainOut as unknown as Parameters<NonNullable<(typeof plugin)['shell.env']>>[1],
     );
 
-    expect(mainOut).toEqual({});
+    expect(mainOut).toEqual({
+      env: { PATH: '/bin', [OPENCODE_ROUTER_MODE]: 'legacy' },
+    });
   });
 
   it('preserves router state in session compaction output context', async () => {
