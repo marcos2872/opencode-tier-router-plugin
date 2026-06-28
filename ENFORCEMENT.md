@@ -110,6 +110,12 @@ A matriz é implementada em `src/router/permissions.ts` e aplicada nos hooks `pe
 
 ---
 
+## Fora de Escopo
+
+- SDK OpenCode (`createOpencode()` / `createOpencodeClient()`) — N/A. Este plugin usa apenas runtime hooks e não instancia clients SDK.
+
+---
+
 ## 🔍 Validação (Enforcement Validator)
 
 Arquivo: `src/router/enforcement-validator.ts`

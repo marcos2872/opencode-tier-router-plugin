@@ -92,6 +92,10 @@ opencode-tier-router-plugin/
    - `/budget` — lista modos ou troca modo
    - `/router on|off` — liga/desliga o plugin
 
+## Fora de Escopo
+
+- SDK OpenCode (`createOpencode()` / `createOpencodeClient()`) — N/A. Este plugin usa apenas runtime hooks e não instancia clients SDK.
+
 ## Configuração (`tiers.json`)
 
 O arquivo `tiers.json` controla todo o comportamento do plugin. Resolução em camadas:

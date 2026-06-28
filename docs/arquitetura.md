@@ -16,6 +16,9 @@ A arquitetura segue os princípios de:
 
 As decisões arquiteturais estão documentadas em `.specs/STATE.md`. Resumo das decisões ativas:
 
+- SDK OpenCode (`createOpencode()` / `createOpencodeClient()`) — N/A. Este plugin usa apenas runtime hooks e não instancia clients SDK.
+
+
 ### AD-001: Plugin, não standalone agent ou proxy
 
 **Decisão**: Implementar roteamento como plugin OpenCode, não como agente dedicado ou proxy externo.

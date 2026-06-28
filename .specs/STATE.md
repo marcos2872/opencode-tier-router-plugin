@@ -81,6 +81,11 @@ All 17 tasks across 4 phases implemented and verified on branch `feat/code-quali
 ### Next Steps
 1. Run `npm run typecheck && npx vitest run`
 
+### Not Started / Pending
+- **wiki-alignment** — Not started. `spec.md`, `context.md` and `tasks.md` exist, but no source/test/config changes have been implemented and `validation.md` is missing.
+  - Scope: runtime bugs, code alignment with WIKI.md, test alignment, `.opencode/` command/tool templates, and N/A scope notes.
+  - Status: draft / pending implementation.
+
 ### Completed Features
 - **RTT-001 Real Token Cost Tracking** — Completed and verified (PASS)
 - **code-quality-refactor** — Completed and verified (PASS) ← New
@@ -118,4 +123,20 @@ All 17 tasks across 4 phases implemented and verified on branch `feat/code-quali
 - **Evidence**: Post-review architecture passes SOLID, Clean Code, DDD principles
 - **Scope**: RTT-001 implementation
 - **Date**: 2026-06-27 (post-review)
+- **Status**: active
+
+### AD-007
+- **Decision**: `wiki-alignment` remains pending and unimplemented until P0 runtime bugs and the rest of its task list are completed
+- **Reason**: `spec.md`, `context.md` and `tasks.md` exist, but no implementation work has been committed and `validation.md` was missing. Marking it as pending avoids implying acceptance or verification.
+- **Trade-off**: The validation report is intentionally descriptive until actual changes are made.
+- **Scope**: wiki-alignment feature validation
+- **Date**: 2026-06-28
+- **Status**: pending implementation
+
+### AD-008
+- **Decision**: SDK OpenCode (`createOpencode()` / `createOpencodeClient()`) is N/A for this plugin
+- **Reason**: The plugin uses only OpenCode runtime hooks and does not instantiate SDK clients
+- **Trade-off**: SDK-specific setup is out of scope; runtime hooks remain the integration boundary
+- **Scope**: wiki-alignment N/A scope
+- **Date**: 2026-06-28
 - **Status**: active
