@@ -140,3 +140,11 @@ All 17 tasks across 4 phases implemented and verified on branch `feat/code-quali
 - **Scope**: wiki-alignment N/A scope
 - **Date**: 2026-06-28
 - **Status**: active
+
+### AD-009
+- **Decision**: Skills de agentes (`SKILL.md`) is N/A for this plugin
+- **Reason**: The plugin does not define agent skills; `tlc-spec-driven` is loaded by name via skill tool
+- **Trade-off**: Agent skill registration is out of scope; runtime hooks remain the integration boundary
+- **Scope**: wiki-alignment N/A scope
+- **Date**: 2026-06-28
+- **Status**: active

@@ -113,6 +113,7 @@ A matriz é implementada em `src/router/permissions.ts` e aplicada nos hooks `pe
 ## Fora de Escopo
 
 - SDK OpenCode (`createOpencode()` / `createOpencodeClient()`) — N/A. Este plugin usa apenas runtime hooks e não instancia clients SDK.
+- Skills de agentes (`SKILL.md`) — N/A. Este plugin não define skills customizadas. A skill `tlc-spec-driven` é carregada por nome via skill tool, não via SKILL.md.
 
 ---
 
