@@ -11,6 +11,7 @@ import { join } from 'node:path';
 import type { Plugin, Config } from '@opencode-ai/plugin';
 import { loadTiers, ConfigError, type RouterConfig } from './router/config.js';
 import { PluginOrchestrator } from './plugin-orchestrator.js';
+import { FileLogger } from './utils/logger.js';
 import {
   DEFAULT_FAST_COST_RATIO,
   DEFAULT_HEAVY_COST_RATIO,
@@ -142,7 +143,7 @@ async function loadConfig(projectDir: string): Promise<RouterConfig> {
     if (err instanceof ConfigError && (err as { cause?: NodeJS.ErrnoException }).cause?.code === 'ENOENT') {
       return FALLBACK_CONFIG;
     }
-    console.warn(
+    new FileLogger().warn(
       '[opencode-tier-router] failed to load tiers.json, using defaults:',
       err instanceof Error ? err.message : String(err),
     );

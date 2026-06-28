@@ -13,6 +13,7 @@
  */
 
 import type { RouterConfig } from './config.js';
+import { FileLogger } from '../utils/logger.js';
 
 /**
  * Resultado da validação das regras de aplicação obrigatória de delegação.
@@ -133,7 +134,7 @@ export function assertEnforcement(cfg: RouterConfig): void {
   }
 
   if (validation.warnings.length > 0) {
-    console.warn('[Enforcement] Warnings:\n' + validation.warnings.map((w) => `  ${w}`).join('\n'));
+    new FileLogger().warn('[Enforcement] Warnings:\n' + validation.warnings.map((w) => `  ${w}`).join('\n'));
   }
 }
 

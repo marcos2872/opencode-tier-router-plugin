@@ -610,7 +610,7 @@ export class PluginOrchestrator {
         }
 
         await saveMode(modeName, this.ctx.directory);
-        this.config = { ...this.config, mode: modeName };
+        Object.assign(this.config, { mode: modeName });
         output.parts = [makeTextPart(input.sessionID, `Switched to ${modeName} mode.`)];
         return;
       }
