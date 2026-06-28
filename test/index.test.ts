@@ -857,6 +857,44 @@ describe('tierRouterPlugin', () => {
     expect(toolOut).toEqual({ allow: true, args: { path: 'src/index.ts' } });
   });
 
+  it('normaliza caminhos de ferramentas de subagentes e registra auditoria', async () => {
+    const plugin = await tierRouterPlugin(makeCtx(projectDir));
+    await plugin['chat.message']?.(
+      { sessionID: 'sub-tool-normalize', agent: 'fast' },
+      {
+        message: {
+          role: 'user',
+          id: 'm-sub-tool-normalize',
+          sessionID: 'sub-tool-normalize',
+          time: { created: 0 },
+          agent: 'fast',
+          model: { providerID: 'github-copilot', modelID: 'claude-haiku-4.5' },
+        },
+        parts: [],
+      },
+    );
+
+    const toolOut = { allow: true, message: 'allowed', args: { path: 'src/index.ts   \n', nested: { filePath: 'README.md\t   ' } } };
+    const infoSpy = vi.spyOn(FileLogger.prototype, 'info');
+    await plugin['tool.execute.before']?.(
+      { sessionID: 'sub-tool-normalize', tool: 'read', callID: 'call-read-normalize', args: toolOut.args } as unknown as Parameters<
+        NonNullable<(typeof plugin)['tool.execute.before']>
+      >[0],
+      toolOut,
+    );
+
+    expect(toolOut).toEqual({
+      allow: true,
+      args: { path: 'src/index.ts', nested: { filePath: 'README.md' } },
+    });
+    expect(infoSpy).toHaveBeenCalledWith('Subagent tool args normalized', {
+      sessionID: 'sub-tool-normalize',
+      callID: 'call-read-normalize',
+      tool: 'read',
+      changedPaths: ['path', 'nested.filePath'],
+    });
+  });
+
   it('hard-block registra tentativas de ferramentas bloqueadas no FileLogger', async () => {
     const plugin = await tierRouterPlugin(makeCtx(projectDir));
     await classifyHardBlocked(plugin, 'main-tool-audit');

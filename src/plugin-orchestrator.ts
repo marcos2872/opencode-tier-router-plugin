@@ -78,6 +78,42 @@ function makeTextPart(sessionID: string, text: string): TextPart {
   };
 }
 
+function isObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isPathLikeKey(key: string): boolean {
+  return /path|file|directory|dir|glob|pattern$/i.test(key);
+}
+
+function normalizeSubagentToolArgs(args: unknown, prefix = ''): { args: unknown; changedPaths: string[] } {
+  if (!isObject(args)) return { args, changedPaths: [] };
+
+  const normalized: Record<string, unknown> = {};
+  const changedPaths: string[] = [];
+
+  for (const [key, value] of Object.entries(args)) {
+    const path = prefix ? `${prefix}.${key}` : key;
+    if (isPathLikeKey(key) && typeof value === 'string') {
+      const trimmed = value.trimEnd();
+      if (trimmed !== value) changedPaths.push(path);
+      normalized[key] = trimmed;
+      continue;
+    }
+
+    if (isObject(value)) {
+      const nested = normalizeSubagentToolArgs(value, path);
+      normalized[key] = nested.args;
+      changedPaths.push(...nested.changedPaths);
+      continue;
+    }
+
+    normalized[key] = value;
+  }
+
+  return { args: normalized, changedPaths };
+}
+
 type ObservableLogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 type ObservableClient = {
@@ -724,7 +760,7 @@ export class PluginOrchestrator {
   };
 
   async handleToolExecuteBefore(
-    input: { sessionID?: string; tool: string; callID?: string },
+    input: { sessionID?: string; tool: string; callID?: string; args?: Record<string, unknown> },
     output: { allow?: boolean; message?: string; args?: unknown },
   ): Promise<void> {
     try {
@@ -732,6 +768,14 @@ export class PluginOrchestrator {
       if (!input.sessionID) return;
 
       if (this.subagentSessions.has(input.sessionID)) {
+        const normalized = normalizeSubagentToolArgs(input.args);
+        if (input.args !== undefined) output.args = normalized.args;
+        this.log.info('Subagent tool args normalized', {
+          sessionID: input.sessionID,
+          callID: input.callID,
+          tool: input.tool,
+          changedPaths: normalized.changedPaths,
+        });
         output.allow = true;
         delete output.message;
         return;
