@@ -1,31 +1,7 @@
-/**
- * Enforcement Validator Tests
- *
- * Validates that the plugin ALWAYS delegates to subagents.
- * Ensures no task can escape delegation to the main window.
- *
- * Critical validation:
- * 1. enforcement.mode = "hard-block" (not "advisory")
- * 2. enforcement.trivialDirectAllowed = false (NEVER allow direct execution)
- * 3. All 3 tiers configured with valid models
- * 4. Cost hierarchy: fast < medium < heavy
- * 5. Comprehensive task pattern coverage
- */
+import { describe, expect, it } from 'vitest';
+import { assertEnforcement, reportEnforcement, validateEnforcement, type RouterConfig } from '../src/router/enforcement-validator.js';
 
-import { describe, it, expect } from 'vitest';
-import {
-  validateEnforcement,
-  assertEnforcement,
-  reportEnforcement,
-  type EnforcementValidation,
-} from '../src/router/enforcement-validator.js';
-import type { RouterConfig } from '../src/router/config.js';
-
-// ============================================================================
-// Test Fixtures
-// ============================================================================
-
-const VALID_CONFIG: RouterConfig = {
+const validConfig: RouterConfig = {
   mode: 'normal',
   tiers: {
     fast: {
@@ -55,7 +31,7 @@ const VALID_CONFIG: RouterConfig = {
   },
   enforcement: {
     mode: 'hard-block',
-    trivialDirectAllowed: false, // ✅ MUST be false
+    trivialDirectAllowed: false,
   },
   routing: {
     strategy: 'keyword',
@@ -65,201 +41,191 @@ const VALID_CONFIG: RouterConfig = {
   },
 };
 
-// ============================================================================
-// Tests: Critical Enforcement Rules
-// ============================================================================
-
-describe('Enforcement Validator - 100% Delegation', () => {
-  it('accepts valid 100% delegation config', () => {
-    const validation = validateEnforcement(VALID_CONFIG);
+describe('validar aplicacao', () => {
+  it('aceita config de delegacao 100%', () => {
+    const validation = validateEnforcement(validConfig);
 
     expect(validation.isValid).toBe(true);
     expect(validation.errors).toHaveLength(0);
+    expect(validation.warnings).toHaveLength(0);
+    expect(validation.recommendations).toHaveLength(0);
   });
 
-  it('REJECTS advisory mode (only hard-block allowed)', () => {
+  it('rejeita modo advisory', () => {
     const badConfig: RouterConfig = {
-      ...VALID_CONFIG,
+      ...validConfig,
       enforcement: { mode: 'advisory', trivialDirectAllowed: false },
     };
 
     const validation = validateEnforcement(badConfig);
 
     expect(validation.isValid).toBe(false);
-    expect(validation.errors.some((e) => e.includes('hard-block'))).toBe(true);
+    expect(validation.errors).toEqual([
+      '❌ CRITICAL: enforcement.mode is "advisory" but MUST be "hard-block". Advisory mode allows tasks to bypass delegation!',
+    ]);
   });
 
-  it('REJECTS trivialDirectAllowed=true (never allow bypass)', () => {
+  it('rejeita trivialDirectAllowed=true', () => {
     const badConfig: RouterConfig = {
-      ...VALID_CONFIG,
+      ...validConfig,
       enforcement: { mode: 'hard-block', trivialDirectAllowed: true },
     };
 
     const validation = validateEnforcement(badConfig);
 
     expect(validation.isValid).toBe(false);
-    expect(validation.errors.some((e) => e.includes('trivialDirectAllowed'))).toBe(true);
+    expect(validation.errors).toEqual([
+      '❌ CRITICAL: enforcement.trivialDirectAllowed is true but MUST be false. This allows "trivial" tasks to execute directly in main window!',
+    ]);
   });
 
-  it('enforces correct cost hierarchy: fast < medium < heavy', () => {
-    // Violation: fast >= medium
-    const badCostConfig1: RouterConfig = {
-      ...VALID_CONFIG,
+  it('verifica hierarquia de custo fast < medium < heavy', () => {
+    const fastTooExpensive: RouterConfig = {
+      ...validConfig,
       tiers: {
-        ...VALID_CONFIG.tiers,
-        fast: { ...VALID_CONFIG.tiers.fast, costRatio: 5 }, // 5 >= 5 (medium)
+        ...validConfig.tiers,
+        fast: { ...validConfig.tiers.fast, costRatio: 5 },
+      },
+    };
+    const mediumTooExpensive: RouterConfig = {
+      ...validConfig,
+      tiers: {
+        ...validConfig.tiers,
+        medium: { ...validConfig.tiers.medium, costRatio: 20 },
       },
     };
 
-    const validation1 = validateEnforcement(badCostConfig1);
-    expect(validation1.isValid).toBe(false);
-    expect(validation1.errors.some((e) => e.includes('hierarchy'))).toBe(true);
-
-    // Violation: medium >= heavy
-    const badCostConfig2: RouterConfig = {
-      ...VALID_CONFIG,
-      tiers: {
-        ...VALID_CONFIG.tiers,
-        medium: { ...VALID_CONFIG.tiers.medium, costRatio: 20 }, // 20 >= 20 (heavy)
-      },
-    };
-
-    const validation2 = validateEnforcement(badCostConfig2);
-    expect(validation2.isValid).toBe(false);
-    expect(validation2.errors.some((e) => e.includes('hierarchy'))).toBe(true);
+    expect(validateEnforcement(fastTooExpensive).errors).toContain(
+      '❌ Cost hierarchy violated: @fast (5x) should be < @medium (5x)',
+    );
+    expect(validateEnforcement(mediumTooExpensive).errors).toContain(
+      '❌ Cost hierarchy violated: @medium (20x) should be < @heavy (20x)',
+    );
   });
 });
 
-// ============================================================================
-// Tests: Tier Configuration
-// ============================================================================
-
-describe('Enforcement Validator - Tier Configuration', () => {
-  it('requires all 3 tiers (fast, medium, heavy)', () => {
-    const missingTier: RouterConfig = {
-      ...VALID_CONFIG,
+describe('configuracao de tiers', () => {
+  it('exige fast, medium e heavy', () => {
+    const missingTier = {
+      ...validConfig,
       tiers: {
-        fast: VALID_CONFIG.tiers.fast,
-        medium: VALID_CONFIG.tiers.medium,
-        // ❌ missing heavy
-      } as any,
-    };
+        fast: validConfig.tiers.fast,
+        medium: validConfig.tiers.medium,
+      },
+    } as unknown as RouterConfig;
 
     const validation = validateEnforcement(missingTier);
 
     expect(validation.isValid).toBe(false);
-    expect(validation.errors.some((e) => e.includes('Missing tier'))).toBe(true);
+    expect(validation.errors).toContain('❌ Missing tier: @heavy is required');
   });
 
-  it('requires valid model format "provider/model" for each tier', () => {
+  it('exige modelo provider/model por tier', () => {
     const invalidModel: RouterConfig = {
-      ...VALID_CONFIG,
+      ...validConfig,
       tiers: {
-        ...VALID_CONFIG.tiers,
-        fast: { ...VALID_CONFIG.tiers.fast, model: 'invalid-model' },
+        ...validConfig.tiers,
+        fast: { ...validConfig.tiers.fast, model: 'invalid-model' },
       },
     };
 
     const validation = validateEnforcement(invalidModel);
 
     expect(validation.isValid).toBe(false);
-    expect(validation.errors.some((e) => e.includes('Invalid model'))).toBe(true);
+    expect(validation.errors).toContain(
+      '❌ Invalid model for @fast: "invalid-model" doesn\'t match "provider/model" format',
+    );
   });
 
-  it('requires positive costRatio for each tier', () => {
+  it('exige costRatio positivo por tier', () => {
     const zeroCost: RouterConfig = {
-      ...VALID_CONFIG,
+      ...validConfig,
       tiers: {
-        ...VALID_CONFIG.tiers,
-        fast: { ...VALID_CONFIG.tiers.fast, costRatio: 0 },
+        ...validConfig.tiers,
+        fast: { ...validConfig.tiers.fast, costRatio: 0 },
       },
     };
 
     const validation = validateEnforcement(zeroCost);
 
     expect(validation.isValid).toBe(false);
-    expect(validation.errors.some((e) => e.includes('costRatio'))).toBe(true);
+    expect(validation.errors).toContain('❌ Invalid costRatio for @fast: must be positive number');
   });
 
-  it('requires positive cap for each tier', () => {
+  it('exige cap positivo por tier', () => {
     const zeroCap: RouterConfig = {
-      ...VALID_CONFIG,
+      ...validConfig,
       tiers: {
-        ...VALID_CONFIG.tiers,
-        medium: { ...VALID_CONFIG.tiers.medium, cap: 0 },
+        ...validConfig.tiers,
+        medium: { ...validConfig.tiers.medium, cap: 0 },
       },
     };
 
     const validation = validateEnforcement(zeroCap);
 
     expect(validation.isValid).toBe(false);
-    expect(validation.errors.some((e) => e.includes('cap'))).toBe(true);
+    expect(validation.errors).toContain('❌ Invalid cap for @medium: must be positive number');
   });
 });
 
-// ============================================================================
-// Tests: Task Pattern Coverage
-// ============================================================================
-
-describe('Enforcement Validator - Task Pattern Coverage', () => {
-  it('warns if fast patterns are too sparse', () => {
+describe('cobertura de padrões de tarefa', () => {
+  it('avisa quando fast tem poucos padrões', () => {
     const sparsePatterns: RouterConfig = {
-      ...VALID_CONFIG,
+      ...validConfig,
       taskPatterns: {
-        ...VALID_CONFIG.taskPatterns,
-        fast: ['search'], // Only 1 pattern
+        ...validConfig.taskPatterns,
+        fast: ['search'],
       },
     };
 
     const validation = validateEnforcement(sparsePatterns);
 
-    expect(validation.warnings.some((w) => w.includes('fast patterns'))).toBe(true);
+    expect(validation.isValid).toBe(true);
+    expect(validation.warnings).toContain('⚠️  Too few fast patterns (1): may not catch search tasks');
   });
 
-  it('warns if medium patterns are too sparse', () => {
+  it('avisa quando medium tem poucos padrões', () => {
     const sparsePatterns: RouterConfig = {
-      ...VALID_CONFIG,
+      ...validConfig,
       taskPatterns: {
-        ...VALID_CONFIG.taskPatterns,
-        medium: ['implement', 'fix'], // Only 2 patterns
+        ...validConfig.taskPatterns,
+        medium: ['implement', 'fix'],
       },
     };
 
     const validation = validateEnforcement(sparsePatterns);
 
-    expect(validation.warnings.some((w) => w.includes('medium patterns'))).toBe(true);
+    expect(validation.isValid).toBe(true);
+    expect(validation.warnings).toContain('⚠️  Too few medium patterns (2): may not catch implementation tasks');
   });
 
-  it('warns if heavy patterns are too sparse', () => {
+  it('avisa quando heavy tem poucos padrões', () => {
     const sparsePatterns: RouterConfig = {
-      ...VALID_CONFIG,
+      ...validConfig,
       taskPatterns: {
-        ...VALID_CONFIG.taskPatterns,
-        heavy: ['design', 'debug'], // Only 2 patterns
+        ...validConfig.taskPatterns,
+        heavy: ['design', 'debug'],
       },
     };
 
     const validation = validateEnforcement(sparsePatterns);
 
-    expect(validation.warnings.some((w) => w.includes('heavy patterns'))).toBe(true);
+    expect(validation.isValid).toBe(true);
+    expect(validation.warnings).toContain('⚠️  Too few heavy patterns (2): may not catch architecture/design tasks');
   });
 });
 
-// ============================================================================
-// Tests: Routing Strategy
-// ============================================================================
-
-describe('Enforcement Validator - Routing Strategy', () => {
-  it('accepts keyword routing strategy', () => {
-    const validation = validateEnforcement(VALID_CONFIG);
+describe('estrategia de roteamento', () => {
+  it('aceita keyword', () => {
+    const validation = validateEnforcement(validConfig);
 
     expect(validation.isValid).toBe(true);
   });
 
-  it('accepts llm routing strategy', () => {
+  it('aceita llm', () => {
     const llmConfig: RouterConfig = {
-      ...VALID_CONFIG,
-      routing: { ...VALID_CONFIG.routing, strategy: 'llm' },
+      ...validConfig,
+      routing: { ...validConfig.routing, strategy: 'llm' },
     };
 
     const validation = validateEnforcement(llmConfig);
@@ -267,75 +233,65 @@ describe('Enforcement Validator - Routing Strategy', () => {
     expect(validation.isValid).toBe(true);
   });
 
-  it('rejects invalid routing strategy', () => {
+  it('rejeita estrategia invalida', () => {
     const invalidStrategy: RouterConfig = {
-      ...VALID_CONFIG,
-      routing: { ...VALID_CONFIG.routing, strategy: 'invalid' as any },
+      ...validConfig,
+      routing: { ...validConfig.routing, strategy: 'invalid' as RouterConfig['routing']['strategy'] },
     };
 
     const validation = validateEnforcement(invalidStrategy);
 
     expect(validation.isValid).toBe(false);
-    expect(validation.errors.some((e) => e.includes('routing.strategy'))).toBe(true);
+    expect(validation.errors).toContain('❌ Invalid routing.strategy: "invalid" (must be "keyword" or "llm")');
   });
 });
 
-// ============================================================================
-// Tests: assertEnforcement (throws on invalid)
-// ============================================================================
-
-describe('Enforcement Validator - Assertions', () => {
-  it('assertEnforcement passes for valid config', () => {
-    expect(() => {
-      assertEnforcement(VALID_CONFIG);
-    }).not.toThrow();
+describe('assertEnforcement', () => {
+  it('aceita config valida', () => {
+    expect(() => assertEnforcement(validConfig)).not.toThrow();
   });
 
-  it('assertEnforcement throws for invalid enforcement.mode', () => {
+  it('lança erro para enforcement.mode invalido', () => {
     const badConfig: RouterConfig = {
-      ...VALID_CONFIG,
+      ...validConfig,
       enforcement: { mode: 'advisory', trivialDirectAllowed: false },
     };
 
-    expect(() => {
-      assertEnforcement(badConfig);
-    }).toThrow('Configuration invalid for 100% delegation');
+    expect(() => assertEnforcement(badConfig)).toThrow(
+      '[Enforcement] Configuration invalid for 100% delegation:',
+    );
   });
 
-  it('assertEnforcement throws for trivialDirectAllowed=true', () => {
+  it('lança erro para trivialDirectAllowed=true', () => {
     const badConfig: RouterConfig = {
-      ...VALID_CONFIG,
+      ...validConfig,
       enforcement: { mode: 'hard-block', trivialDirectAllowed: true },
     };
 
-    expect(() => {
-      assertEnforcement(badConfig);
-    }).toThrow('Configuration invalid for 100% delegation');
+    expect(() => assertEnforcement(badConfig)).toThrow(
+      '[Enforcement] Configuration invalid for 100% delegation:',
+    );
   });
 });
 
-// ============================================================================
-// Tests: Report Generation
-// ============================================================================
-
-describe('Enforcement Validator - Reporting', () => {
-  it('generates valid report for good config', () => {
-    const report = reportEnforcement(VALID_CONFIG);
+describe('geracao de relatorios', () => {
+  it('gera relatorio para config valida', () => {
+    const report = reportEnforcement(validConfig);
 
     expect(report).toContain('ENFORCEMENT VALIDATION REPORT');
     expect(report).toContain('✅ VALID');
     expect(report).toContain('100% delegation');
   });
 
-  it('includes enforcement settings in report', () => {
-    const report = reportEnforcement(VALID_CONFIG);
+  it('inclui configuracao de aplicacao no relatorio', () => {
+    const report = reportEnforcement(validConfig);
 
     expect(report).toContain('enforcement.mode: hard-block');
     expect(report).toContain('enforcement.trivialDirectAllowed: false');
   });
 
-  it('includes tier models in report', () => {
-    const report = reportEnforcement(VALID_CONFIG);
+  it('inclui modelos de tiers no relatorio', () => {
+    const report = reportEnforcement(validConfig);
 
     expect(report).toContain('@fast');
     expect(report).toContain('@medium');
@@ -343,9 +299,9 @@ describe('Enforcement Validator - Reporting', () => {
     expect(report).toContain('github-copilot/claude-haiku-4.5');
   });
 
-  it('lists errors for invalid config', () => {
+  it('lista erros para config invalida', () => {
     const badConfig: RouterConfig = {
-      ...VALID_CONFIG,
+      ...validConfig,
       enforcement: { mode: 'advisory', trivialDirectAllowed: true },
     };
 
@@ -356,26 +312,21 @@ describe('Enforcement Validator - Reporting', () => {
   });
 });
 
-// ============================================================================
-// Integration: Real-World Scenarios
-// ============================================================================
-
-describe('Enforcement Validator - Real-World Scenarios', () => {
-  it('guarantees HARD-BLOCK mode for production', () => {
-    // Production config must have hard-block + no bypass
-    const prodConfig = VALID_CONFIG;
+describe('cenarios reais de aplicacao', () => {
+  it('garante modo hard-block em producao', () => {
+    const prodConfig = validConfig;
 
     expect(prodConfig.enforcement.mode).toBe('hard-block');
     expect(prodConfig.enforcement.trivialDirectAllowed).toBe(false);
 
     const validation = validateEnforcement(prodConfig);
+
     expect(validation.isValid).toBe(true);
   });
 
-  it('prevents advisory mode (too permissive)', () => {
-    // Someone tries to switch to advisory
+  it('impede modo advisory', () => {
     const advisoryConfig: RouterConfig = {
-      ...VALID_CONFIG,
+      ...validConfig,
       enforcement: { mode: 'advisory', trivialDirectAllowed: false },
     };
 
@@ -385,10 +336,9 @@ describe('Enforcement Validator - Real-World Scenarios', () => {
     expect(validation.errors.some((e) => e.includes('CRITICAL'))).toBe(true);
   });
 
-  it('prevents trivial bypass (defeats purpose)', () => {
-    // Someone tries to allow trivial tasks to run directly
+  it('impede bypass trivial', () => {
     const bypassConfig: RouterConfig = {
-      ...VALID_CONFIG,
+      ...validConfig,
       enforcement: { mode: 'hard-block', trivialDirectAllowed: true },
     };
 
@@ -398,14 +348,11 @@ describe('Enforcement Validator - Real-World Scenarios', () => {
     expect(validation.errors.some((e) => e.includes('trivialDirectAllowed'))).toBe(true);
   });
 
-  it('ensures all tiers are available for routing', () => {
-    // Every tier must be configured for proper delegation
-    const tiers = ['fast', 'medium', 'heavy'] as const;
-
-    for (const tier of tiers) {
-      expect(VALID_CONFIG.tiers[tier]).toBeDefined();
-      expect(VALID_CONFIG.tiers[tier]?.model).toBeTruthy();
-      expect(VALID_CONFIG.tiers[tier]?.costRatio).toBeGreaterThan(0);
+  it('garante que todos os tiers estao disponiveis para roteamento', () => {
+    for (const tier of ['fast', 'medium', 'heavy'] as const) {
+      expect(validConfig.tiers[tier]).toBeDefined();
+      expect(validConfig.tiers[tier]?.model).toBeTruthy();
+      expect(validConfig.tiers[tier]?.costRatio).toBeGreaterThan(0);
     }
   });
 });
