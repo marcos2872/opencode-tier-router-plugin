@@ -198,6 +198,34 @@ describe('tierRouterPlugin', () => {
     expect(saved.mode).toBe('budget');
   });
 
+  it('/budget quality atualiza modo ativo e usa padrão quality no roteamento', async () => {
+    const plugin = await tierRouterPlugin(makeCtx(projectDir));
+    await plugin['command.execute.before']?.(
+      { command: '/budget', sessionID: 's-quality', arguments: 'quality' },
+      { parts: [] as TextPart[] },
+    );
+
+    await plugin['chat.message']?.(
+      { sessionID: 's-quality' },
+      {
+        message: {
+          role: 'user',
+          id: 'm-quality',
+          sessionID: 's-quality',
+          time: { created: 0 },
+        },
+        parts: [{ type: 'text', text: 'melhore a navegação' }],
+      },
+    );
+
+    const tiersOut = { parts: [] as TextPart[] };
+    await plugin['command.execute.before']?.({ command: '/tiers', sessionID: 's-quality', arguments: '' }, tiersOut);
+    const text = textOf(tiersOut.parts);
+
+    expect(text).toContain('Mode: quality');
+    expect(text).toContain('Preferred tier (current session): @medium via fallback-default');
+  });
+
   it('/budget with invalid mode shows available modes and keeps current', async () => {
     const plugin = await tierRouterPlugin(makeCtx(projectDir));
     const input = { command: '/budget', sessionID: 's1', arguments: 'unknown' };
