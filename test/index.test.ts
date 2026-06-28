@@ -634,6 +634,31 @@ describe('tierRouterPlugin', () => {
     expect(mainOut).toEqual({});
   });
 
+  it('preserves router state in session compaction output context', async () => {
+    const plugin = await tierRouterPlugin(makeCtx(projectDir));
+    await classifyHardBlocked(plugin, 'main-compaction');
+
+    const output = {};
+    await plugin['experimental.session.compacting']?.(
+      {
+        sessionID: 'main-compaction',
+        context: { router: { preferredTier: 'old', selectionSource: 'old' } },
+      } as unknown as Parameters<NonNullable<(typeof plugin)['experimental.session.compacting']>>[0],
+      output as unknown as Parameters<NonNullable<(typeof plugin)['experimental.session.compacting']>>[1],
+    );
+
+    expect(output).toEqual({
+      context: {
+        router: {
+          preferredTier: 'heavy',
+          selectionSource: 'keyword',
+          hardBlockedTier: 'heavy',
+          hardBlockReason: 'Current agent maps to @medium, but this request was classified as @heavy. Redirect to @heavy.',
+        },
+      },
+    });
+  });
+
   it('records subagent routing state through FileLogger', async () => {
     const plugin = await tierRouterPlugin(makeCtx(projectDir));
     const infoSpy = vi.spyOn(FileLogger.prototype, 'info');

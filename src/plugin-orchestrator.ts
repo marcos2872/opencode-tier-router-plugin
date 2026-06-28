@@ -118,6 +118,22 @@ type ShellEnvOutput = {
   env?: Record<string, string>;
 };
 
+type RouterState = {
+  preferredTier?: string;
+  selectionSource?: string;
+  hardBlockedTier?: string | null;
+  hardBlockReason?: string | null;
+};
+
+type SessionCompactingInput = {
+  context?: Record<string, unknown>;
+  sessionID?: string;
+};
+
+type SessionCompactingOutput = {
+  context?: unknown;
+};
+
 export class PluginOrchestrator {
   private capTracker = createCapTracker();
   private subagentSessions = new Set<string>();
@@ -217,6 +233,52 @@ export class PluginOrchestrator {
       ...(input.env ?? output.env ?? {}),
       ...this.getRouterShellEnv(input),
     };
+  }
+
+  private getRouterStateForSession(sessionID: string | undefined): RouterState {
+    if (!sessionID) return {};
+
+    const state: RouterState = {
+      hardBlockedTier: this.hardBlockedSessions.get(sessionID) ?? null,
+      hardBlockReason: this.hardBlockReasons.get(sessionID) ?? null,
+    };
+
+    const preferredTier = this.preferredTierSessions.get(sessionID);
+    if (preferredTier) state.preferredTier = preferredTier;
+
+    const selectionSource = this.selectionSourceSessions.get(sessionID);
+    if (selectionSource) state.selectionSource = selectionSource;
+
+    return state;
+  }
+
+  private buildRouterCompactionContext(routerState: RouterState): string {
+    return `Router state: ${JSON.stringify(routerState)}`;
+  }
+
+  private applyRouterStateToCompactionContext(outputContext: unknown, routerState: RouterState): unknown {
+    if (Array.isArray(outputContext)) {
+      outputContext.push(this.buildRouterCompactionContext(routerState));
+      return outputContext;
+    }
+
+    const context = outputContext ?? {};
+    const existingRouter = (context as Record<string, unknown>).router ?? {};
+    (context as Record<string, unknown>).router = {
+      ...(existingRouter as Record<string, unknown>),
+      ...routerState,
+    };
+
+    return context;
+  }
+
+  async handleSessionCompacting(input: SessionCompactingInput, output: SessionCompactingOutput): Promise<void> {
+    if (!this.enabled || !input.sessionID) return;
+
+    const routerState = this.getRouterStateForSession(input.sessionID);
+    if (Object.keys(routerState).length === 0) return;
+
+    output.context = this.applyRouterStateToCompactionContext(output.context, routerState);
   }
 
   private cleanupSessions(): void {
