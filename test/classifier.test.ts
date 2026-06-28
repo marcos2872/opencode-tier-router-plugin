@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { classifyTask } from '../src/router/classifier.js';
 import type { TaskPatterns } from '../src/router/config.js';
 
@@ -9,7 +9,7 @@ const patterns: TaskPatterns = {
 };
 
 describe('classifyTask', () => {
-  it('maps every keyword to its tier', () => {
+  it('mapeia cada palavra-chave ao seu tier', () => {
     expect(classifyTask('find x', patterns)).toBe('fast');
     expect(classifyTask('grep x', patterns)).toBe('fast');
     expect(classifyTask('search x', patterns)).toBe('fast');
@@ -21,28 +21,49 @@ describe('classifyTask', () => {
     expect(classifyTask('debug x', patterns)).toBe('heavy');
   });
 
-  it('is case-insensitive', () => {
+  it('ignora padrões vazios', () => {
+    const emptyPatterns: TaskPatterns = {
+      fast: [],
+      medium: [],
+      heavy: [],
+    };
+
+    expect(classifyTask('find x', emptyPatterns)).toBeNull();
+  });
+
+  it('ignora tiers ausentes', () => {
+    const missingPatterns: TaskPatterns = {
+      fast: ['find'],
+      medium: ['refactor'],
+      heavy: [],
+    };
+
+    expect(classifyTask('search x', missingPatterns)).toBeNull();
+    expect(classifyTask('debug x', missingPatterns)).toBeNull();
+  });
+
+  it('é insensível a maiúsculas e minúsculas', () => {
     expect(classifyTask('FIND x', patterns)).toBe('fast');
     expect(classifyTask('Refactor X', patterns)).toBe('medium');
     expect(classifyTask('DEBUG x', patterns)).toBe('heavy');
   });
 
-  it('matches word stems at boundaries', () => {
+  it('combina prefixos de padrões em limites de palavra', () => {
     expect(classifyTask('debugging the code', patterns)).toBe('heavy');
     expect(classifyTask('finding files', patterns)).toBe('fast');
   });
 
-  it('does not match mid-word occurrences', () => {
+  it('não combina ocorrência no meio de palavra', () => {
     expect(classifyTask('research paper', patterns)).toBeNull();
     expect(classifyTask('undefined behavior', patterns)).toBeNull();
   });
 
-  it('returns null when no pattern matches', () => {
+  it('retorna null quando nenhum padrão combina', () => {
     expect(classifyTask('hello world', patterns)).toBeNull();
     expect(classifyTask('', patterns)).toBeNull();
   });
 
-  it('uses heavy > medium > fast priority when multiple tiers match', () => {
+  it('prioriza heavy acima de medium e fast', () => {
     expect(classifyTask('debug and fix the issue', patterns)).toBe('heavy');
     expect(classifyTask('find and refactor code', patterns)).toBe('medium');
     expect(classifyTask('design and implement feature', patterns)).toBe('heavy');
