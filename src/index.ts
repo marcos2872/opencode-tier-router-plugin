@@ -161,6 +161,7 @@ async function loadConfig(projectDir: string): Promise<RouterConfig> {
 const tierRouterPlugin: Plugin = async (ctx) => {
   const cfg = await loadConfig(ctx.directory);
   const orchestrator = new PluginOrchestrator(ctx, cfg);
+  await orchestrator.logObservable('info', 'Plugin initialized', { directory: ctx.directory });
 
   return {
     get enabled(): boolean {

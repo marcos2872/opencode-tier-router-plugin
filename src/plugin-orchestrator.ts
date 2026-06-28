@@ -68,6 +68,22 @@ function makeTextPart(sessionID: string, text: string): TextPart {
   };
 }
 
+type ObservableLogLevel = 'debug' | 'info' | 'warn' | 'error';
+
+type ObservableClient = {
+  app?: {
+    log?: (options: {
+      body: {
+        service: string;
+        level: ObservableLogLevel;
+        message: string;
+        extra?: Record<string, unknown>;
+      };
+      query?: { directory?: string };
+    }) => Promise<unknown>;
+  };
+};
+
 export class PluginOrchestrator {
   private capTracker = createCapTracker();
   private subagentSessions = new Set<string>();
@@ -95,6 +111,20 @@ export class PluginOrchestrator {
 
   get worktree(): PluginInput['worktree'] {
     return this.ctx.worktree;
+  }
+
+  async logObservable(level: ObservableLogLevel, message: string, data: Record<string, unknown> = {}): Promise<void> {
+    const client = this.ctx.client as ObservableClient;
+    if (typeof client.app?.log !== 'function') return;
+
+    try {
+      await client.app.log({
+        body: { service: 'opencode-tier-router', level, message, extra: data },
+        query: { directory: this.ctx.directory },
+      });
+    } catch {
+      return;
+    }
   }
 
   private cleanupSessions(): void {
@@ -136,9 +166,13 @@ export class PluginOrchestrator {
         assertEnforcement(cfg);
         this.log.info('Enforcement validation passed');
       } catch (enforcementErr) {
-        this.log.error('CRITICAL: Enforcement validation failed. Config is invalid for 100% delegation.');
-        this.log.warn(reportEnforcement(cfg));
-      }
+      await this.logObservable('error', 'Hook failed', {
+        hook: 'config.enforcement-validation',
+        error: enforcementErr instanceof Error ? enforcementErr.message : String(enforcementErr),
+      });
+      this.log.error('CRITICAL: Enforcement validation failed. Config is invalid for 100% delegation.');
+      this.log.warn(reportEnforcement(cfg));
+    }
 
       input.agent = input.agent ?? {};
       for (const tier of TIER_NAMES) {
@@ -195,6 +229,10 @@ export class PluginOrchestrator {
         description: 'Enable or disable tier routing',
       };
     } catch (err) {
+      await this.logObservable('error', 'Hook failed', {
+        hook: 'config',
+        error: err instanceof Error ? err.message : String(err),
+      });
       this.log.warn('config hook failed:', err instanceof Error ? err.message : String(err));
     }
   }
@@ -309,6 +347,7 @@ export class PluginOrchestrator {
       const desiredTier = selection.tier ?? mappedTier ?? null;
 
       if (desiredTier) {
+        await this.logObservable('info', 'Tier selected', { tier: desiredTier, source: selection.source });
         this.preferredTierSessions.set(input.sessionID, desiredTier);
         this.selectionSourceSessions.set(input.sessionID, selection.source);
       } else {
@@ -335,6 +374,7 @@ export class PluginOrchestrator {
       }
 
       this.log.info('classify', { sessionID: input.sessionID, desiredTier, action: 'HARD-BLOCK' });
+      await this.logObservable('info', 'Hard-block triggered', { sessionID: input.sessionID, tier: desiredTier });
       this.hardBlockedSessions.set(input.sessionID, desiredTier);
       if (mappedTier && mappedTier !== desiredTier) {
         this.hardBlockReasons.set(
@@ -345,6 +385,10 @@ export class PluginOrchestrator {
         this.hardBlockReasons.set(input.sessionID, `This request requires @${desiredTier}.`);
       }
     } catch (err) {
+      await this.logObservable('error', 'Hook failed', {
+        hook: 'chat.message',
+        error: err instanceof Error ? err.message : String(err),
+      });
       this.log.warn('chat.message hook failed:', err instanceof Error ? err.message : String(err));
     }
   }
@@ -380,6 +424,10 @@ export class PluginOrchestrator {
         output.system.push(buildRoutingHint(preferredTier, source));
       }
     } catch (err) {
+      await this.logObservable('error', 'Hook failed', {
+        hook: 'experimental.chat.system.transform',
+        error: err instanceof Error ? err.message : String(err),
+      });
       this.log.warn('system.transform hook failed:', err instanceof Error ? err.message : String(err));
     }
   }
@@ -412,6 +460,10 @@ export class PluginOrchestrator {
       // never sees a permission popup that will be rejected.
       output.status = 'deny';
     } catch (err) {
+      await this.logObservable('error', 'Hook failed', {
+        hook: 'permission.ask',
+        error: err instanceof Error ? err.message : String(err),
+      });
       this.log.warn('permission.ask hook failed:', err instanceof Error ? err.message : String(err));
     }
   }
@@ -468,6 +520,10 @@ export class PluginOrchestrator {
         });
       }
     } catch (err) {
+      await this.logObservable('error', 'Hook failed', {
+        hook: 'event',
+        error: err instanceof Error ? err.message : String(err),
+      });
       this.log.warn('event hook failed:', err instanceof Error ? err.message : String(err));
     }
   }
@@ -498,6 +554,10 @@ export class PluginOrchestrator {
       if (!hint) return; // leave unblocked tools (e.g. task) untouched
       output.description = `${output.description}\n[Router: ${hint}]`;
     } catch (err) {
+      await this.logObservable('error', 'Hook failed', {
+        hook: 'tool.definition',
+        error: err instanceof Error ? err.message : String(err),
+      });
       this.log.warn('tool.definition hook failed:', err instanceof Error ? err.message : String(err));
     }
   }
@@ -518,6 +578,10 @@ export class PluginOrchestrator {
         }
       }
     } catch (err) {
+      await this.logObservable('error', 'Hook failed', {
+        hook: 'tool.execute.after',
+        error: err instanceof Error ? err.message : String(err),
+      });
       this.log.warn('tool.execute.after hook failed:', err instanceof Error ? err.message : String(err));
     }
   }
@@ -531,6 +595,10 @@ export class PluginOrchestrator {
         output.text += buildNarrationAnnotation(match);
       }
     } catch (err) {
+      await this.logObservable('error', 'Hook failed', {
+        hook: 'experimental.text.complete',
+        error: err instanceof Error ? err.message : String(err),
+      });
       this.log.warn('text.complete hook failed:', err instanceof Error ? err.message : String(err));
     }
   }
@@ -624,6 +692,10 @@ export class PluginOrchestrator {
         return;
       }
     } catch (err) {
+      await this.logObservable('error', 'Hook failed', {
+        hook: 'command.execute.before',
+        error: err instanceof Error ? err.message : String(err),
+      });
       this.log.warn('command.execute.before hook failed:', err instanceof Error ? err.message : String(err));
     }
   }

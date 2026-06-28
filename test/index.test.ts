@@ -1,15 +1,21 @@
 import { mkdir, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { PluginInput, Config } from '@opencode-ai/plugin';
 import type { TextPart } from '@opencode-ai/sdk';
 import tierRouterPlugin from '../src/index.js';
 
-function makeCtx(directory: string): PluginInput {
+function makeClient(appLog: ReturnType<typeof vi.fn> = vi.fn(async () => true)): PluginInput['client'] {
+  return {
+    app: { log: appLog },
+  } as unknown as PluginInput['client'];
+}
+
+function makeCtx(directory: string, client: PluginInput['client'] = {} as PluginInput['client']): PluginInput {
   return {
     directory,
     worktree: directory,
-    client: {} as unknown as PluginInput['client'],
+    client,
     project: {} as unknown as PluginInput['project'],
     experimental_workspace: { register: () => {} },
     serverUrl: new URL('http://localhost'),
@@ -66,6 +72,110 @@ describe('tierRouterPlugin', () => {
 
   afterEach(async () => {
     await rm(projectDir, { recursive: true, force: true });
+  });
+
+  it('logs plugin init to client.app.log when available', async () => {
+    const appLog = vi.fn(async () => true);
+    const plugin = await tierRouterPlugin(makeCtx(projectDir, makeClient(appLog)));
+
+    expect(appLog).toHaveBeenCalledTimes(1);
+    expect(appLog).toHaveBeenCalledWith({
+      body: {
+        service: 'opencode-tier-router',
+        level: 'info',
+        message: 'Plugin initialized',
+        extra: { directory: projectDir },
+      },
+      query: { directory: projectDir },
+    });
+  });
+
+  it('skips app logging silently when client.app.log is unavailable', async () => {
+    const plugin = await tierRouterPlugin(makeCtx(projectDir, {} as unknown as PluginInput['client']));
+    const config: Config = { agent: {} };
+
+    await plugin.config?.(config);
+
+    expect(config.agent?.fast).toBeDefined();
+  });
+
+  it('logs tier selection and hard-block events to client.app.log', async () => {
+    const appLog = vi.fn(async () => true);
+    const plugin = await tierRouterPlugin(makeCtx(projectDir, makeClient(appLog)));
+
+    await plugin['chat.message']?.(
+      { sessionID: 'main-hard', agent: 'build' },
+      {
+        message: {
+          role: 'user',
+          id: 'm-hard-log',
+          sessionID: 'main-hard',
+          time: { created: 0 },
+          agent: 'build',
+          model: { providerID: 'github-copilot', modelID: 'gpt-5.3-codex' },
+          summary: { title: 'review architecture thoroughly', diffs: [] },
+        },
+        parts: [{ type: 'text', text: 'review architecture thoroughly' } as unknown as TextPart],
+      },
+    );
+
+    expect(appLog).toHaveBeenCalledWith({
+      body: {
+        service: 'opencode-tier-router',
+        level: 'info',
+        message: 'Tier selected',
+        extra: { tier: 'heavy', source: 'keyword' },
+      },
+      query: { directory: projectDir },
+    });
+
+    const askOut: { status: 'ask' | 'deny' | 'allow' } = { status: 'ask' };
+    await plugin['permission.ask']?.(
+      {
+        id: 'p-hard-log',
+        type: 'bash',
+        sessionID: 'main-hard',
+        messageID: 'm-hard-log',
+        title: 'run command',
+        metadata: {},
+        time: { created: 0 },
+      },
+      askOut,
+    );
+    expect(askOut.status).toBe('deny');
+    expect(appLog).toHaveBeenCalledWith({
+      body: {
+        service: 'opencode-tier-router',
+        level: 'info',
+        message: 'Hard-block triggered',
+        extra: { sessionID: 'main-hard', tier: 'heavy' },
+      },
+      query: { directory: projectDir },
+    });
+  });
+
+  it('logs hook failures to client.app.log', async () => {
+    const appLog = vi.fn(async () => true);
+    const plugin = await tierRouterPlugin(makeCtx(projectDir, makeClient(appLog)));
+
+    await plugin['experimental.text.complete']?.(
+      { sessionID: 's1', messageID: 'm1', partID: 'p1' },
+      { text: undefined } as unknown as { text: string },
+    );
+
+    expect(appLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        body: expect.objectContaining({
+          level: 'error',
+          message: 'Hook failed',
+          extra: expect.objectContaining({
+            hook: 'experimental.text.complete',
+            error: expect.any(String),
+          }),
+        }),
+        query: { directory: projectDir },
+      }),
+    );
   });
 
   it('uses defaults silently when tiers.json is missing', async () => {
@@ -206,7 +316,18 @@ describe('tierRouterPlugin', () => {
     );
 
     await plugin['chat.message']?.(
-      { sessionID: 's-quality' },
+      {
+        sessionID: 's-quality',
+        message: {
+          role: 'user',
+          id: 'm-quality',
+          sessionID: 's-quality',
+          time: { created: 0 },
+          agent: 'build',
+          model: { providerID: 'github-copilot', modelID: 'gpt-5.3-codex' },
+        },
+        parts: [{ id: 'p-quality', sessionID: 's-quality', messageID: 'm-quality', type: 'text', text: 'melhore a navegação' }],
+      } as unknown as Parameters<NonNullable<(typeof plugin)['chat.message']>>[0],
       {
         message: {
           role: 'user',
@@ -214,8 +335,8 @@ describe('tierRouterPlugin', () => {
           sessionID: 's-quality',
           time: { created: 0 },
         },
-        parts: [{ type: 'text', text: 'melhore a navegação' }],
-      },
+        parts: [],
+      } as unknown as Parameters<NonNullable<(typeof plugin)['chat.message']>>[1],
     );
 
     const tiersOut = { parts: [] as TextPart[] };
