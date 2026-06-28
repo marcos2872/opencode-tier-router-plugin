@@ -1,13 +1,5 @@
-/**
- * Enforcement Integration Tests
- *
- * Validates that the plugin wires enforcement validator correctly.
- * Ensures config hook validates 100% delegation at initialization.
- */
-
-import { describe, it, expect } from 'vitest';
-import { assertEnforcement, reportEnforcement } from '../src/router/enforcement-validator.js';
-import type { RouterConfig } from '../src/router/config.js';
+import { describe, expect, it } from 'vitest';
+import { assertEnforcement, reportEnforcement, type RouterConfig } from '../src/router/enforcement-validator.js';
 
 const ROUTING_CONFIG = {
   strategy: 'keyword' as const,
@@ -16,8 +8,8 @@ const ROUTING_CONFIG = {
   selectorMaxTokens: 16,
 };
 
-describe('Enforcement Integration - Plugin Init', () => {
-  it('rejects config with advisory mode at initialization', () => {
+describe('integracao de aplicacao - inicializacao', () => {
+  it('rejeita config com modo advisory', () => {
     const badConfig: RouterConfig = {
       mode: 'normal',
       tiers: {
@@ -31,12 +23,12 @@ describe('Enforcement Integration - Plugin Init', () => {
       routing: ROUTING_CONFIG,
     };
 
-    expect(() => {
-      assertEnforcement(badConfig);
-    }).toThrow();
+    expect(() => assertEnforcement(badConfig)).toThrow(
+      '[Enforcement] Configuration invalid for 100% delegation:',
+    );
   });
 
-  it('rejects config with trivialDirectAllowed=true at initialization', () => {
+  it('rejeita config com trivialDirectAllowed=true', () => {
     const badConfig: RouterConfig = {
       mode: 'normal',
       tiers: {
@@ -50,12 +42,12 @@ describe('Enforcement Integration - Plugin Init', () => {
       routing: ROUTING_CONFIG,
     };
 
-    expect(() => {
-      assertEnforcement(badConfig);
-    }).toThrow();
+    expect(() => assertEnforcement(badConfig)).toThrow(
+      '[Enforcement] Configuration invalid for 100% delegation:',
+    );
   });
 
-  it('accepts valid hard-block config', () => {
+  it('aceita config hard-block valida', () => {
     const goodConfig: RouterConfig = {
       mode: 'normal',
       tiers: {
@@ -73,12 +65,10 @@ describe('Enforcement Integration - Plugin Init', () => {
       routing: ROUTING_CONFIG,
     };
 
-    expect(() => {
-      assertEnforcement(goodConfig);
-    }).not.toThrow();
+    expect(() => assertEnforcement(goodConfig)).not.toThrow();
   });
 
-  it('generates audit report for invalid configs', () => {
+  it('gera relatorio de auditoria para config invalida', () => {
     const badConfig: RouterConfig = {
       mode: 'normal',
       tiers: {
@@ -95,11 +85,11 @@ describe('Enforcement Integration - Plugin Init', () => {
     const report = reportEnforcement(badConfig);
 
     expect(report).toContain('❌ INVALID');
-    expect(report).toContain('ERRORS');
     expect(report).toContain('Invalid model');
+    expect(report).toContain('@medium: invalid (5x)');
   });
 
-  it('logs enforcement validation success', () => {
+  it('registra validacao de aplicacao com relatorio valido', () => {
     const goodConfig: RouterConfig = {
       mode: 'normal',
       tiers: {
@@ -124,9 +114,8 @@ describe('Enforcement Integration - Plugin Init', () => {
   });
 });
 
-describe('Enforcement Integration - Runtime Validation', () => {
-  it('ensures HARD-BLOCK mode is non-negotiable', () => {
-    // Production config MUST have hard-block
+describe('integracao de aplicacao - validacao de runtime', () => {
+  it('garante modo hard-block nao negociavel', () => {
     const productionConfig: RouterConfig = {
       mode: 'normal',
       tiers: {
@@ -144,11 +133,10 @@ describe('Enforcement Integration - Runtime Validation', () => {
       routing: ROUTING_CONFIG,
     };
 
-    // Should not throw
     expect(() => assertEnforcement(productionConfig)).not.toThrow();
   });
 
-  it('rejects any config that bypasses tier enforcement', () => {
+  it('rejeita qualquer bypass de aplicacao de tiers', () => {
     const bypassConfig: RouterConfig = {
       mode: 'normal',
       tiers: {
@@ -162,19 +150,21 @@ describe('Enforcement Integration - Runtime Validation', () => {
         medium: ['implement', 'fix'],
         heavy: ['design', 'debug'],
       },
-      enforcement: { mode: 'hard-block', trivialDirectAllowed: true }, // ❌ Bypass allowed
+      enforcement: { mode: 'hard-block', trivialDirectAllowed: true },
       routing: ROUTING_CONFIG,
     };
 
-    expect(() => assertEnforcement(bypassConfig)).toThrow();
+    expect(() => assertEnforcement(bypassConfig)).toThrow(
+      '[Enforcement] Configuration invalid for 100% delegation:',
+    );
   });
 
-  it('ensures all 3 tiers have valid models', () => {
+  it('garante modelos validos para todos os tiers', () => {
     const missingModel: RouterConfig = {
       mode: 'normal',
       tiers: {
         fast: { model: 'github-copilot/claude-haiku-4.5', costRatio: 1, cap: 8 },
-        medium: { model: '', costRatio: 5, cap: 12 }, // ❌ Empty model
+        medium: { model: '', costRatio: 5, cap: 12 },
         heavy: { model: 'github-copilot/claude-sonnet-4.5', costRatio: 20, cap: 20 },
       },
       modes: { normal: { defaultTier: 'medium' } },
@@ -187,12 +177,14 @@ describe('Enforcement Integration - Runtime Validation', () => {
       routing: ROUTING_CONFIG,
     };
 
-    expect(() => assertEnforcement(missingModel)).toThrow();
+    expect(() => assertEnforcement(missingModel)).toThrow(
+      '[Enforcement] Configuration invalid for 100% delegation:',
+    );
   });
 });
 
-describe('Enforcement Integration - Audit Trail', () => {
-  it('produces detailed audit report for compliance', () => {
+describe('integracao de aplicacao - trilha de auditoria', () => {
+  it('produz relatorio de auditoria detalhado', () => {
     const config: RouterConfig = {
       mode: 'normal',
       tiers: {
@@ -212,7 +204,6 @@ describe('Enforcement Integration - Audit Trail', () => {
 
     const report = reportEnforcement(config);
 
-    // Should include all critical sections
     expect(report).toContain('ENFORCEMENT VALIDATION REPORT');
     expect(report).toContain('✅ VALID');
     expect(report).toContain('enforcement.mode: hard-block');
@@ -223,21 +214,17 @@ describe('Enforcement Integration - Audit Trail', () => {
     expect(report).toContain('100% delegation');
   });
 
-  it('includes all errors in audit report when config invalid', () => {
+  it('inclui todos os erros no relatorio quando config e invalida', () => {
     const badConfig: RouterConfig = {
       mode: 'normal',
       tiers: {
-        fast: { model: 'invalid', costRatio: 1, cap: 8 }, // ❌
+        fast: { model: 'invalid', costRatio: 1, cap: 8 },
         medium: { model: 'github-copilot/gpt-5.3-codex', costRatio: 5, cap: 12 },
         heavy: { model: 'github-copilot/claude-sonnet-4.5', costRatio: 20, cap: 20 },
       },
       modes: { normal: { defaultTier: 'medium' } },
-      taskPatterns: {
-        fast: ['find'],
-        medium: ['implement'],
-        heavy: ['design'],
-      },
-      enforcement: { mode: 'advisory', trivialDirectAllowed: true }, // ❌ Both bad
+      taskPatterns: { fast: ['find'], medium: ['implement'], heavy: ['design'] },
+      enforcement: { mode: 'advisory', trivialDirectAllowed: true },
       routing: ROUTING_CONFIG,
     };
 
@@ -245,5 +232,8 @@ describe('Enforcement Integration - Audit Trail', () => {
 
     expect(report).toContain('❌ INVALID');
     expect(report).toContain('ERRORS');
+    expect(report).toContain('enforcement.mode is "advisory"');
+    expect(report).toContain('enforcement.trivialDirectAllowed is true');
+    expect(report).toContain('Invalid model for @fast');
   });
 });
