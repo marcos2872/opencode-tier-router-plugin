@@ -8,7 +8,7 @@
  * - preferredTierSessions, selectionSourceSessions
  */
 
-import type { Config } from '@opencode-ai/plugin';
+import type { Config, PluginInput } from '@opencode-ai/plugin';
 import type { TextPart } from '@opencode-ai/sdk';
 import { type RouterConfig, saveMode } from './router/config.js';
 import {
@@ -81,11 +81,20 @@ export class PluginOrchestrator {
   private pendingCommandResponses = new Map<string, TextPart[]>();
   private log: FileLogger;
 
-  constructor(
-    private readonly ctx: { directory: string; client?: unknown },
-    private readonly config: RouterConfig,
-  ) {
+  constructor(private readonly ctx: PluginInput, private readonly config: RouterConfig) {
     this.log = new FileLogger();
+  }
+
+  get project(): PluginInput['project'] {
+    return this.ctx.project;
+  }
+
+  get '$'(): PluginInput['$'] {
+    return this.ctx.$;
+  }
+
+  get worktree(): PluginInput['worktree'] {
+    return this.ctx.worktree;
   }
 
   private cleanupSessions(): void {
