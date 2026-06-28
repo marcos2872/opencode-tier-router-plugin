@@ -1,16 +1,18 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { createCapTracker } from '../src/router/caps.js';
 
 describe('createCapTracker', () => {
-  it('returns record and getBanner methods', () => {
+  it('retorna métodos de rastreamento', () => {
     const tracker = createCapTracker();
+
     expect(typeof tracker.record).toBe('function');
     expect(typeof tracker.getBanner).toBe('function');
+    expect(typeof tracker.cleanup).toBe('function');
   });
 
-  it('increments cap counter for read-only tool calls', () => {
+  it('incrementa o limite para ferramentas somente leitura', () => {
     const tracker = createCapTracker();
-    const session = 'session-1';
+    const session = 'sessao-1';
 
     tracker.record(session, 'read', { path: '/a' });
     expect(tracker.getBanner(session, 'read', { path: '/a' })).toContain('[cap: 1/8]');
@@ -23,22 +25,28 @@ describe('createCapTracker', () => {
 
     tracker.record(session, 'ls', { path: '/c' });
     expect(tracker.getBanner(session, 'ls', { path: '/c' })).toContain('[cap: 4/8]');
+
+    tracker.record(session, 'read', { path: '/a' });
+    expect(tracker.getBanner(session, 'read', { path: '/a' })).toContain(
+      '[⚠ REDUNDANT: this is the same read you ran at call #1]',
+    );
+    expect(tracker.getBanner(session, 'read', { path: '/a' })).toContain('[cap: 5/8]');
   });
 
-  it('does not increment cap counter for non-read-only tools', () => {
+  it('não incrementa o limite para ferramentas não somente leitura', () => {
     const tracker = createCapTracker();
-    const session = 'session-1';
+    const session = 'sessao-1';
 
     tracker.record(session, 'write', { path: '/a' });
-    expect(tracker.getBanner(session, 'write', { path: '/a' })).toBe('');
-
     tracker.record(session, 'execute', { command: 'npm test' });
+
+    expect(tracker.getBanner(session, 'write', { path: '/a' })).toBe('');
     expect(tracker.getBanner(session, 'execute', { command: 'npm test' })).toBe('');
   });
 
-  it('returns cap counter banner below cap', () => {
+  it('retorna banner abaixo do limite', () => {
     const tracker = createCapTracker();
-    const session = 'session-1';
+    const session = 'sessao-1';
 
     for (let i = 0; i < 4; i++) {
       tracker.record(session, 'read', { path: `/file-${i}` });
@@ -47,9 +55,9 @@ describe('createCapTracker', () => {
     expect(tracker.getBanner(session, 'read', { path: '/file-3' })).toContain('[cap: 4/8]');
   });
 
-  it('returns cap warning banner when approaching cap', () => {
+  it('retorna aviso quando o limite está próximo', () => {
     const tracker = createCapTracker();
-    const session = 'session-1';
+    const session = 'sessao-1';
 
     for (let i = 0; i < 6; i++) {
       tracker.record(session, 'read', { path: `/file-${i}` });
@@ -58,9 +66,9 @@ describe('createCapTracker', () => {
     expect(tracker.getBanner(session, 'read', { path: '/file-5' })).toContain('[⚠ CAP WARNING: 2 remaining]');
   });
 
-  it('returns cap reached banner at cap', () => {
+  it('retorna aviso quando o limite é atingido', () => {
     const tracker = createCapTracker();
-    const session = 'session-1';
+    const session = 'sessao-1';
 
     for (let i = 0; i < 8; i++) {
       tracker.record(session, 'read', { path: `/file-${i}` });
@@ -69,9 +77,9 @@ describe('createCapTracker', () => {
     expect(tracker.getBanner(session, 'read', { path: '/file-7' })).toContain('[⚠ CAP REACHED (8/8)]');
   });
 
-  it('keeps cap reached banner after exceeding cap', () => {
+  it('mantém o aviso quando o limite é excedido', () => {
     const tracker = createCapTracker();
-    const session = 'session-1';
+    const session = 'sessao-1';
 
     for (let i = 0; i < 10; i++) {
       tracker.record(session, 'read', { path: `/file-${i}` });
@@ -80,9 +88,9 @@ describe('createCapTracker', () => {
     expect(tracker.getBanner(session, 'read', { path: '/file-9' })).toContain('[⚠ CAP REACHED (10/8)]');
   });
 
-  it('detects redundant read calls by fingerprint', () => {
+  it('detecta leituras redundantes pela impressão digital', () => {
     const tracker = createCapTracker();
-    const session = 'session-1';
+    const session = 'sessao-1';
 
     tracker.record(session, 'read', { path: '/same' });
     tracker.record(session, 'read', { path: '/same' });
@@ -92,9 +100,9 @@ describe('createCapTracker', () => {
     );
   });
 
-  it('detects redundant grep calls by pattern and path', () => {
+  it('detecta greps redundantes por padrão e caminho', () => {
     const tracker = createCapTracker();
-    const session = 'session-1';
+    const session = 'sessao-1';
 
     tracker.record(session, 'grep', { pattern: 'foo', path: '/src' });
     tracker.record(session, 'grep', { pattern: 'foo', path: '/src' });
@@ -104,9 +112,9 @@ describe('createCapTracker', () => {
     );
   });
 
-  it('does not flag different args as redundant', () => {
+  it('não sinaliza argumentos diferentes como redundantes', () => {
     const tracker = createCapTracker();
-    const session = 'session-1';
+    const session = 'sessao-1';
 
     tracker.record(session, 'read', { path: '/a' });
     tracker.record(session, 'read', { path: '/b' });
@@ -114,9 +122,9 @@ describe('createCapTracker', () => {
     expect(tracker.getBanner(session, 'read', { path: '/b' })).not.toContain('REDUNDANT');
   });
 
-  it('does not flag different tools with same args as redundant', () => {
+  it('não sinaliza ferramentas diferentes com os mesmos argumentos como redundantes', () => {
     const tracker = createCapTracker();
-    const session = 'session-1';
+    const session = 'sessao-1';
 
     tracker.record(session, 'read', { path: '/a' });
     tracker.record(session, 'grep', { path: '/a' });
@@ -124,9 +132,9 @@ describe('createCapTracker', () => {
     expect(tracker.getBanner(session, 'grep', { path: '/a' })).not.toContain('REDUNDANT');
   });
 
-  it('tracks call numbers globally within session for redundancy', () => {
+  it('rastreia números de chamada globalmente por sessão', () => {
     const tracker = createCapTracker();
-    const session = 'session-1';
+    const session = 'sessao-1';
 
     tracker.record(session, 'read', { path: '/a' });
     tracker.record(session, 'read', { path: '/b' });
@@ -137,27 +145,43 @@ describe('createCapTracker', () => {
     );
   });
 
-  it('isolates sessions', () => {
+  it('isola sessoes diferentes', () => {
     const tracker = createCapTracker();
 
-    tracker.record('session-a', 'read', { path: '/shared' });
-    tracker.record('session-b', 'read', { path: '/shared' });
-    tracker.record('session-a', 'read', { path: '/shared' });
+    tracker.record('sessao-a', 'read', { path: '/shared' });
+    tracker.record('sessao-b', 'read', { path: '/shared' });
+    tracker.record('sessao-a', 'read', { path: '/shared' });
 
-    expect(tracker.getBanner('session-a', 'read', { path: '/shared' })).toContain(
+    expect(tracker.getBanner('sessao-a', 'read', { path: '/shared' })).toContain(
       '[⚠ REDUNDANT: this is the same read you ran at call #1]',
     );
-    expect(tracker.getBanner('session-b', 'read', { path: '/shared' })).not.toContain('REDUNDANT');
+    expect(tracker.getBanner('sessao-b', 'read', { path: '/shared' })).not.toContain('REDUNDANT');
   });
 
-  it('supports a configurable max cap', () => {
+  it('suporta limite configuravel', () => {
     const tracker = createCapTracker(4);
-    const session = 'session-1';
+    const session = 'sessao-1';
 
     for (let i = 0; i < 4; i++) {
       tracker.record(session, 'read', { path: `/file-${i}` });
     }
 
     expect(tracker.getBanner(session, 'read', { path: '/file-3' })).toContain('[⚠ CAP REACHED (4/4)]');
+  });
+
+  it('retorna vazio para sessao inexistente', () => {
+    const tracker = createCapTracker();
+
+    expect(tracker.getBanner('sessao-inexistente', 'read', { path: '/sem-sessao' })).toBe('');
+  });
+
+  it('remove sessoes registradas', () => {
+    const tracker = createCapTracker();
+    const session = 'sessao-a';
+
+    tracker.record(session, 'read', { path: '/shared' });
+    tracker.cleanup(session);
+
+    expect(tracker.getBanner(session, 'read', { path: '/shared' })).toBe('');
   });
 });
