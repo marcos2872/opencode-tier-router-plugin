@@ -35,7 +35,7 @@ const validConfig: RouterConfig = {
 describe('buildDelegationProtocol', () => {
   it('returns a protocol string starting with the header', () => {
     const protocol = buildDelegationProtocol(validConfig);
-    expect(protocol.startsWith('=== MANDATORY DELEGATION PROTOCOL ===')).toBe(true);
+    expect(protocol.startsWith('--- Task Delegation Reference ---')).toBe(true);
   });
 
   it('includes tier models and cost ratios', () => {
@@ -81,21 +81,7 @@ describe('buildDelegationProtocol', () => {
     expect(buildDelegationProtocol({ ...validConfig, mode: 'deep' })).toContain('depth-first');
   });
 
-  it('includes the trivial direct-execution rule', () => {
-    const protocol = buildDelegationProtocol(validConfig);
-    expect(protocol).toContain('Trivial requests may execute directly.');
-    expect(protocol).toContain('advisory-only');
-  });
 
-  it('includes hard-block rule when enforcement mode is hard-block', () => {
-    const protocol = buildDelegationProtocol({
-      ...validConfig,
-      enforcement: { mode: 'hard-block', trivialDirectAllowed: true },
-    });
-
-    expect(protocol).toContain('HARD-BLOCK enabled');
-    expect(protocol).toContain('MUST delegate');
-  });
 });
 
 describe('classifyTask', () => {

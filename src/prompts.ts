@@ -42,34 +42,6 @@ export const MODE_EMPHASIS: Record<string, string> = {
 };
 
 /**
- * Regra de delegação para tarefas triviais.
- *
- * Controla se tarefas classificadas como triviais (fast/simples) podem
- * executar diretamente na janela principal ou devem ser delegadas.
- *
- * @param allowed - `true` se tarefas triviais podem executar diretamente.
- * @returns Frase de regra para o protocolo de delegação.
- */
-export function buildTrivialRule(allowed: boolean): string {
-  return allowed ? 'Trivial requests may execute directly.' : 'Trivial requests MUST also delegate.';
-}
-
-/**
- * Regra de enforcement (aplicação) para delegação.
- *
- * Descreve o nível de rigidez: HARD-BLOCK bloqueia execução direta,
- * advisory apenas recomenda delegação.
- *
- * @param hardBlock - `true` se enforcement mode é hard-block.
- * @returns Frase de regra para o protocolo de delegação.
- */
-export function buildEnforcementRule(hardBlock: boolean): string {
-  return hardBlock
-    ? 'Enforcement: HARD-BLOCK enabled. Non-trivial requests MUST delegate to @fast/@medium/@heavy; direct execution is not allowed.'
-    : 'Enforcement: advisory-only. Prefer delegation; direct execution is allowed when needed.';
-}
-
-/**
  * Protocolo completo de delegação de tarefas.
  *
  * Injetado no system prompt do modelo base via `chat.system.transform`.
@@ -93,54 +65,22 @@ export function buildDelegationProtocol(cfg: RouterConfig): string {
     .join(' ');
 
   const emphasis = MODE_EMPHASIS[cfg.mode] ?? `mode ${cfg.mode}, default @${defaultTier}`;
-  const hardBlockOn = cfg.enforcement.mode === 'hard-block';
 
   return [
-    '=== MANDATORY DELEGATION PROTOCOL ===',
+    '--- Task Delegation Reference ---',
     ``,
     `Tiers: ${tiersLine} mode:${cfg.mode}`,
     `Default: @${defaultTier}`,
     `Routing: strategy=${cfg.routing.strategy} selector=${cfg.routing.selectorModel}`,
     `R: ${rulesLine}`,
     `Mode: ${cfg.mode} (${emphasis})`,
-    `Cost signal: @fast≈1x, @medium≈5x, @heavy≈20x. Minimize cost while preserving task adequacy.`,
+    `Cost signal: @fast≈1x, @medium≈5x, @heavy≈20x.`,
     ``,
-    '=== YOUR ROLE ===',
-    'You are a ROUTER. You CANNOT use any tool directly. Your ONLY function is to classify the user request and delegate it to a subagent via the "task" tool.',
-    '',
-    '=== BLOCKED TOOLS (ALL DENIED) ===',
-    'Every tool EXCEPT "task" is BLOCKED. Any attempt to call them returns "Permission denied":',
-    '- grep:      BLOCKED → delegate search to @fast via task',
-    '- glob:      BLOCKED → delegate search to @fast via task',
-    '- read:      BLOCKED → delegate read to @fast via task',
-    '- list:      BLOCKED → delegate listing to @fast via task',
-    '- bash:      BLOCKED → delegate execution to @medium/@heavy via task',
-    '- edit:      BLOCKED → delegate edits to @medium via task',
-    '- write:     BLOCKED → delegate writes to @medium via task',
-    '- webfetch:  BLOCKED → delegate fetch to @medium via task',
-    '- websearch: BLOCKED → delegate web search to @medium via task',
-    '- todowrite: BLOCKED',
-    '- doom_loop: BLOCKED',
-    '- lsp:       BLOCKED',
-    '- skill:     BLOCKED',
-    '',
-    '=== ALLOWED TOOL ===',
-    'The ONLY tool you may use is "task". Calling "task" creates a subagent that has full tool access and executes the work.',
-    '',
-    '=== MANDATORY DELEGATION FLOW ===',
-    'For EVERY user request, follow these steps in order. Do NOT skip any step:',
-    'Step 1 — CLASSIFY: Determine the tier (fast, medium, or heavy) based on keywords in the request.',
-    'Step 2 — DELEGATE: Call the "task" tool with subagent_type set to the tier and prompt set to the user request.',
-    'Step 3 — WAIT: Do nothing. The subagent executes and returns the result automatically.',
-    '',
-    'If you ever receive a "Permission denied" error, that means you tried to call a BLOCKED tool. Stop, delete that tool call, and delegate using "task" instead.',
-    '',
-    '=== RULES ===',
-    `Rule: ${buildTrivialRule(cfg.enforcement.trivialDirectAllowed)}`,
-    `Rule: ${buildEnforcementRule(hardBlockOn)}`,
-    'Rule: Respect cap/redundancy banners from subagents; they signal read-limit fatigue.',
-    'Rule: Delegation is mandatory even if the target tier uses the same model as you. Subagents have isolated context, full tool access, and are the only ones who execute.',
-    '==============================',
+    '--- Recommended Delegation ---',
+    `Rule: Respect cap/redundancy banners from subagents; they signal read-limit fatigue.`,
+    `Rule: When a task matches a tier's patterns, delegate to the cheapest matching tier via "task".`,
+    `Rule: Subagents have isolated context and full tool access. They execute the work and return results. Subagents cannot delegate to other subagents — only the main session can delegate.`,
+    '---',
   ].join('\n');
 }
 
