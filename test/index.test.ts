@@ -640,7 +640,11 @@ describe('tierRouterPlugin', () => {
     const plugin = await tierRouterPlugin(makeCtx(projectDir));
     await classifyHardBlocked(plugin, 'main-compaction');
 
-    const output = {};
+    const output = {
+      context: {
+        router: { preferredTier: 'old', selectionSource: 'old', kept: 'output-router-state' },
+      },
+    };
     await plugin['experimental.session.compacting']?.(
       {
         sessionID: 'main-compaction',
@@ -656,6 +660,7 @@ describe('tierRouterPlugin', () => {
           selectionSource: 'keyword',
           hardBlockedTier: 'heavy',
           hardBlockReason: 'Current agent maps to @medium, but this request was classified as @heavy. Redirect to @heavy.',
+          kept: 'output-router-state',
         },
       },
     });

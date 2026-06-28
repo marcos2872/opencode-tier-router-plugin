@@ -23,6 +23,7 @@ import { createCapTracker } from './router/caps.js';
 import { detectNarration } from './narration.js';
 import { assertEnforcement, reportEnforcement } from './router/enforcement-validator.js';
 import { evaluateSessionPermission, isAllowed } from './router/permissions.js';
+import type { RouterState, SessionCompactingInput, SessionCompactingOutput } from './router/types.js';
 import { FileLogger } from './utils/logger.js';
 import {
   HARD_BLOCK_DELEGATION_MESSAGE,
@@ -116,22 +117,6 @@ type ShellEnvInput = {
 
 type ShellEnvOutput = {
   env?: Record<string, string>;
-};
-
-type RouterState = {
-  preferredTier?: string;
-  selectionSource?: string;
-  hardBlockedTier?: string | null;
-  hardBlockReason?: string | null;
-};
-
-type SessionCompactingInput = {
-  context?: Record<string, unknown>;
-  sessionID?: string;
-};
-
-type SessionCompactingOutput = {
-  context?: unknown;
 };
 
 export class PluginOrchestrator {
