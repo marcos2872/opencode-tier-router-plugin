@@ -27,6 +27,9 @@ import { FileLogger } from './utils/logger.js';
 import {
   HARD_BLOCK_DELEGATION_MESSAGE,
   HARD_BLOCK_DENIED_TOOLS,
+  OPENCODE_ROUTER_HARD_BLOCKED,
+  OPENCODE_ROUTER_MODE,
+  OPENCODE_ROUTER_TIER,
   SESSION_TTL_MS,
   TRIVIAL_TASK_MAX_LENGTH,
 } from './constants.js';
@@ -103,6 +106,18 @@ type TuiShowToastClient = {
   };
 };
 
+type ShellEnvInput = {
+  env?: Record<string, string>;
+  conversationSettings?: {
+    systemPrompt?: unknown;
+  };
+  sessionID?: string;
+};
+
+type ShellEnvOutput = {
+  env?: Record<string, string>;
+};
+
 export class PluginOrchestrator {
   private capTracker = createCapTracker();
   private subagentSessions = new Set<string>();
@@ -165,6 +180,43 @@ export class PluginOrchestrator {
     } catch {
       return;
     }
+  }
+
+  private isSubagentShell(input: ShellEnvInput): boolean {
+    const systemPrompt = input.conversationSettings?.systemPrompt;
+
+    if (typeof systemPrompt === 'string') return systemPrompt.includes('subagent profile');
+    if (typeof systemPrompt === 'function') return systemPrompt.toString().includes('subagent profile');
+
+    const includes =
+      systemPrompt && typeof (systemPrompt as { includes?: (substring: string) => boolean }).includes === 'function'
+        ? (systemPrompt as { includes: (substring: string) => boolean }).includes
+        : undefined;
+
+    return Boolean(includes?.('subagent profile'));
+  }
+
+  private getRouterShellEnv(input: ShellEnvInput): Record<string, string> {
+    const cfg = this.config;
+    const sessionID = input.sessionID;
+    const preferredTier = sessionID ? this.preferredTierSessions.get(sessionID) : undefined;
+    const mappedSubagentTier = sessionID ? this.subagentTierMap.get(sessionID) : undefined;
+    const hardBlockedTier = sessionID ? this.hardBlockedSessions.get(sessionID) : undefined;
+
+    return {
+      [OPENCODE_ROUTER_TIER]: preferredTier ?? mappedSubagentTier ?? hardBlockedTier ?? cfg.modes[cfg.mode]?.defaultTier ?? cfg.mode,
+      [OPENCODE_ROUTER_MODE]: cfg.mode,
+      [OPENCODE_ROUTER_HARD_BLOCKED]: hardBlockedTier ? 'true' : 'false',
+    };
+  }
+
+  async handleShellEnv(input: ShellEnvInput, output: ShellEnvOutput): Promise<void> {
+    if (!this.enabled || !this.isSubagentShell(input)) return;
+
+    output.env = {
+      ...(input.env ?? output.env ?? {}),
+      ...this.getRouterShellEnv(input),
+    };
   }
 
   private cleanupSessions(): void {

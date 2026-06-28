@@ -38,6 +38,10 @@ export const HARD_BLOCK_DENIED_TOOLS = [
   'websearch',
 ] as const;
 
+export const OPENCODE_ROUTER_TIER = 'OPENCODE_ROUTER_TIER';
+export const OPENCODE_ROUTER_MODE = 'OPENCODE_ROUTER_MODE';
+export const OPENCODE_ROUTER_HARD_BLOCKED = 'OPENCODE_ROUTER_HARD_BLOCKED';
+
 /**
  * Mensagem padrão de delegação para ferramentas bloqueadas por hard-block.
  */

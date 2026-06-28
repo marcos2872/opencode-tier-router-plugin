@@ -4,7 +4,13 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { PluginInput, Config } from '@opencode-ai/plugin';
 import type { TextPart } from '@opencode-ai/sdk';
 import tierRouterPlugin from '../src/index.js';
-import { HARD_BLOCK_DELEGATION_MESSAGE, HARD_BLOCK_DENIED_TOOLS } from '../src/constants.js';
+import {
+  HARD_BLOCK_DELEGATION_MESSAGE,
+  HARD_BLOCK_DENIED_TOOLS,
+  OPENCODE_ROUTER_HARD_BLOCKED,
+  OPENCODE_ROUTER_MODE,
+  OPENCODE_ROUTER_TIER,
+} from '../src/constants.js';
 import { FileLogger } from '../src/utils/logger.js';
 
 function makeClient(
@@ -578,6 +584,54 @@ describe('tierRouterPlugin', () => {
     }
 
     expect(out.output).toContain('[cap: 4/8]');
+  });
+
+  it('injects router env vars into subagent shells and leaves main shells untouched', async () => {
+    const plugin = await tierRouterPlugin(makeCtx(projectDir));
+    await plugin['chat.message']?.(
+      { sessionID: 'sub-shell-env', agent: 'fast' },
+      {
+        message: {
+          role: 'user',
+          id: 'm-sub-shell-env',
+          sessionID: 'sub-shell-env',
+          time: { created: 0 },
+          agent: 'fast',
+          model: { providerID: 'github-copilot', modelID: 'claude-haiku-4.5' },
+        },
+        parts: [],
+      },
+    );
+
+    const subagentOut = {};
+    await plugin['shell.env']?.(
+      {
+        sessionID: 'sub-shell-env',
+        env: { PATH: '/bin' },
+        conversationSettings: { systemPrompt: 'subagent profile' },
+      } as unknown as Parameters<NonNullable<(typeof plugin)['shell.env']>>[0],
+      subagentOut as unknown as Parameters<NonNullable<(typeof plugin)['shell.env']>>[1],
+    );
+
+    expect(subagentOut).toEqual({
+      env: {
+        PATH: '/bin',
+        [OPENCODE_ROUTER_TIER]: 'fast',
+        [OPENCODE_ROUTER_MODE]: 'normal',
+        [OPENCODE_ROUTER_HARD_BLOCKED]: 'false',
+      },
+    });
+
+    const mainOut = {};
+    await plugin['shell.env']?.(
+      {
+        env: { PATH: '/bin', [OPENCODE_ROUTER_MODE]: 'legacy' },
+        conversationSettings: { systemPrompt: 'main profile' },
+      } as unknown as Parameters<NonNullable<(typeof plugin)['shell.env']>>[0],
+      mainOut as unknown as Parameters<NonNullable<(typeof plugin)['shell.env']>>[1],
+    );
+
+    expect(mainOut).toEqual({});
   });
 
   it('records subagent routing state through FileLogger', async () => {

@@ -178,6 +178,7 @@ const tierRouterPlugin: Plugin = async (ctx) => {
     'tool.execute.after': (input: any, output: any) => orchestrator.handleToolExecuteAfter(input, output),
     'experimental.text.complete': (input: any, output: any) => orchestrator.handleTextComplete(input, output),
     'command.execute.before': (input: any, output: any) => orchestrator.handleCommandExecuteBefore(input, output),
+    'shell.env': (input: any, output: any) => orchestrator.handleShellEnv(input, output),
   };
 };
 
