@@ -86,3 +86,8 @@ export const MEDIUM_TIER_MAX_TOKENS = 10000;
  * Limite mínimo de tokens a partir do qual a tarefa é considerada heavy.
  */
 export const HEAVY_TIER_MIN_TOKENS = 10000;
+
+/**
+ * Diretório para arquivos temporários de delegação de hard-block.
+ */
+export const DELEGATION_TMP_DIR = '/tmp/opencode-router-model';

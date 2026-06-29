@@ -10,6 +10,8 @@
 
 import type { Config, PluginInput } from '@opencode-ai/plugin';
 import type { TextPart } from '@opencode-ai/sdk';
+import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { type RouterConfig, saveMode } from './router/config.js';
 import {
   buildDelegationProtocol,
@@ -28,6 +30,7 @@ import { evaluateSessionPermission, isAllowed } from './router/permissions.js';
 import type { RouterState, SessionCompactingInput, SessionCompactingOutput } from './router/types.js';
 import { FileLogger } from './utils/logger.js';
 import {
+  DELEGATION_TMP_DIR,
   HARD_BLOCK_DENIED_TOOLS,
   OPENCODE_ROUTER_HARD_BLOCKED,
   OPENCODE_ROUTER_MODE,
@@ -357,6 +360,32 @@ export class PluginOrchestrator {
     this.preferredTierSessions.delete(sessionID);
     this.selectionSourceSessions.delete(sessionID);
     this.capTracker.cleanup(sessionID);
+    this.cleanupDelegationFile(sessionID).catch(() => {});
+  }
+
+  /**
+   * Cria arquivo de delegação para uma sessão hard-blocked.
+   * O arquivo fica em DELEGATION_TMP_DIR/{sessionID}.md e contém
+   * a mensagem de delegação com o tier específico.
+   */
+  private async ensureDelegationFile(sessionID: string, tier: string): Promise<string> {
+    const dir = DELEGATION_TMP_DIR;
+    const filePath = join(dir, `${sessionID}.md`);
+    await mkdir(dir, { recursive: true });
+    await writeFile(filePath, buildHardBlockDelegationMessage(tier), 'utf-8');
+    return filePath;
+  }
+
+  /**
+   * Remove arquivo de delegação de uma sessão.
+   */
+  private async cleanupDelegationFile(sessionID: string): Promise<void> {
+    const filePath = join(DELEGATION_TMP_DIR, `${sessionID}.md`);
+    try {
+      await rm(filePath, { force: true });
+    } catch {
+      // ignore — arquivo pode não existir
+    }
   }
 
   private clearRouterState(): void {
@@ -627,6 +656,7 @@ export class PluginOrchestrator {
       this.log.info('classify', { sessionID: input.sessionID, desiredTier, action: 'HARD-BLOCK' });
       await this.logObservable('info', 'Hard-block triggered', { sessionID: input.sessionID, tier: desiredTier });
       this.hardBlockedSessions.set(input.sessionID, desiredTier);
+      await this.ensureDelegationFile(input.sessionID, desiredTier);
       if (mappedTier && mappedTier !== desiredTier) {
         this.hardBlockReasons.set(
           input.sessionID,
@@ -886,16 +916,73 @@ export class PluginOrchestrator {
         callID: input.callID,
         tool: input.tool,
       });
-      delete output.args;
-      delete output.message;
-      output.allow = false;
-      output.message = buildHardBlockDelegationMessage(tier);
+
+      // Redireciona args da ferramenta para mostrar mensagem de delegação
+      // ao invés de tentar negar (allow/message são ignorados pelo runtime)
+      this.redirectToolArgs(input.tool, tier, output);
     } catch (err) {
       await this.logObservable('error', 'Hook failed', {
         hook: 'tool.execute.before',
         error: err instanceof Error ? err.message : String(err),
       });
       this.log.warn('tool.execute.before hook failed:', err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  /**
+   * Redireciona os argumentos de uma ferramenta bloqueada para que o modelo
+   * receba a mensagem de delegação como resultado da ferramenta.
+   *
+   * O runtime do OpenCode ignora `output.allow` e `output.message` em
+   * `tool.execute.before` — o único campo respeitado é `output.args`.
+   */
+  private redirectToolArgs(
+    tool: string,
+    tier: string,
+    output: { allow?: unknown; message?: unknown; args?: unknown },
+  ): void {
+    delete output.allow;
+    delete output.message;
+
+    // Garante que args existe
+    if (!output.args || typeof output.args !== 'object') {
+      output.args = {};
+    }
+    const args = output.args as Record<string, unknown>;
+    const msg = buildHardBlockDelegationMessage(tier);
+
+    switch (tool) {
+      case 'bash':
+        args.command = `echo "${msg}"`;
+        break;
+
+      case 'read':
+        args.filePath = join(DELEGATION_TMP_DIR, 'session.md');
+        break;
+
+      case 'grep':
+        args.include = DELEGATION_TMP_DIR;
+        args.pattern = 'Delegue';
+        break;
+
+      case 'glob':
+        args.pattern = '*';
+        args.path = DELEGATION_TMP_DIR;
+        break;
+
+      case 'list':
+        args.path = DELEGATION_TMP_DIR;
+        break;
+
+      case 'edit':
+      case 'write':
+        args.filePath = '/dev/null';
+        break;
+
+      default:
+        // Ferramentas não mapeadas: define args para mostrar a mensagem
+        args._delegation = msg;
+        break;
     }
   }
 

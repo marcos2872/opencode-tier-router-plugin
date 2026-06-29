@@ -50,6 +50,21 @@ const FAST_STEMS = [
   'pesquis',
   'consult',
   'descobr',
+  'git',
+  'branch',
+  'commit',
+  'log',
+  'diff',
+  'status',
+  'pergunt',
+  'duvid',
+  'doubt',
+  'arquiv',
+  'diretor',
+  'past',
+  'ondef',
+  'oquef',
+  'qual',
 ];
 
 const MEDIUM_STEMS = [
@@ -117,6 +132,15 @@ const HEAVY_STEMS = [
   'investig',
   'raciocin',
   'explic',
+  'spec',
+  'task',
+  'rule',
+  'regr',
+  'projet',
+  'planej',
+  'especific',
+  'estrutur',
+  'sistem',
 ];
 
 function normalize(text: string): string {
@@ -132,9 +156,23 @@ function normalize(text: string): string {
 function countStemMatches(text: string, stems: string[]): number {
   let score = 0;
   for (const stem of stems) {
-    if (text.includes(stem)) score += 1;
+    if (matchesStem(text, stem)) score += 1;
   }
   return score;
+}
+
+function matchesStem(text: string, stem: string): boolean {
+  const normalizedStem = stem.trim().toLowerCase();
+  if (!normalizedStem) return false;
+  if (normalizedStem.length <= 4) {
+    const boundaryRegex = new RegExp(`(^|\\s)${escapeRegExp(normalizedStem)}($|\\s)`, 'i');
+    return boundaryRegex.test(text);
+  }
+  return text.includes(normalizedStem);
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function classifyByLexicon(text: string): TierName | null {

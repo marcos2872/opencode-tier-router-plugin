@@ -1,4 +1,4 @@
-import { mkdir, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Config, PluginInput } from '@opencode-ai/plugin';
@@ -6,6 +6,7 @@ import type { TextPart } from '@opencode-ai/sdk';
 import tierRouterPlugin from '../src/index.js';
 import { buildHardBlockDelegationMessage } from '../src/prompts.js';
 import {
+  DELEGATION_TMP_DIR,
   HARD_BLOCK_DENIED_TOOLS,
   OPENCODE_ROUTER_HARD_BLOCKED,
   OPENCODE_ROUTER_MODE,
@@ -39,9 +40,7 @@ function makeCtx(directory: string, client: PluginInput['client'] = {} as Plugin
 
 type PluginInstance = Awaited<ReturnType<typeof tierRouterPlugin>>;
 
-type SystemTransformInput = Parameters<
-  NonNullable<PluginInstance['experimental.chat.system.transform']>
->[0];
+type SystemTransformInput = Parameters<NonNullable<PluginInstance['experimental.chat.system.transform']>>[0];
 
 function systemTransformInput(sessionID?: string): SystemTransformInput {
   return {
@@ -579,9 +578,7 @@ describe('tierRouterPlugin', () => {
     );
 
     const systemOut: { system?: string[] } = {};
-    await expect(
-      callSystemTransform(plugin, systemTransformInput('sub-undefined'), systemOut),
-    ).resolves.not.toThrow();
+    await expect(callSystemTransform(plugin, systemTransformInput('sub-undefined'), systemOut)).resolves.not.toThrow();
 
     expect(systemOut.system).toBeDefined();
     expect(systemOut.system!.join('\n')).toContain('Do not dispatch sub-sub-agents');
@@ -591,9 +588,7 @@ describe('tierRouterPlugin', () => {
     const plugin = await tierRouterPlugin(makeCtx(projectDir));
 
     const systemOut: { system?: string[] } = { system: [] };
-    await expect(
-      callSystemTransform(plugin, systemTransformInput(), systemOut),
-    ).resolves.not.toThrow();
+    await expect(callSystemTransform(plugin, systemTransformInput(), systemOut)).resolves.not.toThrow();
 
     const prompt = systemOut.system?.join('\n') ?? '';
     expect(prompt).not.toContain('Do not dispatch sub-sub-agents');
@@ -1018,7 +1013,7 @@ describe('tierRouterPlugin', () => {
     expect(systemOut.system.join('\n')).not.toContain('Task Delegation Reference');
   });
 
-  it('hard-block retorna contrato exato para cada ferramenta nativa bloqueada', async () => {
+  it('hard-block redireciona args de cada ferramenta nativa bloqueada', async () => {
     for (const tool of HARD_BLOCK_DENIED_TOOLS) {
       const plugin = await tierRouterPlugin(makeCtx(projectDir));
       await classifyHardBlocked(plugin, `main-${tool}`);
@@ -1026,7 +1021,10 @@ describe('tierRouterPlugin', () => {
       const toolOut = { allow: true, message: 'allowed', args: { path: 'src/index.ts' } };
       await plugin['tool.execute.before']?.({ sessionID: `main-${tool}`, tool, callID: `call-${tool}` }, toolOut);
 
-      expect(toolOut).toEqual({ allow: false, message: buildHardBlockDelegationMessage('heavy') });
+      expect(toolOut).not.toHaveProperty('allow');
+      expect(toolOut).not.toHaveProperty('message');
+      expect(toolOut.args).toBeDefined();
+      expect(typeof toolOut.args).toBe('object');
     }
   });
 
@@ -1041,7 +1039,8 @@ describe('tierRouterPlugin', () => {
       toolOut,
     );
 
-    expect(toolOut).toEqual({ allow: false, message: buildHardBlockDelegationMessage('heavy') });
+    expect(toolOut.args).toBeDefined();
+    expect(toolOut).not.toHaveProperty('allow');
     expect(tuiShowToast).toHaveBeenCalledWith({
       body: {
         title: 'Acao bloqueada',
@@ -1064,7 +1063,8 @@ describe('tierRouterPlugin', () => {
       toolOut,
     );
 
-    expect(toolOut).toEqual({ allow: false, message: buildHardBlockDelegationMessage('heavy') });
+    expect(toolOut.args).toBeDefined();
+    expect(toolOut).not.toHaveProperty('allow');
   });
 
   it('hard-block deixa ferramentas nao bloqueadas antes da execucao para sessoes principais', async () => {
@@ -1162,7 +1162,8 @@ describe('tierRouterPlugin', () => {
       toolOut,
     );
 
-    expect(toolOut).toEqual({ allow: false, message: buildHardBlockDelegationMessage('heavy') });
+    expect(toolOut.args).toBeDefined();
+    expect(toolOut).not.toHaveProperty('allow');
 
     expect(infoSpy).toHaveBeenCalledWith('Denied tool blocked before execution', {
       sessionID: 'main-tool-audit',
@@ -1413,5 +1414,146 @@ describe('tierRouterPlugin', () => {
       path: { id: 'main-event-task', permissionID: 'p-task' },
       body: { response: 'once' },
     });
+  });
+
+  it('HBTI-01: bash redirect para echo com delegacao', async () => {
+    const plugin = await tierRouterPlugin(makeCtx(projectDir));
+    await classifyHardBlocked(plugin, 'hbti-bash');
+
+    const toolOut = { args: { command: 'ls -la' } };
+    await plugin['tool.execute.before']?.({ sessionID: 'hbti-bash', tool: 'bash', callID: 'call-bash' }, toolOut);
+
+    expect(toolOut.args).toBeDefined();
+    expect((toolOut.args as Record<string, unknown>).command).toContain('echo "Delegue para @heavy');
+    expect(toolOut).not.toHaveProperty('allow');
+    expect(toolOut).not.toHaveProperty('message');
+  });
+
+  it('HBTI-02: fast bash redirect para echo com delegacao', async () => {
+    const plugin = await tierRouterPlugin(makeCtx(projectDir));
+    await plugin['chat.message']?.(
+      { sessionID: 'hbti-bash-fast', agent: 'build' },
+      {
+        message: {
+          role: 'user',
+          id: 'm-hbti-bash-fast',
+          sessionID: 'hbti-bash-fast',
+          time: { created: 0 },
+          agent: 'build',
+          model: { providerID: 'github-copilot', modelID: 'gpt-5.3-codex' },
+          summary: { title: 'find login function', diffs: [] },
+        },
+        parts: [{ type: 'text', text: 'find login function' } as unknown as TextPart],
+      },
+    );
+
+    const toolOut = { args: { command: 'ls -la' } };
+    await plugin['tool.execute.before']?.(
+      { sessionID: 'hbti-bash-fast', tool: 'bash', callID: 'call-bash-fast' },
+      toolOut,
+    );
+
+    expect((toolOut.args as Record<string, unknown>).command).toContain('echo "Delegue para @fast');
+  });
+
+  it('HBTI-03: read filePath aponta para delegacao', async () => {
+    const plugin = await tierRouterPlugin(makeCtx(projectDir));
+    await classifyHardBlocked(plugin, 'hbti-read');
+    const toolOut = { args: { filePath: 'src/index.ts' } };
+    await plugin['tool.execute.before']?.({ sessionID: 'hbti-read', tool: 'read', callID: 'call-read' }, toolOut);
+    expect((toolOut.args as Record<string, unknown>).filePath).toBe(join(DELEGATION_TMP_DIR, 'session.md'));
+    expect(toolOut.args).toBeDefined();
+  });
+
+  it('HBTI-04: grep redirect para arquivo de delegacao', async () => {
+    const plugin = await tierRouterPlugin(makeCtx(projectDir));
+    await classifyHardBlocked(plugin, 'hbti-grep');
+    const toolOut = { args: { pattern: 'TODO', include: '*.ts' } };
+    await plugin['tool.execute.before']?.({ sessionID: 'hbti-grep', tool: 'grep', callID: 'call-grep' }, toolOut);
+    const a = toolOut.args as Record<string, unknown>;
+    expect(a.pattern).toBe('Delegue');
+    expect(a.include).toBe(DELEGATION_TMP_DIR);
+  });
+
+  it('HBTI-05: glob redirect para arquivo de delegacao', async () => {
+    const plugin = await tierRouterPlugin(makeCtx(projectDir));
+    await classifyHardBlocked(plugin, 'hbti-glob');
+    const toolOut = { args: { pattern: 'src/**/*.ts', path: 'src' } };
+    await plugin['tool.execute.before']?.({ sessionID: 'hbti-glob', tool: 'glob', callID: 'call-glob' }, toolOut);
+    const a = toolOut.args as Record<string, unknown>;
+    expect(a.pattern).toBe('*');
+    expect(a.path).toBe(DELEGATION_TMP_DIR);
+  });
+
+  it('HBTI-06: list redirect para diretoria de delegacao', async () => {
+    const plugin = await tierRouterPlugin(makeCtx(projectDir));
+    await classifyHardBlocked(plugin, 'hbti-list');
+    const toolOut = { args: { path: 'src' } };
+    await plugin['tool.execute.before']?.({ sessionID: 'hbti-list', tool: 'list', callID: 'call-list' }, toolOut);
+    expect((toolOut.args as Record<string, unknown>).path).toBe(DELEGATION_TMP_DIR);
+  });
+
+  it('HBTI-07: edit/write filePath = /dev/null', async () => {
+    for (const tool of ['edit' as const, 'write' as const]) {
+      const plugin = await tierRouterPlugin(makeCtx(projectDir));
+      await classifyHardBlocked(plugin, `hbti-${tool}`);
+      const toolOut = { args: { filePath: 'src/index.ts' } };
+      await plugin['tool.execute.before']?.({ sessionID: `hbti-${tool}`, tool, callID: `call-${tool}` }, toolOut);
+      expect((toolOut.args as Record<string, unknown>).filePath).toBe('/dev/null');
+    }
+  });
+
+  it('HBTI-08: subagent nao tem args modificados', async () => {
+    const plugin = await tierRouterPlugin(makeCtx(projectDir));
+    await plugin['chat.message']?.(
+      { sessionID: 'hbti-sub', agent: 'fast' },
+      {
+        message: {
+          role: 'user',
+          id: 'm-hbti-sub',
+          sessionID: 'hbti-sub',
+          time: { created: 0 },
+          agent: 'fast',
+          model: { providerID: 'github-copilot', modelID: 'claude-haiku-4.5' },
+        },
+        parts: [],
+      },
+    );
+    const toolOut = { allow: true, args: { path: 'src/index.ts' } };
+    await plugin['tool.execute.before']?.({ sessionID: 'hbti-sub', tool: 'read', callID: 'call-read-sub' }, toolOut);
+    expect((toolOut.args as Record<string, unknown>).path).toBe('src/index.ts');
+  });
+
+  it('HBTI-09: diretorio de delegacao e conteudo sao criados', async () => {
+    const plugin = await tierRouterPlugin(makeCtx(projectDir));
+    const sessionID = 'hbti-file';
+    await classifyHardBlocked(plugin, sessionID);
+
+    const filePath = join(DELEGATION_TMP_DIR, `${sessionID}.md`);
+    try {
+      const content = await readFile(filePath, 'utf-8');
+      expect(content).toBe(buildHardBlockDelegationMessage('heavy'));
+    } finally {
+      await rm(filePath, { force: true });
+    }
+  });
+
+  it('HBTI-10: args undefined tratado sem crash', async () => {
+    const plugin = await tierRouterPlugin(makeCtx(projectDir));
+    await classifyHardBlocked(plugin, 'hbti-undef');
+    const toolOut = {} as Record<string, unknown>;
+    await plugin['tool.execute.before']?.(
+      { sessionID: 'hbti-undef', tool: 'bash', callID: 'call-bash' },
+      toolOut as unknown as Parameters<NonNullable<(typeof plugin)['tool.execute.before']>>[1],
+    );
+    expect(toolOut.args).toBeDefined();
+    expect(typeof toolOut.args).toBe('object');
+  });
+
+  it('HBTI-11: sessao nao hard-blocked preserva args', async () => {
+    const plugin = await tierRouterPlugin(makeCtx(projectDir));
+    const toolOut = { args: { command: 'ls -la' } };
+    await plugin['tool.execute.before']?.({ sessionID: 'normal-session', tool: 'bash', callID: 'call-bash' }, toolOut);
+    expect((toolOut.args as Record<string, unknown>).command).toBe('ls -la');
   });
 });

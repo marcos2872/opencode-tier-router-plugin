@@ -22,9 +22,9 @@ export function buildSelectorPrompt(text: string): string {
   return [
     'Classify the user request into one tier: fast, medium, or heavy.',
     'Return exactly one word: fast OR medium OR heavy.',
-    'fast = search/read/list/explore',
-    'medium = implement/refactor/fix/change/create',
-    'heavy = architecture/debug/analyze/quality/review',
+    'fast = search/read/list/explore/git/buscar/listar/mostrar/pergunta',
+    'medium = implement/refactor/fix/build/update/create/edit/test',
+    'heavy = architecture/design/specs/tasks/rules/debug/analyze/review/arquitetura/especificacao/regras',
     `request: ${text}`,
   ].join('\n');
 }

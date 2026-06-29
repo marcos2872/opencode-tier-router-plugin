@@ -42,6 +42,40 @@
 - **Date**: 2026-06-26
 - **Status**: active
 
+### AD-011
+- **Decision**: Bloqueio de ferramentas via `tool.execute.before` usa redirect de args em vez de `output.allow = false`
+- **Reason**: O tipo oficial do OpenCode para `tool.execute.before` tem output `{ args: any }` — `allow` e `message` não existem na API e são ignorados pelo runtime. Ferramentas bloqueadas executavam normalmente mesmo com o toast aparecendo.
+- **Trade-off**: Ferramentas bloqueadas consomem recursos (criam arquivo temporário, executam com args redirect), mas o modelo recebe a mensagem de delegação no resultado da ferramenta em vez de um erro silencioso.
+- **Scope**: hardblock-tool-intercept feature
+- **Date**: 2026-06-29
+- **Status**: active
+- **Supersedes**: (implicitamente) AD-004 — a implementação do hard-block muda de `output.allow = false` para redirect de args
+
+### AD-012
+- **Decision**: Classificação de tiers segue ordem heavy→medium→fast com padrões expandidos para git, perguntas, specs e regras
+- **Reason**: O fluxo real do usuário inclui comandos git e perguntas sobre arquivos (devem ser @fast), specs/tasks/regras (devem ser @heavy). Os padrões anteriores não cobriam esses casos, fazendo buscas caírem em @medium.
+- **Trade-off**: Padrões mais específicos reduzem ambiguity mas exigem manutenção conforme o uso evolui.
+- **Scope**: tier-reclassification feature
+- **Date**: 2026-06-29
+- **Status**: active
+- **Refines**: AD-003 — a classificação tem mais padrões mas a mesma estratégia de routing
+
+### AD-013
+- **Decision**: `atualizar` permanece como padrão @medium mesmo quando combinado com palavras de busca @fast
+- **Reason**: A ordem heavy→medium→fast foi mantida. "Atualizar" indica intenção de modificar, não apenas consultar. Se o usuário quer @fast para buscas que contêm "atualizar", deve reformular a query (ex: "buscar docs" sem "atualizar").
+- **Trade-off**: Usuário pode precisar reformular queries com palavras mistas. Alternativa (prioridade fast→medium→heavy) foi rejeitada pois faria "refatorar" virar @fast.
+- **Scope**: tier-reclassification feature
+- **Date**: 2026-06-29
+- **Status**: active
+
+### AD-014
+- **Decision**: hardblock-tool-intercept e tier-reclassification foram implementados sem commit para validação antes do push
+- **Reason**: O usuário solicitou explicitamente "nao faca commit" para permitir verificação manual antes de commitar.
+- **Trade-off**: Mudanças ficam em working tree; risco de perder alterações se não commitar depois. Mitigação: typecheck + vitest + lint passam.
+- **Scope**: ambas as features
+- **Date**: 2026-06-29
+- **Status**: active
+
 ## Implementation Summary — code-quality-refactor
 
 **Status**: ✅ **COMPLETED AND VERIFIED (PASS)**
@@ -75,24 +109,20 @@ All 17 tasks across 4 phases implemented and verified on branch `feat/code-quali
 ## Handoff
 
 ### Completed
-- **Remove global `input.permission` overrides** — hard-block is now prompt-based (`buildHardBlockMessage`). Tested in real session (121 tests pass).
-- **`/router off` command** — handled in both `command.execute.before` and `chat.message` with `pendingCommandResponses` mechanism.
-- **RTT-001 Real Token Cost Tracking** — Completed and verified (PASS)
+- **ALIGN-34 Subagent Protocol Injection** — Implementado e commitado (`b45d9b1`). Subagentes recebem diretivas comportamentais via `buildSubagentDirectives()`.
+- **hardblock-tier-message** — Implementado e commitado (`9114f35`). Toast e mensagem de delegação agora usam tier dinâmico via `buildHardBlockDelegationMessage(tier)`.
+- **hardblock-tool-intercept** — Implementado. Ferramentas bloqueadas agora redirecionam args em vez de `output.allow = false` (ignorado pelo runtime). Cada ferramenta (bash→echo, read→delegation file, grep→delegation dir, etc.) mostra a mensagem de delegação ao modelo. Testes atualizados e passando (173 testes).
+- **tier-reclassification** — Implementado. Padrões expandidos: git/pergunta/busca → @fast, build → @medium, spec/task/rule/regra → @heavy. Atualizados `tiers.json`, `selector.ts` (stems), `prompts.ts` (LLM prompt) e testes.
 - **code-quality-refactor** — Completed and verified (PASS)
+- **RTT-001 Real Token Cost Tracking** — Completed and verified (PASS)
+- **Remove global input.permission overrides** — Concluído
+- **/router off command** — Concluído
 
-### In Progress
-- **ALIGN-34 Subagent Protocol Injection** — Spec `spec.md` and `context.md` created.
-  - Phase: Specify ✅
-  - Branch: `main` (no implementation started)
-  - Next step: Confirm specs → implement (Design skipped — Medium scope)
-
-- **hardblock-tier-message** — Bug fix: toast + delegation message sempre mostram `@heavy` hardcoded.
-  - Phase: Specify ✅ (spec.md + context.md created)
-  - Branch: `main` (no implementation started)
-  - Next step: Confirm specs → implement (Design skipped — <3 changes)
+### Updated
+- **README.md** — Atualizado com novos `taskPatterns`, mecanismo de redirect de args em hard-block, troubleshooting.
 
 ### Not Started / Pending
-- **wiki-alignment** — Not started. `spec.md`, `context.md` and `tasks.md` exist, but no source/test/config changes have been implemented and `validation.md` is missing.
+- **wiki-alignment** — Not started. `spec.md`, `context.md` and `tasks.md` exist, but no source/test/config changes have been implemented.
   - Status: draft / pending implementation.
 
 ## Implementation Timeline

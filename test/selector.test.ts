@@ -16,9 +16,22 @@ const cfg: RouterConfig = {
     deep: { defaultTier: 'heavy' },
   },
   taskPatterns: {
-    fast: ['find', 'grep', 'search', 'buscar', 'busque', 'procurar', 'procure', 'ler', 'leia'],
-    medium: ['implement', 'refactor', 'fix', 'implementar', 'refatorar', 'corrigir'],
-    heavy: ['design', 'debug', 'analyze', 'arquitetura', 'depurar', 'analisar'],
+    fast: [
+      'find',
+      'grep',
+      'search',
+      'buscar',
+      'busque',
+      'procurar',
+      'procure',
+      'ler',
+      'leia',
+      'git',
+      'onde',
+      'arquivo',
+    ],
+    medium: ['implement', 'refactor', 'fix', 'implementar', 'refatorar', 'corrigir', 'build', 'atualizar'],
+    heavy: ['design', 'debug', 'analyze', 'arquitetura', 'depurar', 'analisar', 'spec', 'task', 'rule', 'regra'],
   },
   enforcement: {
     mode: 'hard-block',
@@ -45,6 +58,46 @@ describe('selectTierByStrategy', () => {
     });
 
     await expect(selectTierByStrategy('debug authentication flow', cfg)).resolves.toEqual({
+      tier: 'heavy',
+      source: 'keyword',
+    });
+  });
+
+  it('TR-01: busca e git sao fast', async () => {
+    await expect(selectTierByStrategy('git log', cfg)).resolves.toEqual({
+      tier: 'fast',
+      source: 'keyword',
+    });
+    await expect(selectTierByStrategy('buscar auth', cfg)).resolves.toEqual({
+      tier: 'fast',
+      source: 'keyword',
+    });
+  });
+
+  it('TR-06: spec e task sao heavy', async () => {
+    await expect(selectTierByStrategy('criar spec para auth', cfg)).resolves.toEqual({
+      tier: 'heavy',
+      source: 'keyword',
+    });
+    await expect(selectTierByStrategy('revisar tasks do projeto', cfg)).resolves.toEqual({
+      tier: 'heavy',
+      source: 'keyword',
+    });
+  });
+
+  it('TR-08: regra e rule sao heavy', async () => {
+    await expect(selectTierByStrategy('definir regras do projeto', cfg)).resolves.toEqual({
+      tier: 'heavy',
+      source: 'keyword',
+    });
+  });
+
+  it('TR-13: multiplos tiers segue ordem heavy>medium>fast', async () => {
+    await expect(selectTierByStrategy('buscar e refatorar', cfg)).resolves.toEqual({
+      tier: 'medium',
+      source: 'keyword',
+    });
+    await expect(selectTierByStrategy('spec e busca', cfg)).resolves.toEqual({
       tier: 'heavy',
       source: 'keyword',
     });

@@ -3,9 +3,9 @@ import { classifyTask } from '../src/router/classifier.js';
 import type { TaskPatterns } from '../src/router/config.js';
 
 const patterns: TaskPatterns = {
-  fast: ['find', 'grep', 'search'],
-  medium: ['refactor', 'implement', 'fix'],
-  heavy: ['design', 'architecture', 'debug'],
+  fast: ['find', 'grep', 'search', 'git', 'onde', 'buscar', 'procurar', 'arquivo'],
+  medium: ['refactor', 'implement', 'fix', 'build', 'atualizar'],
+  heavy: ['design', 'architecture', 'debug', 'spec', 'task', 'rule', 'regra'],
 };
 
 describe('classifyTask', () => {
@@ -13,12 +13,23 @@ describe('classifyTask', () => {
     expect(classifyTask('find x', patterns)).toBe('fast');
     expect(classifyTask('grep x', patterns)).toBe('fast');
     expect(classifyTask('search x', patterns)).toBe('fast');
+    expect(classifyTask('git status', patterns)).toBe('fast');
+    expect(classifyTask('onde esta x', patterns)).toBe('fast');
+    expect(classifyTask('buscar x', patterns)).toBe('fast');
+    expect(classifyTask('procurar x', patterns)).toBe('fast');
+    expect(classifyTask('arquivo x', patterns)).toBe('fast');
     expect(classifyTask('refactor x', patterns)).toBe('medium');
     expect(classifyTask('implement x', patterns)).toBe('medium');
     expect(classifyTask('fix x', patterns)).toBe('medium');
+    expect(classifyTask('build x', patterns)).toBe('medium');
+    expect(classifyTask('atualizar x', patterns)).toBe('medium');
     expect(classifyTask('design x', patterns)).toBe('heavy');
     expect(classifyTask('architecture x', patterns)).toBe('heavy');
     expect(classifyTask('debug x', patterns)).toBe('heavy');
+    expect(classifyTask('spec x', patterns)).toBe('heavy');
+    expect(classifyTask('task x', patterns)).toBe('heavy');
+    expect(classifyTask('rule x', patterns)).toBe('heavy');
+    expect(classifyTask('regra x', patterns)).toBe('heavy');
   });
 
   it('ignora padrões vazios', () => {
@@ -68,5 +79,7 @@ describe('classifyTask', () => {
     expect(classifyTask('find and refactor code', patterns)).toBe('medium');
     expect(classifyTask('design and implement feature', patterns)).toBe('heavy');
     expect(classifyTask('find grep and search', patterns)).toBe('fast');
+    expect(classifyTask('spec and refactor', patterns)).toBe('heavy');
+    expect(classifyTask('task and git', patterns)).toBe('heavy');
   });
 });

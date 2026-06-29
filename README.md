@@ -13,6 +13,7 @@ Objetivo: manter a qualidade das respostas e delegar trabalho ao modelo mais ade
 - Caps e redundância para chamadas somente leitura em subagentes.
 - Hooks de plugin integrados ao runtime OpenCode.
 - Subagents não recebem prompts do router e não podem delegar para outros subagents.
+- Padrões de classificação expandidos: comandos git e perguntas → @fast, correção/build → @medium, specs/tasks/regras → @heavy.
 
 ## Visão geral
 
@@ -24,7 +25,7 @@ O fluxo atual é:
 4. Injeta no prompt do sistema:
    - protocolo informativo de delegação quando não está em hard-block;
    - mensagem forte de hard-block quando `enforcement.mode = "hard-block"`.
-5. Aplica fallback de enforcement via `permission.ask`, `event` e `tool.execute.before` para sessões principais bloqueadas.
+5. Aplica fallback de enforcement via `permission.ask`, `event` e `tool.execute.before` para sessões principais bloqueadas — ferramentas nativas têm seus argumentos redirecionados para exibir a mensagem de delegação ao modelo.
 6. Permite subagents executarem diretamente, mas impede subagents de chamarem `task()`.
 7. Rastreia caps e chamadas redundantes para ferramentas somente leitura.
 8. Preserva estado de router em compactação de sessão.
@@ -138,9 +139,9 @@ A função de resolução retorna o caminho local do projeto quando nenhum arqui
     }
   },
   "taskPatterns": {
-    "fast": ["find", "grep", "search", "where", "locate", "list", "show", "read", "explore", "buscar", "busque", "busca", "procurar", "procure", "procura", "ler", "leia", "listar", "liste", "mostrar", "mostre"],
-    "medium": ["refactor", "implement", "add", "write", "fix", "update", "change", "create", "edit", "rename", "implementar", "refatorar", "adicionar", "corrigir", "atualizar", "criar", "editar", "renomear", "validar"],
-    "heavy": ["design", "architecture", "debug", "complex", "explain", "reason", "analyze", "optimize", "quality", "review", "arquitetura", "depurar", "complexo", "analisar", "otimizar", "qualidade", "revisar", "diagnosticar"]
+    "fast": ["find", "grep", "search", "where", "locate", "list", "show", "read", "explore", "buscar", "busque", "busca", "procurar", "procure", "procura", "ler", "leia", "listar", "liste", "mostrar", "mostre", "git", "branch", "commit", "log", "diff", "status", "push", "pull", "merge", "clone", "onde", "oque", "como", "qual", "pergunta", "duvida", "doubt", "arquivo", "diretorio", "pasta"],
+    "medium": ["refactor", "implement", "add", "write", "fix", "update", "change", "create", "edit", "rename", "implementar", "refatorar", "adicionar", "corrigir", "atualizar", "criar", "editar", "renomear", "validar", "compilar", "compila", "build"],
+    "heavy": ["design", "architecture", "debug", "complex", "explain", "reason", "analyze", "optimize", "quality", "review", "arquitetura", "depurar", "complexo", "analisar", "otimizar", "qualidade", "revisar", "diagnosticar", "spec", "specs", "task", "tasks", "tasks.md", "rule", "rules", "regra", "regras", "projeto", "planejar", "plan", "especificacao", "especificar"]
   },
   "enforcement": {
     "mode": "hard-block",
@@ -239,10 +240,10 @@ Não existem comandos slash `/mode`, `/enforcement`, `/trivialDirectAllowed`, `/
 
 - Injeta `buildHardBlockMessage` no prompt da sessão principal.
 - Instrui o modelo a chamar `task` com `subagent_type` adequado e não executar ferramentas diretamente.
-- Usa fallbacks de runtime: `permission.ask`, `event` e `tool.execute.before` para negar ferramentas nativas da sessão principal bloqueada.
+- Usa fallbacks de runtime: `permission.ask` nega permissão, `event` rejeita eventos de permissão, e `tool.execute.before` redireciona os argumentos das ferramentas nativas para exibir a mensagem de delegação ao modelo (já que `allow`/`message` são ignorados pela API do runtime).
 - Adiciona hints de ferramenta via `tool.definition`, mas não substitui os hooks de permissão.
 - Subagents não recebem prompts do router e continuam executando diretamente.
-- Native tools do runtime não são controladas diretamente em todos os contextos: na sessão principal hard-blockada elas são negadas via hooks; em subagents, ferramentas nativas são permitidas.
+- Native tools do runtime não são controladas diretamente em todos os contextos: na sessão principal hard-blockada, ferramentas nativas têm seus argumentos redirecionados para mostrar a mensagem de delegação; em subagents, ferramentas nativas são permitidas e executam normalmente.
 
 Com `enforcement.trivialDirectAllowed = false` (padrão), até tarefas rápidas e triviais devem ser delegadas para `@fast`.
 
@@ -297,6 +298,7 @@ Verifique com `/tiers` e ajuste `tiers.<tier>.model` em `tiers.json`. Depois rei
 - Confirme em `/tiers` que `enforcement.mode` é `hard-block`.
 - Se estiver em `advisory`, lembre que ele só orienta e não bloqueia execução direta.
 - Ajuste `taskPatterns` para o idioma e comandos reais do seu projeto.
+- Lembre que o `tool.execute.before` do runtime do OpenCode **não** suporta `allow=false` — o bloqueio real é feito via redirect de args. Se você vir ferramentas executando apesar do toast de hard-block, confirme se está usando a versão mais recente do plugin (com `redirectToolArgs`).
 - Se `routing.strategy` for `llm`, confirme se `routing.selectorModel` existe no provider OpenCode.
 
 ### Tarefas nativas foram bloqueadas

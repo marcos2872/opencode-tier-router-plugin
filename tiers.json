@@ -69,7 +69,27 @@
       "listar",
       "liste",
       "mostrar",
-      "mostre"
+      "mostre",
+      "git",
+      "branch",
+      "commit",
+      "log",
+      "diff",
+      "status",
+      "push",
+      "pull",
+      "merge",
+      "clone",
+      "onde",
+      "oque",
+      "como",
+      "qual",
+      "pergunta",
+      "duvida",
+      "doubt",
+      "arquivo",
+      "diretorio",
+      "pasta"
     ],
     "medium": [
       "refactor",
@@ -90,7 +110,10 @@
       "criar",
       "editar",
       "renomear",
-      "validar"
+      "validar",
+      "compilar",
+      "compila",
+      "build"
     ],
     "heavy": [
       "design",
@@ -110,7 +133,21 @@
       "otimizar",
       "qualidade",
       "revisar",
-      "diagnosticar"
+      "diagnosticar",
+      "spec",
+      "specs",
+      "task",
+      "tasks",
+      "tasks.md",
+      "rule",
+      "rules",
+      "regra",
+      "regras",
+      "projeto",
+      "planejar",
+      "plan",
+      "especificacao",
+      "especificar"
     ]
   },
   "enforcement": {
