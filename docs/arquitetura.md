@@ -140,7 +140,7 @@ graph TD
 
             Utils["utils/safe-json.ts<br/>━━━━━━━━━━━━━━━<br/>• Safe JSON parse<br/>• Size limits"]
 
-            Constants["constants.ts<br/>━━━━━━━━━━━━━━━<br/>• FALLBACK_CONFIG<br/>• Named constants<br/>• SESSION_TTL_MS"]
+            Constants["constants.ts<br/>━━━━━━━━━━━━━━━<br/>• FALLBACK_CONFIG<br/>• Named constants<br/>• SESSION_TTL_MS, DELEGATION_TMP_DIR"]
         end
     end
 
@@ -244,8 +244,9 @@ graph TD
 
 | Prompt | Conteúdo | Quem recebe |
 |--------|----------|-------------|
-| `buildDelegationProtocol` | Referência: tiers, custos, regras de delegação, proibição de subagente delegar | **Todas** as sessões (main + subagentes) |
-| `buildHardBlockMessage` | "ALL TOOLS DENIED", "YOU ARE A ROUTER", lista de ferramentas bloqueadas | **Só** sessões hard-blocked (main session) |
+| `buildDelegationProtocol` | Referência: tiers, custos, regras de delegação, proibição de subagente delegar | Sessão principal **não hard-blockada** |
+| `buildHardBlockMessage` | "ALL TOOLS EXCEPT task ARE DENIED", "YOU ARE A ROUTER", lista de ferramentas bloqueadas | Sessão principal **hard-blockada** |
+| subagent directives | Diretivas específicas de execução, sem protocolo de router | Subagentes |
 
 **Estrutura do protocolo informativo** (`buildDelegationProtocol`):
 
@@ -273,14 +274,10 @@ Rule: Subagents have isolated context and full tool access. They execute the wor
 
 This request is classified as @medium tier and MUST be delegated.
 
-ALL TOOLS EXCEPT "task" ARE DENIED:
-  grep    → DENIED — delegate search to @fast via "task"
-  glob    → DENIED — delegate search to @fast via "task"
-  read    → DENIED — delegate search to @fast via "task"
-  bash    → DENIED — delegate execution to @medium/@heavy via "task"
-  edit    → DENIED — delegate edits to @medium via "task"
-  write   → DENIED — delegate writes to @medium via "task"
-  ...
+ALL TOOLS EXCEPT "task" ARE PERMANENTLY DENIED:
+  grep → DENIED   glob → DENIED   read → DENIED   list → DENIED
+  bash → DENIED   edit → DENIED   write → DENIED   webfetch → DENIED
+  websearch → DENIED
 
 REQUIRED ACTION:
   1. Call "task" with subagent_type="medium" and a description of the work
@@ -426,11 +423,12 @@ flowchart TD
     HardBlocked -->|sim| DenyTool[status = deny<br/>Sem diálogo]
     HardBlocked -->|não| NormalFlow[Runtime segue padrão]
 
-    DenyTool --> Event[Hook: event<br/>permission.asked]
+    DenyTool --> ToolBefore[Hook: tool.execute.before<br/>Redirect hard-block args]
+    ToolBefore --> Event[Hook: event<br/>permission.asked]
     Event --> Reject[Reject + Toast<br/>'Tool blocked. Delegate']
     Reject --> End[Fim: bloqueado]
 
-    AllowTool --> ToolBefore[Hook: tool.execute.before]
+    AllowTool --> ToolBefore[Hook: tool.execute.before<br/>Cap tracker for subagents]
     NormalFlow --> ToolBefore
 
     ToolBefore --> CapTracker[Cap Tracker<br/>Incrementa contador]
@@ -476,9 +474,10 @@ User: "refatore a função de login"
 
 #### 3. Hook `chat.system.transform` (src/plugin-orchestrator.ts)
 
-1. Constrói protocolo informativo via `buildDelegationProtocol(cfg)` — **todas as sessões**
-2. Se sessão hard-blocked, também injeta `buildHardBlockMessage(tier)` — **só main session**
-3. Modelo orquestrador recebe (protocolo informativo):
+1. Sessão principal não hard-blockada recebe `buildDelegationProtocol(cfg)`.
+2. Subagentes não recebem protocolo de router; recebem apenas diretivas específicas.
+3. Sessão principal hard-blockada recebe `buildHardBlockMessage(tier)` — **apenas** essa mensagem.
+4. Modelo orquestrador recebe protocolo informativo:
 
 ```
 --- Task Delegation Reference ---
@@ -494,13 +493,16 @@ Rule: Subagents cannot delegate to other subagents.
 ---
 ```
 
-4. Se hard-blocked, também recebe:
+5. Sessão hard-blockada recebe:
 
 ```
 ❗ HARD-BLOCK ACTIVE — YOU ARE A ROUTER, NOT AN EXECUTOR
 
 This request is classified as @medium tier and MUST be delegated.
-ALL TOOLS EXCEPT "task" ARE DENIED: read→DENIED, bash→DENIED, edit→DENIED, ...
+ALL TOOLS EXCEPT "task" ARE PERMANENTLY DENIED:
+  grep → DENIED   glob → DENIED   read → DENIED   list → DENIED
+  bash → DENIED   edit → DENIED   write → DENIED   webfetch → DENIED
+  websearch → DENIED
 ```
 
 #### 4. Modelo orquestrador decide
@@ -528,7 +530,18 @@ Executa **após** o diálogo de permissão ser resolvido (evento `permission.ask
 - Hard-blocked: rejeita a permissão via API + mostra toast "Tool blocked. Delegate to @tier"
 - Subagent ou normal: auto-allow com `response: 'once'` (não adiciona regra permanente)
 
-#### 7. Hook `tool.execute.after` (src/plugin-orchestrator.ts)
+#### 7. Hook `tool.execute.before` — redirecionamento para hard-block
+
+Para sessões hard-blocked, o plugin não retorna `allow: false` neste hook, porque o runtime ignora esse campo em `tool.execute.before`. Em vez disso, o plugin **redireciona os argumentos** da chamada da ferramenta antes da execução:
+
+- `bash` → `command = echo "<mensagem de delegação>"`
+- `read` → `filePath = /tmp/opencode-router/session-{id}.md`
+- `grep` → `include = /tmp/opencode-router`, `pattern = "Delegue para @"`
+- `glob` / `list` → `path = /tmp/opencode-router`
+- `edit` / `write` → `filePath = /dev/null`
+- demais → insere campo `_delegation` nos args
+
+#### 8. Hook `tool.execute.after` (src/plugin-orchestrator.ts)
 1. Cap tracker atualiza limites após execução
 2. Injeta banners conforme limite
 
@@ -577,9 +590,9 @@ Executa **após** o diálogo de permissão ser resolvido (evento `permission.ask
     "deep": { "description": "Depth-first", "defaultTier": "heavy" }
   },
   "taskPatterns": {
-    "fast": ["find", "grep", "search", "buscar", "procurar", "ler", "listar", "mostrar"],
-    "medium": ["refactor", "implement", "fix", "criar", "corrigir", "editar", "renomear", "validar"],
-    "heavy": ["design", "architecture", "debug", "analisar", "revisar", "diagnosticar", "quality"]
+    "fast": ["find", "grep", "search", "buscar", "procurar", "ler", "listar", "mostrar", "git/branch/commit/log/diff/status/push/pull/merge/clone/onde/oque/como/qual/pergunta/duvida/doubt/arquivo/diretorio/pasta"],
+    "medium": ["refactor", "implement", "fix", "criar", "corrigir", "editar", "renomear", "validar", "build/compilar/compila"],
+    "heavy": ["design", "architecture", "debug", "analisar", "revisar", "diagnosticar", "quality", "spec/specs/task/tasks/tasks.md/rule/rules/regra/regras/projeto/planejar/plan/especificacao/especificar"]
   },
   "enforcement": {
     "mode": "hard-block",

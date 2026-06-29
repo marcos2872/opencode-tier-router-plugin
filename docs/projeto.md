@@ -70,9 +70,9 @@ opencode-tier-router-plugin/
    - Determina o tier adequado (`@fast`, `@medium`, `@heavy`)
 
 3. **Transformação do system prompt** (hook `chat.system.transform`):
-   - Injeta protocolo **informativo** (`buildDelegationProtocol`) em **todas as sessões**
-   - Se sessão hard-blocked, também injeta **hard-block message** (`buildHardBlockMessage`)
-   - Dois níveis: info para todos, imperativo só para main session
+   - Main não hard-blockada → mensagem de protocolo (`buildDelegationProtocol`)
+   - Main hard-blockada → **apenas** mensagem de hard-block (`buildHardBlockMessage`), **sem** protocolo
+   - Subagentes → recebem apenas diretivas específicas, nunca mensagens de router
 
 4. **Controle de permissões** (hook `permission.ask`):
    - Subagent → `output.status = 'allow'` (sem diálogo)
@@ -121,9 +121,9 @@ O arquivo `tiers.json` controla todo o comportamento do plugin. Resolução em c
     "deep": { "description": "Depth-first", "defaultTier": "heavy" }
   },
   "taskPatterns": {
-    "fast": ["find", "search", "read", "buscar", "procurar", "listar", "mostrar"],
-    "medium": ["refactor", "implement", "fix", "criar", "corrigir", "editar", "validar"],
-    "heavy": ["design", "architecture", "debug", "analisar", "revisar", "diagnosticar"]
+    "fast": ["find", "search", "read", "buscar", "procurar", "listar", "mostrar", "git/branch/commit/log/diff/status/push/pull/merge/clone/onde/oque/como/qual/pergunta/duvida/doubt/arquivo/diretorio/pasta"],
+    "medium": ["refactor", "implement", "fix", "criar", "corrigir", "editar", "validar", "build/compilar/compila"],
+    "heavy": ["design", "architecture", "debug", "analisar", "revisar", "diagnosticar", "spec/specs/task/tasks/tasks.md/rule/rules/regra/regras/projeto/planejar/plan/especificacao/especificar"]
   },
   "enforcement": {
     "mode": "hard-block",
@@ -144,14 +144,21 @@ Ver [arquitetura.md](./arquitetura.md#configuração-tiers.json) para detalhes s
 
 O plugin registra o hook `tool.execute.before` em `src/index.ts` e decide no `PluginOrchestrator` antes que ferramentas nativas sensíveis sejam executadas.
 
-- **Sessões principais hard-blocked**: ferramentas nativas `grep|glob|read|list|bash|edit|write|webfetch|websearch` são bloqueadas antes da execução. O hook retorna exatamente:
+- **Sessões principais hard-blocked**: o runtime do OpenCode **ignora** `allow: false` em `tool.execute.before` (só `permission.ask` respeita esse campo). Portanto, em vez de negar, o plugin **redireciona os argumentos** da chamada da ferramenta.
 
-```json
-{
-  "allow": false,
-  "message": "Delegue para @heavy. Esta ferramenta esta bloqueada para execucao direta."
-}
-```
+- **Mapeamento de redirect**:
+  | Ferramenta | Redirect aplicado |
+  |----------|-------------------|
+  | `bash` | `command = echo "<mensagem de delegação>"` |
+  | `read` | `filePath = /tmp/opencode-router/session-{id}.md` |
+  | `grep` | `include = /tmp/opencode-router`, `pattern = "Delegue para @"` |
+  | `glob` / `list` | `path = /tmp/opencode-router` |
+  | `edit` / `write` | `filePath = /dev/null` |
+  | demais | insere campo `_delegation` nos args |
+
+- **Tier dinâmico**: a mensagem de delegação usa o tier retornado pelo classificador/selector, não um valor fixo `@heavy`.
+
+- **Função `redirectToolArgs`**: mapeia o nome da ferramenta para os novos argumentos antes da execução, forçando a mensagem de delegação independentemente do comportamento padrão do runtime.
 
 - **Proteção de arquivos sensíveis**: `read|list|glob|grep|bash|edit|write` são tratados como operações sensíveis no fluxo do router. Quando uma sessão principal hard-blocked tenta executar qualquer ferramenta da lista, o plugin grava um evento de auditoria no `FileLogger` com `sessionID`, `callID` e `tool`.
 - **Subagentes**: se `sessionID` pertence a um subagente, o hook retorna `{ "allow": true }` imediatamente e não aplica bloqueio do router.
@@ -275,6 +282,35 @@ analyze code quality and propose architecture changes
 ```
 
 → Classificado como `@heavy` (keyword: "analyze", "architecture")
+→ Roteado para `llama.cpp/Nex-N2-mini` (tier heavy)
+
+### Tarefa fast (estado do git)
+
+```
+git status
+```
+
+→ Classificado como `@fast` (keyword: "git/status")
+→ Roteado para `opencode/big-pickle`
+
+### Tarefa fast (localizar arquivo/pasta)
+
+```
+qual é o arquivo X
+onde está Y
+```
+
+→ Classificado como `@fast` (stems: "qual", "arquivo", "onde", "pasta")
+→ Roteado para `opencode/big-pickle`
+
+### Tarefa heavy (especificar feature)
+
+```
+especificar feature X
+criar spec
+```
+
+→ Classificado como `@heavy` (stems: "especificar", "spec")
 → Roteado para `llama.cpp/Nex-N2-mini` (tier heavy)
 
 ## Troubleshooting

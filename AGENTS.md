@@ -34,7 +34,7 @@ opencode-tier-router-plugin/
 │   ├── index.ts               # Plugin entry: all hooks wired
 │   ├── plugin-orchestrator.ts # Hook orchestration (SRP extraction)
 │   ├── prompts.ts             # Prompt builders (delegation protocol, hard-block, routing hint)
-│   ├── constants.ts           # Named constants (FALLBACK_CONFIG, regex, SESSION_TTL)
+│   ├── constants.ts           # Named constants (FALLBACK_CONFIG, regex, SESSION_TTL, DELEGATION_TMP_DIR)
 │   ├── narration.ts           # Narration pattern detection
 │   ├── utils/
 │   │   ├── logger.ts          # FileLogger — logs to router-debug.log in plugin dir
@@ -71,6 +71,7 @@ opencode-tier-router-plugin/
 - Routing strategy: `llm` selector with fallback (`llm -> keyword -> defaultTier`), `keyword` also available
 - Config resolution: project `tiers.json` > `~/.config/opencode/tiers.json` > create in project dir
 - `buildDelegationProtocol` is purely informational (tiers, costs, rules) — injected only for non-hard-blocked sessions. Hard-blocked sessions receive only `buildHardBlockMessage`
+- Hard-block tool intercept via `tool.execute.before`: em vez de `allow: false` (ignorado pelo runtime), o plugin redireciona os argumentos da ferramenta para forçar a mensagem de delegação. Cada tipo de ferramenta tem um redirect específico (bash→echo, read→arquivo temporário, edit→/dev/null, etc.). Subagentes recebem auto-allow.
 - `buildHardBlockMessage` carries strong delegation instructions — only injected for hard-blocked main sessions
 - Subagents receive no router prompts (guard in handleSystemTransform skips them entirely)
 - Permission blocking is prompt-based via `buildHardBlockMessage`. The `permission.ask` hook denies hard-blocked and allows subagents for tools the runtime checks (e.g., `bash`); `event` hook rejects `permission.asked` events for hard-blocked sessions
@@ -80,7 +81,7 @@ opencode-tier-router-plugin/
 
 ```
 config → chat.message → experimental.chat.system.transform → permission.ask
-  → event → tool.definition → tool.execute.after → experimental.text.complete
+  → tool.execute.before → event → tool.definition → tool.execute.after → experimental.text.complete
   → command.execute.before
 ```
 
@@ -112,5 +113,5 @@ npm run typecheck && npx vitest run
 ## Reference
 
 - OpenCode plugin API: `@opencode-ai/plugin`
-- Key hooks: `config`, `chat.message`, `experimental.chat.system.transform`, `permission.ask`, `event`, `tool.definition`, `tool.execute.after`, `experimental.text.complete`, `command.execute.before`
+- Key hooks: `config`, `chat.message`, `experimental.chat.system.transform`, `permission.ask`, `tool.execute.before`, `event`, `tool.definition`, `tool.execute.after`, `experimental.text.complete`, `command.execute.before`
 - FileLogger: `src/utils/logger.ts` — writes to `{plugin_dir}/router-debug.log`
