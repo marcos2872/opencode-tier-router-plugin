@@ -4,8 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Config, PluginInput } from '@opencode-ai/plugin';
 import type { TextPart } from '@opencode-ai/sdk';
 import tierRouterPlugin from '../src/index.js';
+import { buildHardBlockDelegationMessage } from '../src/prompts.js';
 import {
-  HARD_BLOCK_DELEGATION_MESSAGE,
   HARD_BLOCK_DENIED_TOOLS,
   OPENCODE_ROUTER_HARD_BLOCKED,
   OPENCODE_ROUTER_MODE,
@@ -1026,7 +1026,7 @@ describe('tierRouterPlugin', () => {
       const toolOut = { allow: true, message: 'allowed', args: { path: 'src/index.ts' } };
       await plugin['tool.execute.before']?.({ sessionID: `main-${tool}`, tool, callID: `call-${tool}` }, toolOut);
 
-      expect(toolOut).toEqual({ allow: false, message: HARD_BLOCK_DELEGATION_MESSAGE });
+      expect(toolOut).toEqual({ allow: false, message: buildHardBlockDelegationMessage('heavy') });
     }
   });
 
@@ -1041,11 +1041,11 @@ describe('tierRouterPlugin', () => {
       toolOut,
     );
 
-    expect(toolOut).toEqual({ allow: false, message: HARD_BLOCK_DELEGATION_MESSAGE });
+    expect(toolOut).toEqual({ allow: false, message: buildHardBlockDelegationMessage('heavy') });
     expect(tuiShowToast).toHaveBeenCalledWith({
       body: {
         title: 'Acao bloqueada',
-        message: 'Delegue para @heavy.',
+        message: buildHardBlockDelegationMessage('heavy'),
         variant: 'warning',
         duration: 8000,
       },
@@ -1064,7 +1064,7 @@ describe('tierRouterPlugin', () => {
       toolOut,
     );
 
-    expect(toolOut).toEqual({ allow: false, message: HARD_BLOCK_DELEGATION_MESSAGE });
+    expect(toolOut).toEqual({ allow: false, message: buildHardBlockDelegationMessage('heavy') });
   });
 
   it('hard-block deixa ferramentas nao bloqueadas antes da execucao para sessoes principais', async () => {
@@ -1162,7 +1162,7 @@ describe('tierRouterPlugin', () => {
       toolOut,
     );
 
-    expect(toolOut).toEqual({ allow: false, message: HARD_BLOCK_DELEGATION_MESSAGE });
+    expect(toolOut).toEqual({ allow: false, message: buildHardBlockDelegationMessage('heavy') });
 
     expect(infoSpy).toHaveBeenCalledWith('Denied tool blocked before execution', {
       sessionID: 'main-tool-audit',

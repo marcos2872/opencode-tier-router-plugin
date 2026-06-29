@@ -43,12 +43,6 @@ export const OPENCODE_ROUTER_MODE = 'OPENCODE_ROUTER_MODE';
 export const OPENCODE_ROUTER_HARD_BLOCKED = 'OPENCODE_ROUTER_HARD_BLOCKED';
 
 /**
- * Mensagem padrão de delegação para ferramentas bloqueadas por hard-block.
- */
-export const HARD_BLOCK_DELEGATION_MESSAGE =
-  'Delegue para @heavy. Esta ferramenta esta bloqueada para execucao direta.';
-
-/**
  * Cap máximo padrão de chamadas de ferramenta por tier.
  */
 export const DEFAULT_TIER_CAP = 8;

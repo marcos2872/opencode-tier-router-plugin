@@ -13,6 +13,7 @@ import type { TextPart } from '@opencode-ai/sdk';
 import { type RouterConfig, saveMode } from './router/config.js';
 import {
   buildDelegationProtocol,
+  buildHardBlockDelegationMessage,
   buildRoutingHint,
   buildHardBlockMessage,
   buildNarrationAnnotation,
@@ -27,7 +28,6 @@ import { evaluateSessionPermission, isAllowed } from './router/permissions.js';
 import type { RouterState, SessionCompactingInput, SessionCompactingOutput } from './router/types.js';
 import { FileLogger } from './utils/logger.js';
 import {
-  HARD_BLOCK_DELEGATION_MESSAGE,
   HARD_BLOCK_DENIED_TOOLS,
   OPENCODE_ROUTER_HARD_BLOCKED,
   OPENCODE_ROUTER_MODE,
@@ -222,7 +222,12 @@ export class PluginOrchestrator {
     }
   }
 
-  private async notifyToolBlocked(): Promise<void> {
+  /**
+   * Exibe toast quando uma ferramenta é bloqueada por hard-block.
+   *
+   * @param tier - Nome do tier para o qual a tarefa deve ser delegada.
+   */
+  private async notifyToolBlocked(tier: string): Promise<void> {
     const client = this.ctx.client as TuiShowToastClient;
     if (typeof client.tui?.showToast !== 'function') return;
 
@@ -230,7 +235,7 @@ export class PluginOrchestrator {
       await client.tui.showToast({
         body: {
           title: 'Acao bloqueada',
-          message: 'Delegue para @heavy.',
+          message: buildHardBlockDelegationMessage(tier),
           variant: 'warning',
           duration: 8000,
         },
@@ -853,6 +858,7 @@ export class PluginOrchestrator {
       if (!input.sessionID) return;
 
       if (this.subagentSessions.has(input.sessionID)) {
+        this.touchSession(input.sessionID);
         const normalized = normalizeSubagentToolArgs(input.args);
         if (input.args !== undefined) output.args = normalized.args;
         this.log.info('Subagent tool args normalized', {
@@ -874,7 +880,7 @@ export class PluginOrchestrator {
       });
       if (!tier || decision.status !== 'deny' || decision.kind !== 'native') return;
 
-      await this.notifyToolBlocked();
+      await this.notifyToolBlocked(tier);
       this.log.info('Denied tool blocked before execution', {
         sessionID: input.sessionID,
         callID: input.callID,
@@ -883,7 +889,7 @@ export class PluginOrchestrator {
       delete output.args;
       delete output.message;
       output.allow = false;
-      output.message = HARD_BLOCK_DELEGATION_MESSAGE;
+      output.message = buildHardBlockDelegationMessage(tier);
     } catch (err) {
       await this.logObservable('error', 'Hook failed', {
         hook: 'tool.execute.before',

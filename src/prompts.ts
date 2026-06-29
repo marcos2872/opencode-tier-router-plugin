@@ -43,6 +43,19 @@ export function buildSubagentDirectives(): string {
 }
 
 /**
+ * Mensagem de delegação para ferramentas bloqueadas por hard-block.
+ *
+ * Retorna uma instrução dinâmica que informa o tier correto para o qual
+ * o modelo deve delegar a tarefa.
+ *
+ * @param tier - Nome do tier (fast, medium, heavy).
+ * @returns Mensagem de delegação com o tier especificado.
+ */
+export function buildHardBlockDelegationMessage(tier: string): string {
+  return `Delegue para @${tier}. Esta ferramenta esta bloqueada para execucao direta.`;
+}
+
+/**
  * Mapa de ênfase textual por modo de roteamento.
  *
  * Descreve de forma legível a estratégia do modo atual para o modelo base.
