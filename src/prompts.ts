@@ -30,6 +30,19 @@ export function buildSelectorPrompt(text: string): string {
 }
 
 /**
+ * Diretivas comportamentais para subagentes.
+ *
+ * Injetada no system prompt de sessões de subagente via handleSystemTransform.
+ * Instrui o subagente a não delegar sub-tarefas e a não perguntar ao usuário
+ * sem necessidade.
+ *
+ * @returns String com as diretivas comportamentais.
+ */
+export function buildSubagentDirectives(): string {
+  return 'Do not dispatch sub-sub-agents. Do not ask the user questions unless blocked.';
+}
+
+/**
  * Mapa de ênfase textual por modo de roteamento.
  *
  * Descreve de forma legível a estratégia do modo atual para o modelo base.

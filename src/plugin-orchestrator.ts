@@ -16,6 +16,7 @@ import {
   buildRoutingHint,
   buildHardBlockMessage,
   buildNarrationAnnotation,
+  buildSubagentDirectives,
   MODE_EMPHASIS,
 } from './prompts.js';
 import { selectTierByStrategy, type SelectionSource } from './router/selector.js';
@@ -644,7 +645,11 @@ export class PluginOrchestrator {
         if (input.sessionID) this.clearSessionRouterState(input.sessionID);
         return;
       }
-      if (input.sessionID && this.subagentSessions.has(input.sessionID)) return;
+      if (input.sessionID && this.subagentSessions.has(input.sessionID)) {
+        output.system = output.system ?? [];
+        output.system.push(buildSubagentDirectives());
+        return;
+      }
 
       const cfg = await this.loadConfig();
       output.system = output.system ?? [];

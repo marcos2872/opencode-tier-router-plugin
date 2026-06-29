@@ -76,19 +76,24 @@ All 17 tasks across 4 phases implemented and verified on branch `feat/code-quali
 
 ### Completed
 - **Remove global `input.permission` overrides** — hard-block is now prompt-based (`buildHardBlockMessage`). Tested in real session (121 tests pass).
-- **`/router off` command** — handled in both `command.execute.before` and `chat.message` with `pendingCommandResponses` mechanism. The model sees "Tier router disabled." instead of the raw `/router off` text.
+- **`/router off` command** — handled in both `command.execute.before` and `chat.message` with `pendingCommandResponses` mechanism.
+- **RTT-001 Real Token Cost Tracking** — Completed and verified (PASS)
+- **code-quality-refactor** — Completed and verified (PASS)
 
-### Next Steps
-1. Run `npm run typecheck && npx vitest run`
+### In Progress
+- **ALIGN-34 Subagent Protocol Injection** — Spec `spec.md` and `context.md` created.
+  - Phase: Specify ✅
+  - Branch: `main` (no implementation started)
+  - Next step: Confirm specs → implement (Design skipped — Medium scope)
+
+- **hardblock-tier-message** — Bug fix: toast + delegation message sempre mostram `@heavy` hardcoded.
+  - Phase: Specify ✅ (spec.md + context.md created)
+  - Branch: `main` (no implementation started)
+  - Next step: Confirm specs → implement (Design skipped — <3 changes)
 
 ### Not Started / Pending
 - **wiki-alignment** — Not started. `spec.md`, `context.md` and `tasks.md` exist, but no source/test/config changes have been implemented and `validation.md` is missing.
-  - Scope: runtime bugs, code alignment with WIKI.md, test alignment, `.opencode/` command/tool templates, and N/A scope notes.
   - Status: draft / pending implementation.
-
-### Completed Features
-- **RTT-001 Real Token Cost Tracking** — Completed and verified (PASS)
-- **code-quality-refactor** — Completed and verified (PASS) ← New
 
 ## Implementation Timeline
 
@@ -148,3 +153,12 @@ All 17 tasks across 4 phases implemented and verified on branch `feat/code-quali
 - **Scope**: wiki-alignment N/A scope
 - **Date**: 2026-06-28
 - **Status**: active
+
+### AD-010
+- **Decision**: Subagents passam a receber diretivas comportamentais injetadas no system prompt via `handleSystemTransform`
+- **Reason**: O `buildDelegationProtocol` já instrui o orquestrador que *"subagents cannot delegate to other subagents"*, mas o subagente nunca recebe essa instrução — o `handleSystemTransform` retorna cedo sem injetar nada. A injeção direta de "não delegue, não pergunte sem necessidade" fecha um gap de consistência entre a instrução que o orquestrador recebe e a que o subagente recebe.
+- **Trade-off**: Subagentes agora recebem conteúdo injetado pelo plugin (antes recebiam zero deste plugin). Custo: ~20 tokens adicionais por sessão de subagente. Risco: se o runtime mudar a ordem de resolução de system prompts, a diretiva pode ser sobrescrita.
+- **Scope**: ALIGN-34 (subagent prompt injection)
+- **Date**: 2026-06-29
+- **Status**: active
+- **Refines**: AD-003 — subagentes continuam sem receber prompts de **roteamento**, mas agora recebem diretivas comportamentais

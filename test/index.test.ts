@@ -37,6 +37,27 @@ function makeCtx(directory: string, client: PluginInput['client'] = {} as Plugin
   };
 }
 
+type PluginInstance = Awaited<ReturnType<typeof tierRouterPlugin>>;
+
+type SystemTransformInput = Parameters<
+  NonNullable<PluginInstance['experimental.chat.system.transform']>
+>[0];
+
+function systemTransformInput(sessionID?: string): SystemTransformInput {
+  return {
+    sessionID,
+    model: {} as unknown as SystemTransformInput['model'],
+  };
+}
+
+function callSystemTransform(
+  plugin: PluginInstance,
+  input: SystemTransformInput,
+  output: { system?: string[] },
+): Promise<void> {
+  return plugin['experimental.chat.system.transform']?.(input, output as never) ?? Promise.resolve();
+}
+
 function textOf(parts: TextPart[] | undefined): string {
   return parts?.map((p) => p.text).join('\n') ?? '';
 }
@@ -475,6 +496,107 @@ describe('tierRouterPlugin', () => {
     expect(systemPrompt).toContain('--- Task Delegation Reference ---');
     expect(systemPrompt).not.toContain('HARD-BLOCK ACTIVE');
     expect(systemPrompt).not.toContain('Routing hint');
+  });
+
+  it('ALIGN-01/02: subagent session recebe diretivas comportamentais no system transform', async () => {
+    const plugin = await tierRouterPlugin(makeCtx(projectDir));
+    await plugin['chat.message']?.(
+      { sessionID: 'sub-align', agent: 'fast' },
+      {
+        message: {
+          role: 'user',
+          id: 'm-sub-align',
+          sessionID: 'sub-align',
+          time: { created: 0 },
+          agent: 'fast',
+          model: { providerID: 'github-copilot', modelID: 'claude-haiku-4.5' },
+        },
+        parts: [],
+      },
+    );
+
+    const systemOut: { system?: string[] } = {};
+    await callSystemTransform(plugin, systemTransformInput('sub-align'), systemOut);
+
+    const prompt = systemOut.system?.join('\n') ?? '';
+    expect(prompt).toContain('Do not dispatch sub-sub-agents');
+    expect(prompt).toContain('Do not ask the user questions unless blocked');
+  });
+
+  it('ALIGN-04: main session nao recebe diretivas de subagente', async () => {
+    const plugin = await tierRouterPlugin(makeCtx(projectDir));
+
+    const systemOut: { system?: string[] } = {};
+    await callSystemTransform(plugin, systemTransformInput('main-align'), systemOut);
+
+    const prompt = systemOut.system?.join('\n') ?? '';
+    expect(prompt).not.toContain('Do not dispatch sub-sub-agents');
+    expect(prompt).not.toContain('Do not ask the user questions unless blocked');
+  });
+
+  it('ALIGN-05: hard-block message permanece intacta para sessoes bloqueadas', async () => {
+    const plugin = await tierRouterPlugin(makeCtx(projectDir));
+
+    await plugin['chat.message']?.(
+      { sessionID: 'main-hb-align', agent: 'build' },
+      {
+        message: {
+          role: 'user',
+          id: 'm-hb-align',
+          sessionID: 'main-hb-align',
+          time: { created: 0 },
+          agent: 'build',
+          model: { providerID: 'github-copilot', modelID: 'gpt-5.3-codex' },
+          summary: { title: 'review architecture thoroughly', diffs: [] },
+        },
+        parts: [{ type: 'text', text: 'review architecture thoroughly' } as unknown as TextPart],
+      },
+    );
+
+    const systemOut: { system?: string[] } = { system: [] };
+    await callSystemTransform(plugin, systemTransformInput('main-hb-align'), systemOut);
+
+    const prompt = systemOut.system?.join('\n') ?? '';
+    expect(prompt).toContain('HARD-BLOCK ACTIVE');
+    expect(prompt).not.toContain('Do not dispatch sub-sub-agents');
+  });
+
+  it('ALIGN-06: output.system undefined nao causa crash em sessao de subagente', async () => {
+    const plugin = await tierRouterPlugin(makeCtx(projectDir));
+    await plugin['chat.message']?.(
+      { sessionID: 'sub-undefined', agent: 'fast' },
+      {
+        message: {
+          role: 'user',
+          id: 'm-sub-undefined',
+          sessionID: 'sub-undefined',
+          time: { created: 0 },
+          agent: 'fast',
+          model: { providerID: 'github-copilot', modelID: 'claude-haiku-4.5' },
+        },
+        parts: [],
+      },
+    );
+
+    const systemOut: { system?: string[] } = {};
+    await expect(
+      callSystemTransform(plugin, systemTransformInput('sub-undefined'), systemOut),
+    ).resolves.not.toThrow();
+
+    expect(systemOut.system).toBeDefined();
+    expect(systemOut.system!.join('\n')).toContain('Do not dispatch sub-sub-agents');
+  });
+
+  it('ALIGN-07: sessionID undefined nao causa crash', async () => {
+    const plugin = await tierRouterPlugin(makeCtx(projectDir));
+
+    const systemOut: { system?: string[] } = { system: [] };
+    await expect(
+      callSystemTransform(plugin, systemTransformInput(), systemOut),
+    ).resolves.not.toThrow();
+
+    const prompt = systemOut.system?.join('\n') ?? '';
+    expect(prompt).not.toContain('Do not dispatch sub-sub-agents');
   });
 
   it('expoe ferramenta customizada router_status com estado atual do roteador', async () => {
