@@ -1,38 +1,33 @@
 # opencode-tier-router-plugin
 
-🚀 **Plugin para OpenCode** que faz **roteamento inteligente por tiers de modelo** (`@fast`, `@medium`, `@heavy`) com base no tipo de tarefa.
+Plugin para OpenCode que roteia tarefas entre tiers de modelo: `@fast`, `@medium` e `@heavy`.
 
-Objetivo: manter a qualidade das respostas e delegar trabalho ao modelo mais adequado, sem infraestrutura externa (proxy/router separado).
+Objetivo: manter a qualidade das respostas e delegar trabalho ao modelo mais adequado, sem infraestrutura externa. O plugin roda como plugin do OpenCode, usando hooks de runtime para classificar a tarefa, injetar contexto no prompt e aplicar enforcement.
 
-## ✨ Principais Recursos
+## Principais recursos
 
-- 🎯 **Roteamento por tier**: Classifica automaticamente e delega para o modelo mais adequado
-- 🔒 **Hard-block enforcement**: Bloqueio real de ferramentas via `permission.ask` + `event` hook, com toast de notificação
-- ⚡ **Caps & redundância**: Monitora uso de leitura e detecta trabalho redundante
-- 🧩 **Plugin hooks**: Integração nativa com OpenCode via hooks existentes
-- 🚫 **Sem corrente de delegação**: Subagentes não podem delegar para outros subagentes — executam diretamente
-
----
+- Roteamento por tier com classificação por palavras-chave e, opcionalmente, por selector LLM.
+- Enforcement configurável: `advisory` para orientação ou `hard-block` para exigir delegação.
+- Mapeamento de agentes nativos: `explore -> @fast`, `build -> @medium`, `general -> @heavy`, `plan -> @heavy`.
+- Persistência simples de modo via `tiers.json`; sem arquivo de estado separado.
+- Caps e redundância para chamadas somente leitura em subagentes.
+- Hooks de plugin integrados ao runtime OpenCode.
+- Subagents não recebem prompts do router e não podem delegar para outros subagents.
 
 ## Visão geral
 
-O plugin:
+O fluxo atual é:
 
-1. Lê a configuração de `tiers.json`
-2. Injeta um protocolo de delegação no system prompt
-3. Classifica tarefas por palavras-chave (`taskPatterns`)
-4. Aplica fallback de seleção (`llm -> keyword -> defaultTier`)
-5. Aplica controles de uso (caps e redundância) em subagentes
-6. Aplica enforcement para exigir delegação
-
-Também mapeia agentes nativos do OpenCode para tiers:
-
-- `explore -> @fast`
-- `build -> @medium`
-- `general -> @heavy`
-- `plan -> @heavy`
-
----
+1. Carrega `tiers.json` pelo projeto, fallback global ou defaults internos.
+2. Registra os agents/tiers no hook `config`.
+3. Classifica mensagens do chat por `taskPatterns`, lexicon simples e, se configurado, por selector LLM.
+4. Injeta no prompt do sistema:
+   - protocolo informativo de delegação quando não está em hard-block;
+   - mensagem forte de hard-block quando `enforcement.mode = "hard-block"`.
+5. Aplica fallback de enforcement via `permission.ask`, `event` e `tool.execute.before` para sessões principais bloqueadas.
+6. Permite subagents executarem diretamente, mas impede subagents de chamarem `task()`.
+7. Rastreia caps e chamadas redundantes para ferramentas somente leitura.
+8. Preserva estado de router em compactação de sessão.
 
 ## Instalação
 
@@ -40,6 +35,7 @@ Também mapeia agentes nativos do OpenCode para tiers:
 
 - Node.js 18+
 - OpenCode com suporte a plugins
+- Dependências do projeto instaladas localmente
 
 ### Build
 
@@ -48,7 +44,7 @@ npm install
 npm run build
 ```
 
-Saída principal: `dist/index.js`
+A saída principal fica em `dist/index.js`, indicada também por `"main": "dist/index.js"` no `package.json`.
 
 ### Como ativar no OpenCode
 
@@ -62,7 +58,7 @@ No `opencode.json` do projeto onde você vai usar:
 }
 ```
 
-Alternativa (apontando para build):
+Alternativa apontando diretamente para o build:
 
 ```json
 {
@@ -72,23 +68,24 @@ Alternativa (apontando para build):
 }
 ```
 
-Depois, reinicie a sessão e rode:
+Depois, reinicie a sessão do OpenCode e confirme:
 
 ```text
+/router
 /tiers
 ```
 
----
-
 ## Configuração (`tiers.json`)
 
-Ordem de resolução:
+### Ordem de resolução
 
-1. `./tiers.json` (projeto atual)
-2. `~/.config/opencode/tiers.json` (global)
-3. defaults internos do plugin
+1. `./tiers.json` no diretório atual do projeto, quando existe.
+2. `~/.config/opencode/tiers.json` global, quando não há arquivo local.
+3. Defaults internos do plugin, quando não há arquivo em nenhum lugar.
 
-### Exemplo completo
+A função de resolução retorna o caminho local do projeto quando nenhum arquivo existe, para que comandos como `/budget` possam criar e persistir `tiers.json` no projeto.
+
+### Exemplo atual
 
 ```json
 {
@@ -124,26 +121,26 @@ Ordem de resolução:
   },
   "modes": {
     "normal": {
-      "description": "Balanced routing",
+      "description": "Balanced routing: fast for search, medium for implementation, heavy for architecture/debug",
       "defaultTier": "medium"
     },
     "budget": {
-      "description": "Cost-first",
+      "description": "Cost-first: prefer @fast whenever possible",
       "defaultTier": "fast"
     },
     "quality": {
-      "description": "Quality-first",
+      "description": "Quality-first: prefer @medium and @heavy over @fast",
       "defaultTier": "medium"
     },
     "deep": {
-      "description": "Depth-first",
+      "description": "Depth-first: route architecture and debug tasks to @heavy",
       "defaultTier": "heavy"
     }
   },
   "taskPatterns": {
-    "fast": ["find", "grep", "search", "read", "list", "buscar", "busque", "procurar", "procure", "ler", "leia", "listar", "liste"],
-    "medium": ["implement", "refactor", "fix", "update", "create", "implementar", "refatorar", "corrigir", "atualizar", "criar", "validar"],
-    "heavy": ["design", "architecture", "debug", "analyze", "quality", "review", "arquitetura", "depurar", "analisar", "qualidade", "revisar"]
+    "fast": ["find", "grep", "search", "where", "locate", "list", "show", "read", "explore", "buscar", "busque", "busca", "procurar", "procure", "procura", "ler", "leia", "listar", "liste", "mostrar", "mostre"],
+    "medium": ["refactor", "implement", "add", "write", "fix", "update", "change", "create", "edit", "rename", "implementar", "refatorar", "adicionar", "corrigir", "atualizar", "criar", "editar", "renomear", "validar"],
+    "heavy": ["design", "architecture", "debug", "complex", "explain", "reason", "analyze", "optimize", "quality", "review", "arquitetura", "depurar", "complexo", "analisar", "otimizar", "qualidade", "revisar", "diagnosticar"]
   },
   "enforcement": {
     "mode": "hard-block",
@@ -158,140 +155,223 @@ Ordem de resolução:
 }
 ```
 
----
+### Campos suportados
+
+| Campo | Valores | Obrigatório | Observações |
+|---|---|---:|---|
+| `mode` | string | Sim | Modo ativo. Deve existir dentro de `modes`. |
+| `tiers.<tier>.model` | `provider/model` | Sim | Modelo usado pelo tier. Validação é apenas de formato. |
+| `tiers.<tier>.costRatio` | número > 0 | Sim | Sinal relativo de custo para escolha de tier. |
+| `tiers.<tier>.cap` | número > 0 | Sim | Limite de chamadas somente leitura para banners/caps. |
+| `tiers.<tier>.thresholds` | `{ min: number, max: number | null }` | Não | Limites opcionais de tokens para cada tier. |
+| `modes.<mode>.description` | string | Não | Texto legível exibido em `/tiers`. |
+| `modes.<mode>.defaultTier` | `fast`, `medium` ou `heavy` | Sim | Tier usado quando nenhuma classificação corresponde. |
+| `taskPatterns.fast` | lista de strings | Sim | Keywords para `@fast`; não pode estar vazia. |
+| `taskPatterns.medium` | lista de strings | Sim | Keywords para `@medium`; não pode estar vazia. |
+| `taskPatterns.heavy` | lista de strings | Sim | Keywords para `@heavy`; não pode estar vazia. |
+| `enforcement.mode` | `advisory` ou `hard-block` | Sim | Padrão do plugin fallback: `hard-block`. |
+| `enforcement.trivialDirectAllowed` | boolean | Sim | Padrão do plugin fallback: `false`. |
+| `routing.strategy` | `keyword` ou `llm` | Sim | Padrão do plugin fallback: `keyword`; o `tiers.json` atual usa `llm`. |
+| `routing.selectorModel` | `provider/model` | Sim | Modelo usado quando `routing.strategy = "llm"`. |
+| `routing.selectorTimeoutMs` | número > 0 | Sim | Timeout do selector LLM em milissegundos. |
+| `routing.selectorMaxTokens` | número > 0 | Sim | Limite de tokens de saída do selector LLM. |
+
+### Persistência
+
+- `mode` é persistido em `tiers.json` quando usado o comando `/budget <normal|budget|quality|deep>`.
+- Alterações manuais em `tiers.json` são aplicadas quando o plugin recarrega/reinicia.
+- Estado de `router on/off`, caps, sessões hard-blockadas e tier preferido da sessão ficam em memória.
+- `/router off` desativa os hooks de roteamento e limpa o estado de router da sessão; ele não remove prompts de system que já tenham sido injetados antes do comando.
+- Não há arquivo de estado separado para o router.
 
 ## Opções possíveis
 
-| Campo | Valores | Efeito |
-|---|---|---|
-| `mode` | `normal`, `budget`, `quality`, `deep` | Seleciona perfil de roteamento |
-| `tiers.<tier>.model` | `provider/model` | Modelo usado no tier |
-| `tiers.<tier>.costRatio` | número > 0 | Sinal de custo para decisão |
-| `tiers.<tier>.cap` | número > 0 | Limite de leitura para banners/cap |
-| `tiers.<tier>.thresholds` | `{min, max}` | Limites de inputTokens para classificação automática |
-| `taskPatterns` | lista de keywords | Classificação por intenção |
-| `enforcement.mode` | `advisory`, `hard-block` | Advisory só orienta; hard-block nega execução direta quando necessário |
-| `enforcement.trivialDirectAllowed` | `true`, `false` | Em hard-block, permite/bloqueia tarefas triviais |
-| `routing.strategy` | `keyword`, `llm` | Seleção de tier por keyword ou por modelo rápido |
-| `routing.selectorModel` | `provider/model` | Modelo usado para seleção quando `strategy=llm` |
-| `routing.selectorTimeoutMs` | número > 0 | Timeout da seleção LLM |
-| `routing.selectorMaxTokens` | número > 0 | Limite de tokens para resposta do selector |
+### Modos
 
----
+- `normal`: balanceado; usa `@medium` como default.
+- `budget`: custo primeiro; prefere `@fast` sempre que possível.
+- `quality`: qualidade primeiro; prefere `@medium` e `@heavy` sobre `@fast`.
+- `deep`: profundidade primeiro; envia arquitetura/debug para `@heavy` e usa `@heavy` como default.
+
+### Enforcement
+
+| Modo | Comportamento |
+|---|---|
+| `advisory` | Injeta protocolo informativo e hint de roteamento. Não bloqueia execução direta. |
+| `hard-block` | Injeta prompt imperativo de hard-block e usa hooks de fallback para negar execução direta de ferramentas nativas na sessão principal. |
+
+### Strategy
+
+- `keyword`: classifica por `taskPatterns`, com fallback por lexicon e depois por `defaultTier`.
+- `llm`: chama `session.prompt()` com `routing.selectorModel`; se falhar ou timeout, cai para keyword/lexicon/default.
 
 ## Comandos do plugin
 
-### Roteamento & Configuração
+Comandos realmente implementados no runtime:
 
 | Comando | O que faz |
 |---|---|
-| `/tiers` | Mostra configuração ativa (modo, enforcement, tiers e mapeamento de agentes) |
-| `/budget` | Lista modos disponíveis |
-| `/budget <mode>` | Troca modo e atualiza `tiers.json` |
-| `/router` | Mostra status do plugin (`on/off`) |
-| `/router on` | Liga o roteador |
-| `/router off` | Desliga o roteador |
+| `/tiers` | Mostra modo ativo, enforcement, strategy, mapeamento de agentes, tier preferido da sessão e tiers configurados. |
+| `/budget` | Lista modos disponíveis e marca o modo ativo. |
+| `/budget <normal|budget|quality|deep>` | Troca o modo ativo e salva `mode` em `tiers.json` no projeto. |
+| `/router` | Mostra se o router está `on` ou `off` na sessão atual. |
+| `/router on` | Ativa o router no estado em memória da sessão atual. |
+| `/router off` | Desativa os hooks de roteamento, limpa o estado de hard-block/preferência/caps e permite reativar com `/router on`. Não remove prompts já injetados antes do comando. |
 
----
+Ferramenta customizada disponível:
 
-## Advisory vs Hard-block
+| Ferramenta | O que faz |
+|---|---|
+| `router_status` | Retorna JSON com `enabled`, `mode`, `tiers` e `hardBlockCount`. |
+
+Não existem comandos slash `/mode`, `/enforcement`, `/trivialDirectAllowed`, `/strategy`, `/reset` ou `/config`; altere esses campos em `tiers.json` e reinicie/recarregue o plugin para aplicar mudanças.
+
+## Advisory vs hard-block
 
 ### `advisory`
 
-- Injeta protocolo de delegação
-- Não bloqueia execução direta
-- Melhor para fluxo padrão
+- Injeta protocolo informativo com tiers, custos, modo e regras.
+- Injeta hint de roteamento quando um tier é pré-selecionado.
+- Não bloqueia execução direta na janela principal.
+- Útil quando você prefere que o modelo decida se executa diretamente ou delega.
 
 ### `hard-block`
 
-- Força delegação via **prompt** — `buildHardBlockMessage` injeta instruções imperativas no system prompt:
-  "YOUR FIRST AND ONLY ACTION: Call task. ALL TOOLS EXCEPT 'task' ARE PERMANENTLY DENIED."
-- Hooks `permission.ask` e `event` atuam como fallback para ferramentas que o runtime considera sensíveis
-- Native tools (`read`, `edit`, `glob`, `grep`, etc.) são auto-allowed pelo runtime
-- Com `trivialDirectAllowed=false` (padrão), **toda** tarefa precisa delegar
-- Com `trivialDirectAllowed=true`, tarefas triviais fast podem executar direto
+- Injeta `buildHardBlockMessage` no prompt da sessão principal.
+- Instrui o modelo a chamar `task` com `subagent_type` adequado e não executar ferramentas diretamente.
+- Usa fallbacks de runtime: `permission.ask`, `event` e `tool.execute.before` para negar ferramentas nativas da sessão principal bloqueada.
+- Adiciona hints de ferramenta via `tool.definition`, mas não substitui os hooks de permissão.
+- Subagents não recebem prompts do router e continuam executando diretamente.
+- Native tools do runtime não são controladas diretamente em todos os contextos: na sessão principal hard-blockada elas são negadas via hooks; em subagents, ferramentas nativas são permitidas.
 
----
+Com `enforcement.trivialDirectAllowed = false` (padrão), até tarefas rápidas e triviais devem ser delegadas para `@fast`.
 
-## Exemplos rápidos
+## Exemplos rápidos de fluxo
 
-- Busca simples (tende a `@fast`):
-  - `busque autenticação no projeto`
-- Implementação/refactor (tende a `@medium`):
-  - `refatore a função de login`
-- Arquitetura/debug/análise (tende a `@heavy`):
-  - `analyze code quality and propose architecture changes`
+1. Ver status:
 
----
+```text
+/router
+/tiers
+```
+
+2. Alternar modo e persistir em `tiers.json`:
+
+```text
+/budget quality
+```
+
+3. Delegar busca simples:
+
+```text
+busque autenticação no projeto
+```
+
+Tende a `@fast` e deve ser delegado para o subagent de busca/leitura.
+
+4. Delegar implementação:
+
+```text
+refatore a função de login
+```
+
+Tende a `@medium`.
+
+5. Delegar arquitetura/debug:
+
+```text
+analise a arquitetura da API e proponha mudanças de qualidade
+```
+
+Tende a `@heavy`.
 
 ## Troubleshooting
 
-## 1) `Model not found`
+### `Model not found`
 
-O ID do modelo está inválido para seu provider. Verifique com `/models` e ajuste `tiers.json`.
+Verifique com `/tiers` e ajuste `tiers.<tier>.model` em `tiers.json`. Depois reinicie/recarregue o plugin para aplicar o novo modelo.
 
-## 2) Não está delegando
+### Não está delegando
 
-- Verifique `/tiers`
-- Ajuste `taskPatterns` para seu idioma/prompt real
-- Teste `enforcement.mode = "hard-block"`
+- Confirme que `/router` está `on`.
+- Confirme em `/tiers` que `enforcement.mode` é `hard-block`.
+- Se estiver em `advisory`, lembre que ele só orienta e não bloqueia execução direta.
+- Ajuste `taskPatterns` para o idioma e comandos reais do seu projeto.
+- Se `routing.strategy` for `llm`, confirme se `routing.selectorModel` existe no provider OpenCode.
 
-## 3) Delega, mas mantém modelo errado
+### Tarefas nativas foram bloqueadas
 
-Confirme em `/tiers` o mapeamento de agentes nativos (`explore/build/general/plan`) e os modelos de tiers.
+Na sessão principal com hard-block, isso é esperado. O fluxo correto é delegar para o tier indicado, por exemplo `@fast`, `@medium` ou `@heavy`.
 
-## 4) Aviso de `tiers.json` ausente
+### Mudanças em `tiers.json` não surtiram efeito
 
-Ausência de `tiers.json` é tratada com fallback de defaults. Para controle total, crie `tiers.json` no projeto.
+O plugin carrega a configuração no início da sessão/plugin. Edite `tiers.json` e reinicie ou recarregue o plugin. O comando `/budget` é a exceção para trocar `mode`, porque persiste e atualiza o modo em memória.
 
----
+### Hard-block está bloqueando demais
+
+Use `advisory` para modo consultivo ou altere `enforcement.trivialDirectAllowed` para `true` se quiser permitir tarefas triviais de `@fast` executarem diretamente na janela principal.
 
 ## Desenvolvimento
 
+Comandos disponíveis:
+
 ```bash
+npm install
 npm run build
 npm run typecheck
 npx vitest run
+npm run lint
+npm run format
+npm run precommit
 ```
 
-Estrutura principal:
+Descrição:
 
-### Core
+- `npm run build`: compila TypeScript para `dist/index.js`.
+- `npm run typecheck`: executa `tsc --noEmit` e `tsc --noEmit -p tsconfig.test.json`.
+- `npx vitest run`: executa todos os testes.
+- `npm run lint`: executa ESLint em `src/` e `test/`.
+- `npm run format`: verifica formatação com Prettier em `src/` e `test/`.
+- `npm run precommit`: executa typecheck, lint e format.
 
-- `src/index.ts` → hooks e comandos do plugin (config, chat.message, system.transform, permission.ask, event, tool.definition, tool.execute.after, command.execute.before)
-- `src/plugin-orchestrator.ts` → orquestração de hooks (SRP extraction)
-- `src/prompts.ts` → prompt builders (protocolo info, hard-block, routing hint)
-- `src/constants.ts` → constantes nomeadas (FALLBACK_CONFIG, regex, SESSION_TTL)
-- `src/narration.ts` → detecção de narração
+### Estrutura principal
 
-### Roteamento & Delegação
+#### Core
 
-- `src/router/config.ts` → load/validate/save de config
-- `src/router/classifier.ts` → classificação de tarefas por keywords
-- `src/router/selector.ts` → seletor de tier (keyword/LLM + fallback)
-- `src/router/caps.ts` → cap tracker + redundância + cleanup por sessão
-- `src/router/enforcement-validator.ts` → validação de enforcement
+- `src/index.ts` — ponto de entrada do plugin, hooks e ferramenta `router_status`.
+- `src/plugin-orchestrator.ts` — orquestra hooks, estado de sessão, hard-block, caps e compacts router state.
+- `src/prompts.ts` — builders de protocolo informativo, hard-block, hint de roteamento e anotação de narração.
+- `src/constants.ts` — constantes nomeadas para TTL, caps, custos e mensagens de hard-block.
+- `src/narration.ts` — detecção de narração em saída de texto.
 
-### Utilitários
+#### Roteamento, config e enforcement
 
-- `src/utils/logger.ts` → FileLogger (router-debug.log)
-- `src/utils/safe-json.ts` → parsing JSON seguro
+- `src/router/config.ts` — carregamento, validação e persistência de modo em `tiers.json`.
+- `src/router/selector.ts` — seleção por `keyword` ou `llm` com fallback.
+- `src/router/classifier.ts` — classificação por palavras-chave.
+- `src/router/permissions.ts` — matriz de permissões para `task`, ferramentas nativas e customizadas.
+- `src/router/caps.ts` — cap tracker e detecção de chamadas somente leitura redundantes.
+- `src/router/enforcement-validator.ts` — validação, assertiva e relatório de enforcement.
+- `src/router/types.ts` — tipos de estado preservado em compacts.
 
-### Testes
+#### Utilitários
 
-- `test/phase0-modules.spec.ts` → testes SRP
-- `test/enforcement-validator.spec.ts` → testes de validação de enforcement
-- `test/phase2-persistence.spec.ts` → testes de persistência e carregamento
-- `test/phase4-e2e.spec.ts` → testes de ciclo completo
-- `test/phase5-plugin-integration.spec.ts` → testes de integração plugin
-- `test/caps.test.ts` → testes de cap tracker
-- `test/config-thresholds.spec.ts` → testes de thresholds de configuração
-- `test/index.test.ts` → testes de integração do index
-- `test/lru-eviction.spec.ts` → testes de LRU eviction
-- `test/race-conditions.spec.ts` → testes de acesso concorrente
-- `ENFORCEMENT.md` → rules, architecture guarantees, security checklist
+- `src/utils/logger.ts` — `FileLogger`, grava logs em `router-debug.log`.
+- `src/utils/safe-json.ts` — parsing JSON seguro com limite de tamanho.
 
----
+#### Testes
+
+- `test/phase0-modules.spec.ts`
+- `test/enforcement-validator.spec.ts`
+- `test/phase2-persistence.spec.ts`
+- `test/phase4-e2e.spec.ts`
+- `test/phase5-plugin-integration.spec.ts`
+- `test/protocol.test.ts`
+- `test/caps.test.ts`
+- `test/config-thresholds.spec.ts`
+- `test/index.test.ts`
+- `test/lru-eviction.spec.ts`
+- `test/race-conditions.spec.ts`
 
 ## Licença
 

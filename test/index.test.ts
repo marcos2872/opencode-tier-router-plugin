@@ -416,6 +416,67 @@ describe('tierRouterPlugin', () => {
     expect(textOf(statusOut.parts)).toContain('off');
   });
 
+  it('/router off limpa hard-block e prompts antes de reativar', async () => {
+    const plugin = await tierRouterPlugin(makeCtx(projectDir));
+    await classifyHardBlocked(plugin, 'main-off-clear');
+
+    const statusTool = (plugin as unknown as { tool?: { router_status?: { execute: () => Promise<string> } } }).tool
+      ?.router_status;
+    const raw = await statusTool?.execute();
+    expect(JSON.parse(raw ?? '{}')).toEqual(expect.objectContaining({ enabled: true, hardBlockCount: 1 }));
+
+    const off = { command: '/router', sessionID: 'main-off-clear', arguments: 'off' };
+    await plugin['command.execute.before']?.(off, { parts: [] });
+
+    const disabledAskOut: { status: 'ask' | 'deny' | 'allow' } = { status: 'ask' };
+    await plugin['permission.ask']?.(
+      {
+        id: 'p-off-clear',
+        type: 'bash',
+        sessionID: 'main-off-clear',
+        messageID: 'm-off-clear',
+        title: 'run command',
+        metadata: {},
+        time: { created: 0 },
+      },
+      disabledAskOut,
+    );
+    expect(disabledAskOut.status).toBe('allow');
+
+    const systemOut = { system: [] as string[] };
+    await plugin['experimental.chat.system.transform']?.(
+      {
+        sessionID: 'main-off-clear',
+        model: {} as unknown as Parameters<
+          NonNullable<(typeof plugin)['experimental.chat.system.transform']>
+        >[0]['model'],
+      },
+      systemOut,
+    );
+    expect(systemOut.system).toHaveLength(0);
+
+    const on = { command: '/router', sessionID: 'main-off-clear', arguments: 'on' };
+    await plugin['command.execute.before']?.(on, { parts: [] });
+    const rawAfterOn = await statusTool?.execute();
+    const statusAfterOn = JSON.parse(rawAfterOn ?? '{}');
+    expect(statusAfterOn).toEqual(expect.objectContaining({ enabled: true, hardBlockCount: 0 }));
+
+    const systemOutAfterOn = { system: [] as string[] };
+    await plugin['experimental.chat.system.transform']?.(
+      {
+        sessionID: 'main-off-clear',
+        model: {} as unknown as Parameters<
+          NonNullable<(typeof plugin)['experimental.chat.system.transform']>
+        >[0]['model'],
+      },
+      systemOutAfterOn,
+    );
+    const systemPrompt = systemOutAfterOn.system.join('\n');
+    expect(systemPrompt).toContain('--- Task Delegation Reference ---');
+    expect(systemPrompt).not.toContain('HARD-BLOCK ACTIVE');
+    expect(systemPrompt).not.toContain('Routing hint');
+  });
+
   it('expoe ferramenta customizada router_status com estado atual do roteador', async () => {
     const plugin = await tierRouterPlugin(makeCtx(projectDir));
     const routerStatusTool = (
@@ -711,6 +772,45 @@ describe('tierRouterPlugin', () => {
           hardBlockReason:
             'Current agent maps to @medium, but this request was classified as @heavy. Redirect to @heavy.',
           kept: 'output-router-state',
+        },
+      },
+    });
+  });
+
+  it('/router off remove estado de roteamento da compactacao', async () => {
+    const plugin = await tierRouterPlugin(makeCtx(projectDir));
+    await classifyHardBlocked(plugin, 'main-off-compact');
+
+    const output = {
+      context: {
+        router: { preferredTier: 'old', hardBlockedTier: 'heavy', kept: 'keep-me' },
+      },
+    };
+    await plugin['experimental.session.compacting']?.(
+      {
+        sessionID: 'main-off-compact',
+        context: output.context,
+      } as unknown as Parameters<NonNullable<(typeof plugin)['experimental.session.compacting']>>[0],
+      output as unknown as Parameters<NonNullable<(typeof plugin)['experimental.session.compacting']>>[1],
+    );
+
+    await plugin['command.execute.before']?.(
+      { command: '/router', sessionID: 'main-off-compact', arguments: 'off' },
+      { parts: [] },
+    );
+
+    await plugin['experimental.session.compacting']?.(
+      {
+        sessionID: 'main-off-compact',
+        context: output.context,
+      } as unknown as Parameters<NonNullable<(typeof plugin)['experimental.session.compacting']>>[0],
+      output as unknown as Parameters<NonNullable<(typeof plugin)['experimental.session.compacting']>>[1],
+    );
+
+    expect(output).toEqual({
+      context: {
+        router: {
+          kept: 'keep-me',
         },
       },
     });

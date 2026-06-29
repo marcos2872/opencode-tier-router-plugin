@@ -1,6 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  // "plugin": ["/home/marcos/Projects/opencode-router-model/dist/index.js"],
+  "plugin": ["/home/marcos/Projects/opencode-router-model/dist/index.js"],
   "model": "opencode/big-pickle",
   "provider": {
     "llama.cpp": {

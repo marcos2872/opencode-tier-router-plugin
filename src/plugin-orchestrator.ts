@@ -314,13 +314,58 @@ export class PluginOrchestrator {
     return context;
   }
 
+  private removeRouterStateFromCompactionContext(outputContext: unknown): unknown {
+    if (Array.isArray(outputContext)) return outputContext;
+
+    const context = outputContext ?? {};
+    const router = (context as Record<string, unknown>).router as Record<string, unknown> | undefined;
+    if (!router) return outputContext;
+
+    for (const key of ['preferredTier', 'selectionSource', 'hardBlockedTier', 'hardBlockReason'] as const) {
+      delete router[key];
+    }
+
+    if (Object.keys(router).length === 0) delete (context as Record<string, unknown>).router;
+    return context;
+  }
+
   async handleSessionCompacting(input: SessionCompactingInput, output: SessionCompactingOutput): Promise<void> {
-    if (!this.enabled || !input.sessionID) return;
+    if (!input.sessionID) return;
+    if (!this.enabled) {
+      this.clearSessionRouterState(input.sessionID);
+      output.context = this.removeRouterStateFromCompactionContext(output.context);
+      return;
+    }
 
     const routerState = this.getRouterStateForSession(input.sessionID);
     if (Object.keys(routerState).length === 0) return;
 
     output.context = this.applyRouterStateToCompactionContext(output.context, routerState);
+  }
+
+  private clearSessionRouterState(sessionID: string): void {
+    this.subagentSessions.delete(sessionID);
+    this.subagentTierMap.delete(sessionID);
+    this.hardBlockedSessions.delete(sessionID);
+    this.hardBlockReasons.delete(sessionID);
+    this.preferredTierSessions.delete(sessionID);
+    this.selectionSourceSessions.delete(sessionID);
+    this.capTracker.cleanup(sessionID);
+  }
+
+  private clearRouterState(): void {
+    this.capTracker.clear();
+    this.subagentSessions.clear();
+    this.subagentTierMap.clear();
+    this.hardBlockedSessions.clear();
+    this.hardBlockReasons.clear();
+    this.preferredTierSessions.clear();
+    this.selectionSourceSessions.clear();
+  }
+
+  private disableRouter(): void {
+    this.enabled = false;
+    this.clearRouterState();
   }
 
   private cleanupSessions(): void {
@@ -478,7 +523,7 @@ export class PluginOrchestrator {
             this.enabled = true;
             output.parts = [makeTextPart(input.sessionID, 'Tier router enabled.')];
           } else if (cmdArg === 'off') {
-            this.enabled = false;
+            this.disableRouter();
             output.parts = [makeTextPart(input.sessionID, 'Tier router disabled.')];
           } else {
             output.parts = [makeTextPart(input.sessionID, `Tier router is ${this.enabled ? 'on' : 'off'}.`)];
@@ -532,10 +577,7 @@ export class PluginOrchestrator {
 
       if (!this.enabled) {
         this.log.info('chat.message router disabled, returning early', { sessionID: input.sessionID });
-        this.hardBlockedSessions.delete(input.sessionID);
-        this.hardBlockReasons.delete(input.sessionID);
-        this.preferredTierSessions.delete(input.sessionID);
-        this.selectionSourceSessions.delete(input.sessionID);
+        this.clearSessionRouterState(input.sessionID);
         return;
       }
 
@@ -598,7 +640,10 @@ export class PluginOrchestrator {
 
   async handleSystemTransform(input: { sessionID?: string }, output: { system?: string[] }): Promise<void> {
     try {
-      if (!this.enabled) return;
+      if (!this.enabled) {
+        if (input.sessionID) this.clearSessionRouterState(input.sessionID);
+        return;
+      }
       if (input.sessionID && this.subagentSessions.has(input.sessionID)) return;
 
       const cfg = await this.loadConfig();
@@ -637,6 +682,7 @@ export class PluginOrchestrator {
   async handlePermissionAsk(input: { sessionID?: string; type?: string }, output: { status?: string }): Promise<void> {
     try {
       if (!this.enabled) {
+        if (input.sessionID) this.clearSessionRouterState(input.sessionID);
         output.status = 'allow';
         return;
       }
@@ -673,7 +719,15 @@ export class PluginOrchestrator {
 
   async handleEvent(input: { event: { type: string; properties?: Record<string, unknown> } }): Promise<void> {
     try {
-      if (!this.enabled) return;
+      if (!this.enabled) {
+        const props = input.event.properties as
+          | {
+              sessionID?: string;
+            }
+          | undefined;
+        if (props?.sessionID) this.clearSessionRouterState(props.sessionID);
+        return;
+      }
       const event = input.event;
 
       // The internal bus publishes "permission.asked"; the SDK type uses "permission.updated".
@@ -787,7 +841,10 @@ export class PluginOrchestrator {
     output: { allow?: boolean; message?: string; args?: unknown },
   ): Promise<void> {
     try {
-      if (!this.enabled) return;
+      if (!this.enabled) {
+        if (input.sessionID) this.clearSessionRouterState(input.sessionID);
+        return;
+      }
       if (!input.sessionID) return;
 
       if (this.subagentSessions.has(input.sessionID)) {
@@ -920,7 +977,7 @@ export class PluginOrchestrator {
           return;
         }
         if (args === 'off') {
-          this.enabled = false;
+          this.disableRouter();
           this.log.info('router command set enabled', { enabled: this.enabled, sessionID: input.sessionID });
           output.parts = [makeTextPart(input.sessionID, 'Tier router disabled.')];
           this.pendingCommandResponses.set(input.sessionID, output.parts);

@@ -766,7 +766,7 @@ Controla estratégia de seleção de tier.
 | `/budget <mode>` | Troca modo e atualiza `tiers.json` |
 | `/router` | Mostra status do plugin (`on/off`) |
 | `/router on` | Liga o roteador |
-| `/router off` | Desliga o roteador |
+| `/router off` | Desativa os hooks de roteamento, limpa o estado de hard-block/preferência/caps e permite reativar com `/router on`. Não remove prompts já injetados antes do comando. |
 
 ---
 

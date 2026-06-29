@@ -39,6 +39,13 @@ export interface CapTracker {
    * @returns Nada.
    */
   cleanup(sessionId: string): void;
+
+  /**
+   * Remove todos os dados de rastreamento de caps.
+   *
+   * @returns Nada.
+   */
+  clear(): void;
 }
 
 /**
@@ -102,6 +109,10 @@ export function createCapTracker(max = DEFAULT_MAX): CapTracker {
 
     cleanup(sessionId) {
       sessions.delete(sessionId);
+    },
+
+    clear() {
+      sessions.clear();
     },
   };
 }
