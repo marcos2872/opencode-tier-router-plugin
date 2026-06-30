@@ -85,11 +85,20 @@
 - **Status**: active
 - **Refines**: AD-001, AD-003 e AD-004 — substitui arquitetura hook-based/prompt-based por arquitetura de agente dedicado.
 
+### AD-016
+- **Decision**: Subagentes com `systemPrompt` próprio, configurável via `tiers.json`
+- **Reason**: O usuário decidiu que @fast, @medium e @heavy devem receber `systemPrompt` próprio na criação pelo plugin, com identidade do tier e regras fixas de não delegar e não perguntar. O Router deve passar instrução + contexto pela task(), sem repetir essas regras no prompt da task.
+- **Trade-off**: Remove a dependência do hook `experimental.chat.system.transform` para subagentes e elimina a race condition de `system.transform` vs `chat.message`; a personalização exige campos opcionais `fast.systemPrompt`, `medium.systemPrompt` e `heavy.systemPrompt` em `tiers.json`, com fallback para prompts padrão embutidos.
+- **Scope**: router-agent feature
+- **Date**: 2026-06-30
+- **Status**: active
+- **Refines**: AD-010 — substitui injeção de diretrizes por `handleSystemTransform` por `systemPrompt` nativo dos agentes subagentes.
+
 ## Handoff — router-agent
 
 ### Started
 - **router-agent** — Especificação, contexto e design inicializados no branch `feat/router-agent`.
-  - Status: specs committed; implementation pending.
+  - Status: specs updated for subagent `systemPrompt` via `tiers.json`; implementation pending.
   - Next: implement the simplified config-only plugin and update tests/docs accordingly.
 
 ## Implementation Summary — code-quality-refactor
