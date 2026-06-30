@@ -76,6 +76,22 @@
 - **Date**: 2026-06-29
 - **Status**: active
 
+### AD-015
+- **Decision**: Router-agent feature substitui hard-block por agente Router dedicado com permissões bloqueadas
+- **Reason**: O usuário solicitou migrar o plugin de hooks/routing para um modelo em que o Router apenas configura subagents e delega via task(), enquanto a execução fica nos subagents @fast, @medium e @heavy.
+- **Trade-off**: Remove interceptação hook-based e remove módulos de classifier/selector/enforcement/caps; depende da capacidade do runtime de criar agentes com permissões nativas.
+- **Scope**: router-agent feature
+- **Date**: 2026-06-30
+- **Status**: active
+- **Refines**: AD-001, AD-003 e AD-004 — substitui arquitetura hook-based/prompt-based por arquitetura de agente dedicado.
+
+## Handoff — router-agent
+
+### Started
+- **router-agent** — Especificação, contexto e design inicializados no branch `feat/router-agent`.
+  - Status: specs committed; implementation pending.
+  - Next: implement the simplified config-only plugin and update tests/docs accordingly.
+
 ## Implementation Summary — code-quality-refactor
 
 **Status**: ✅ **COMPLETED AND VERIFIED (PASS)**
