@@ -50,7 +50,7 @@ A mudança proposta substitui esse modelo por um agente Router dedicado: o plugi
 
 **Acceptance Criteria**:
 
-1. WHEN `tiers.json` é válido THEN o plugin SHALL criar um agente Router com `name = agentName`, `model = agentModel`, `permissions` com `task: allow`, `skill: allow` e demais ferramentas nativas de execução bloqueadas.
+1. WHEN `tiers.json` é válido THEN o plugin SHALL criar um agente Router com `name = agentName`, `model = agentModel`, `permissions` com `task: { allow: ['@fast', '@medium', '@heavy'] }`, `skill: allow` e demais ferramentas nativas de execução bloqueadas.
 2. WHEN `agentName` é omitido THEN o plugin SHALL usar `router` como nome do agente Router.
 3. WHEN `agentModel` é omitido THEN o plugin SHALL usar `opencode/big-pickle` como modelo do agente Router.
 4. WHEN `routerPrompt` é omitido THEN o plugin SHALL usar o prompt padrão do Router.
@@ -158,7 +158,7 @@ A mudança proposta substitui esse modelo por um agente Router dedicado: o plugi
 
 ## Acceptance Criteria Summary
 
-1. AC-001: Dado `tiers.json` válido, plugin cria agente Router com `name = agentName`, `model = agentModel`, `permissions` com `task: allow`, `skill: allow` e demais ferramentas nativas de execução bloqueadas.
+1. AC-001: Dado `tiers.json` válido, plugin cria agente Router com `name = agentName`, `model = agentModel`, `permissions` com `task: { allow: ['@fast', '@medium', '@heavy'] }`, `skill: allow` e demais ferramentas nativas de execução bloqueadas.
 2. AC-002: Dado `tiers.json` com `routerPrompt`, o system prompt do Router contém esse texto.
 3. AC-003: Dado `tiers.json` sem `routerPrompt`, um prompt padrão é usado.
 4. AC-004: Dado `tiers.json` válido, subagentes @fast/@medium/@heavy são criados com `permissions: allow`, `mode: subagent` e `systemPrompt` próprio.
@@ -176,7 +176,7 @@ A mudança proposta substitui esse modelo por um agente Router dedicado: o plugi
 ## Success Criteria
 
 - [ ] O plugin é configurado apenas no hook `config`.
-- [ ] O Router possui permissões nativas bloqueadas para ferramentas de execução.
+- [ ] O Router possui permissões nativas bloqueadas para ferramentas de execução e só pode delegar para `@fast`, `@medium` e `@heavy`.
 - [ ] O Router delega para @fast, @medium e @heavy por meio de `task()`.
 - [ ] A decisão de tier deixa de depender de `taskPatterns`, classifier, selector ou enforcement.
 - [ ] `routerPrompt`, `agentName` e `agentModel` são configuráveis via `tiers.json`.

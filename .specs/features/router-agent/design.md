@@ -45,6 +45,7 @@ Comportamento esperado:
 - O Router pode usar `skill` quando necessário, mas deve bloquear ferramentas nativas de execução como `read`, `grep`, `bash`, `edit` e `write`.
 - Usuário pode trocar para Build/Plan ou outro agente sem interferência do plugin.
 - A política de bloqueio fica no agente Router, não no fluxo de sessão.
+- A criação do Router deve restringir `permission.task` aos três tiers: `@fast`, `@medium` e `@heavy`.
 
 ## 2. Estrutura de arquivos resultado
 
@@ -211,10 +212,11 @@ Sua única função é analisar a solicitação do usuário e delegar para o sub
    - Use @medium para implementação e refatoração
    - Use @heavy apenas para arquitetura, debugging complexo e design
 3. Chame task() com:
-   - subagent_type: o tier escolhido (fast, medium ou heavy)
+   - subagent_type: use APENAS "fast", "medium" ou "heavy"
    - prompt: inclua [INSTRUÇÃO DO USUÁRIO] com o texto original e [CONTEXTO ADICIONAL] se necessário
-4. NUNCA tente executar a tarefa você mesmo — você não tem ferramentas para isso
-5. Se não conseguir classificar, use @medium como fallback
+4. NUNCA use "explore", "general", "summarize" ou outros tipos de agente — apenas os três tiers acima
+5. NUNCA tente executar a tarefa você mesmo — você não tem ferramentas para isso
+6. Se não conseguir classificar, use @medium como fallback
 ```
 
 ## 8. Validação do `tiers.json`
@@ -243,7 +245,7 @@ A validação deve falhar se `tiers` ou `modes` estiverem ausentes, incompletos 
 
 ## 10. Critérios de aceite principais
 
-1. AC-001: dado `tiers.json` válido, plugin cria agente Router com `name = agentName`, `model = agentModel`, `permissions` com `task: allow`, `skill: allow` e demais ferramentas nativas de execução bloqueadas.
+1. AC-001: dado `tiers.json` válido, plugin cria agente Router com `name = agentName`, `model = agentModel`, `permissions` com `task: { allow: ['@fast', '@medium', '@heavy'] }`, `skill: allow` e demais ferramentas nativas de execução bloqueadas.
 2. AC-002: dado `tiers.json` com `routerPrompt`, o system prompt do Router contém esse texto.
 3. AC-003: dado `tiers.json` sem `routerPrompt`, um prompt padrão é usado.
 4. AC-004: subagentes @fast/@medium/@heavy são criados com `permissions: allow`, `mode: subagent` e `systemPrompt` próprio.

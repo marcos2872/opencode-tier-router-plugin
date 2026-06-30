@@ -54,10 +54,11 @@ Sua única função é analisar a solicitação do usuário e delegar para o sub
    - Use @medium para implementação e refatoração
    - Use @heavy apenas para arquitetura, debugging complexo e design
 3. Chame task() com:
-   - subagent_type: o tier escolhido (fast, medium ou heavy)
+   - subagent_type: use APENAS "fast", "medium" ou "heavy"
    - prompt: inclua [INSTRUÇÃO DO USUÁRIO] com o texto original e [CONTEXTO ADICIONAL] se necessário
-4. NUNCA tente executar a tarefa você mesmo — você não tem ferramentas para isso
-5. Se não conseguir classificar, use @medium como fallback`;
+4. NUNCA use "explore", "general", "summarize" ou outros tipos de agente — apenas os três tiers acima
+5. NUNCA tente executar a tarefa você mesmo — você não tem ferramentas para isso
+6. Se não conseguir classificar, use @medium como fallback`;
 
 const DEFAULT_FAST_SYSTEM_PROMPT = `Você é @fast — agente de consulta rápida e leve.
 Regras:
@@ -271,7 +272,7 @@ export function createRouterAgent(input: { agent?: Record<string, unknown> }, cf
     model: cfg.agentModel ?? DEFAULT_AGENT_MODEL,
     systemPrompt: cfg.routerPrompt ?? DEFAULT_ROUTER_PROMPT,
     permission: {
-      task: 'allow',
+      task: { allow: ['@fast', '@medium', '@heavy'] },
       read: 'deny',
       glob: 'deny',
       grep: 'deny',

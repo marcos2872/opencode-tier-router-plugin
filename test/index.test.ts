@@ -102,7 +102,7 @@ describe('tierRouterPlugin', () => {
       model: 'opencode/big-pickle',
       systemPrompt: 'custom router prompt',
       permission: {
-        task: 'allow',
+        task: { allow: ['@fast', '@medium', '@heavy'] },
         read: 'deny',
         glob: 'deny',
         grep: 'deny',
