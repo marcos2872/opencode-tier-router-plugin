@@ -3,7 +3,14 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { ConfigError, loadConfig, type RouterConfig } from '../src/config.js';
+import {
+  ConfigError,
+  createRouterAgent,
+  createTierSubagents,
+  loadConfig,
+  overrideBuiltinAgents,
+  type RouterConfig,
+} from '../src/config.js';
 
 type RawConfig = Partial<RouterConfig> & {
   taskPatterns?: unknown;
@@ -117,6 +124,57 @@ describe('loadConfig', () => {
       expect(cfg.tiers.fast.systemPrompt).toContain('Você é @fast');
       expect(cfg.tiers.medium.systemPrompt).toContain('Você é @medium');
       expect(cfg.tiers.heavy.systemPrompt).toContain('Você é @heavy');
+    } finally {
+      await temp.cleanup();
+    }
+  });
+
+  it('overrides built-in explore and general agents to match fast and medium tiers', async () => {
+    const temp = await tempDir('router-agent-override-builtin-');
+    try {
+      const path = join(temp.dir, 'tiers.json');
+      writeConfig(path, validConfig);
+
+      const cfg = loadConfig(path);
+      const input: { agent?: Record<string, unknown> } = {
+        agent: {
+          explore: { model: 'wrong/explore-model', systemPrompt: 'wrong explore prompt', permission: { read: 'deny' } },
+          general: { model: 'wrong/general-model', systemPrompt: 'wrong general prompt', permission: { read: 'deny' } },
+        },
+      };
+
+      createRouterAgent(input, cfg);
+      createTierSubagents(input, cfg);
+      overrideBuiltinAgents(input, cfg);
+
+      expect(input.agent?.explore).toMatchObject({
+        model: 'custom/fast-model',
+        mode: 'subagent',
+        systemPrompt: 'custom fast prompt',
+        permission: expect.objectContaining({
+          read: 'allow',
+          glob: 'allow',
+          grep: 'allow',
+          list: 'allow',
+          bash: 'allow',
+          tool: 'allow',
+        }),
+        description: 'Fast tier subagent — consultas e exploração (override)',
+      });
+      expect(input.agent?.general).toMatchObject({
+        model: 'custom/medium-model',
+        mode: 'subagent',
+        systemPrompt: 'custom medium prompt',
+        permission: expect.objectContaining({
+          read: 'allow',
+          glob: 'allow',
+          grep: 'allow',
+          list: 'allow',
+          bash: 'allow',
+          tool: 'allow',
+        }),
+        description: 'Medium tier subagent — implementação e refatoração (override)',
+      });
     } finally {
       await temp.cleanup();
     }

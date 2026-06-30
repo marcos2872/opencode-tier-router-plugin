@@ -1,5 +1,5 @@
 import type { Config, Plugin, PluginInput } from '@opencode-ai/plugin';
-import { loadConfig, createRouterAgent, createTierSubagents } from './config.js';
+import { loadConfig, createRouterAgent, createTierSubagents, overrideBuiltinAgents } from './config.js';
 
 const plugin = (input: PluginInput) =>
   Promise.resolve({
@@ -10,6 +10,7 @@ const plugin = (input: PluginInput) =>
           createRouterAgent(config, cfg);
         }
         createTierSubagents(config, cfg);
+        overrideBuiltinAgents(config, cfg);
       } catch (e) {
         console.error(`[tier-router] config error:`, e);
       }

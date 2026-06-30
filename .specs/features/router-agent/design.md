@@ -170,7 +170,16 @@ Regras:
 };
 ```
 
-## 5. Formato do prompt do Router ao delegar
+## 5. Override de agentes built-in
+
+Para evitar que o Router escolha nomes built-in do OpenCode que não aparecem na política de subagents (`explore` e `general`), o plugin sobrescreve esses agentes no hook `config` depois de criar os tiers.
+
+- `explore` passa a usar a mesma `model`, `mode: subagent`, `systemPrompt` e permissões de `cfg.tiers.fast`.
+- `general` passa a usar a mesma `model`, `mode: subagent`, `systemPrompt` e permissões de `cfg.tiers.medium`.
+
+Essa sobreposição não altera a política do Router: ele ainda deve delegar apenas por `task()` com `subagent_type` igual a `fast`, `medium` ou `heavy`. O objetivo é garantir que qualquer escolha acidental do LLM para `explore` ou `general` tenha o mesmo comportamento dos tiers equivalentes.
+
+## 6. Formato do prompt do Router ao delegar
 
 Ao chamar `task()`, o Router deve formatar o prompt do subagente assim:
 
@@ -184,11 +193,11 @@ Ao chamar `task()`, o Router deve formatar o prompt do subagente assim:
 
 O Router **não** precisa repetir as regras do subagente no prompt da task, porque elas já estão no `systemPrompt` configurado na criação do subagente.
 
-## 6. Hooks removidos
+## 7. Hooks removidos
 
 `experimental.chat.system.transform` é removido porque os `systemPrompt` dos subagentes já estão configurados diretamente na criação dos agentes. Não há mais dependência da ordem de execução entre `experimental.chat.system.transform` e `chat.message` para injetar diretrizes nos subagentes.
 
-## 7. Prompt padrão do Router
+## 8. Prompt padrão do Router
 
 Quando `routerPrompt` não é fornecido, usar:
 
@@ -225,7 +234,7 @@ Você é o Router, um agente orquestrador que DELEGA TUDO para subagentes.
 6. Exemplo: se o usuário diz "veja como é feito em X" → task(subagent_type="fast", prompt="[INSTRUÇÃO DO USUÁRIO]: veja como é feito em X...")
 ```
 
-## 8. Validação do `tiers.json`
+## 9. Validação do `tiers.json`
 
 A validação deve garantir:
 
@@ -242,14 +251,14 @@ A validação deve garantir:
 
 A validação deve falhar se `tiers` ou `modes` estiverem ausentes, incompletos ou contendo valores incompatíveis com a nova arquitetura.
 
-## 9. Notas de segurança
+## 10. Notas de segurança
 
 - O Router deve ser configurado com permissões bloqueadas para ferramentas nativas de execução, mantendo `skill` como allow.
 - Subagentes devem continuar com ferramentas permitidas.
 - A configuração do plugin deve definir prompts em `systemPrompt` dos subagentes, não injetar prompts por hook.
 - A decisão de delegado fica no Router; não há enforcement adicional no runtime.
 
-## 10. Critérios de aceite principais
+## 11. Critérios de aceite principais
 
 1. AC-001: dado `tiers.json` válido, plugin cria agente Router com `name = agentName`, `model = agentModel`, `permissions` com `task: { allow: ['@fast', '@medium', '@heavy'] }`, `skill: allow` e demais ferramentas nativas de execução bloqueadas.
 2. AC-002: dado `tiers.json` com `routerPrompt`, o system prompt do Router contém esse texto.
@@ -265,3 +274,4 @@ A validação deve falhar se `tiers` ou `modes` estiverem ausentes, incompletos 
 12. AC-009: Router pode chamar `task()` para delegar a subagentes.
 13. AC-010: usuário pode editar `routerPrompt` no `tiers.json` e reiniciar para aplicar.
 14. AC-004c: usuário pode customizar os system prompts dos subagentes em `tiers.json`.
+15. AC-004d: os agentes built-in `explore` e `general` são sobrescritos para usar as configurações de `fast` e `medium`, respectivamente.

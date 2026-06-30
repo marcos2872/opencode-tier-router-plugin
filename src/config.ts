@@ -66,21 +66,21 @@ const DEFAULT_ROUTER_PROMPT = `Você é o Router, um agente orquestrador que DEL
 5. Se não conseguir classificar, use @medium como fallback
 6. Exemplo: se o usuário diz "veja como é feito em X" → task(subagent_type="fast", prompt="[INSTRUÇÃO DO USUÁRIO]: veja como é feito em X...")`;
 
-const DEFAULT_FAST_SYSTEM_PROMPT = `Você é @fast — agente de consulta rápida e leve.
+const DEFAULT_FAST_PROMPT = `Você é @fast — agente de consulta rápida e leve.
 Regras:
 - Seja direto e conciso, sem análise profunda
 - NÃO dispare sub-sub-agentes
 - NÃO pergunte ao usuário a menos que esteja bloqueado
 - Se a tarefa exigir análise complexa ou debug, avise que talvez precise do @medium ou @heavy`;
 
-const DEFAULT_MEDIUM_SYSTEM_PROMPT = `Você é @medium — agente de implementação e refatoração.
+const DEFAULT_MEDIUM_PROMPT = `Você é @medium — agente de implementação e refatoração.
 Regras:
 - Implemente, refatore, corrija e edite conforme solicitado
 - NÃO dispare sub-sub-agentes
 - NÃO pergunte ao usuário a menos que esteja bloqueado
 - Prefira soluções simples e diretas; para mudanças arquiteturais profundas, avise que @heavy pode ser mais adequado`;
 
-const DEFAULT_HEAVY_SYSTEM_PROMPT = `Você é @heavy — agente de análise profunda e arquitetura.
+const DEFAULT_HEAVY_PROMPT = `Você é @heavy — agente de análise profunda e arquitetura.
 Regras:
 - Analise, projete, debuge e otimize com profundidade
 - NÃO dispare sub-sub-agentes
@@ -101,19 +101,19 @@ const DEFAULT_CONFIG: RouterConfig = {
   tiers: {
     fast: {
       model: DEFAULT_TIER_MODELS.fast,
-      systemPrompt: DEFAULT_FAST_SYSTEM_PROMPT,
+      systemPrompt: DEFAULT_FAST_PROMPT,
       costRatio: 1,
       cap: 8,
     },
     medium: {
       model: DEFAULT_TIER_MODELS.medium,
-      systemPrompt: DEFAULT_MEDIUM_SYSTEM_PROMPT,
+      systemPrompt: DEFAULT_MEDIUM_PROMPT,
       costRatio: 5,
       cap: 12,
     },
     heavy: {
       model: DEFAULT_TIER_MODELS.heavy,
-      systemPrompt: DEFAULT_HEAVY_SYSTEM_PROMPT,
+      systemPrompt: DEFAULT_HEAVY_PROMPT,
       costRatio: 20,
       cap: 20,
     },
@@ -221,19 +221,19 @@ function normalizeConfig(config: unknown): RouterConfig {
     tiers: {
       fast: {
         model: cfg.tiers.fast?.model ?? DEFAULT_TIER_MODELS.fast,
-        systemPrompt: cfg.tiers.fast?.systemPrompt ?? DEFAULT_FAST_SYSTEM_PROMPT,
+        systemPrompt: cfg.tiers.fast?.systemPrompt ?? DEFAULT_FAST_PROMPT,
         costRatio: cfg.tiers.fast?.costRatio,
         cap: cfg.tiers.fast?.cap,
       },
       medium: {
         model: cfg.tiers.medium?.model ?? DEFAULT_TIER_MODELS.medium,
-        systemPrompt: cfg.tiers.medium?.systemPrompt ?? DEFAULT_MEDIUM_SYSTEM_PROMPT,
+        systemPrompt: cfg.tiers.medium?.systemPrompt ?? DEFAULT_MEDIUM_PROMPT,
         costRatio: cfg.tiers.medium?.costRatio,
         cap: cfg.tiers.medium?.cap,
       },
       heavy: {
         model: cfg.tiers.heavy?.model ?? DEFAULT_TIER_MODELS.heavy,
-        systemPrompt: cfg.tiers.heavy?.systemPrompt ?? DEFAULT_HEAVY_SYSTEM_PROMPT,
+        systemPrompt: cfg.tiers.heavy?.systemPrompt ?? DEFAULT_HEAVY_PROMPT,
         costRatio: cfg.tiers.heavy?.costRatio,
         cap: cfg.tiers.heavy?.cap,
       },
@@ -245,6 +245,31 @@ function normalizeConfig(config: unknown): RouterConfig {
 function readConfig(path: string): RouterConfig {
   const raw = readFileSync(path, 'utf8');
   return normalizeConfig(JSON.parse(raw));
+}
+
+function getTierSystemPrompt(tierName: TierName, tier: TierConfig): string {
+  return (
+    tier.systemPrompt ??
+    (tierName === 'fast' ? DEFAULT_FAST_PROMPT : tierName === 'medium' ? DEFAULT_MEDIUM_PROMPT : DEFAULT_HEAVY_PROMPT)
+  );
+}
+
+function getTierPermission(): Record<string, string> {
+  return {
+    task: 'allow',
+    read: 'allow',
+    glob: 'allow',
+    grep: 'allow',
+    list: 'allow',
+    bash: 'allow',
+    edit: 'allow',
+    write: 'allow',
+    webfetch: 'allow',
+    websearch: 'allow',
+    skill: 'allow',
+    question: 'allow',
+    tool: 'allow',
+  };
 }
 
 export function loadConfig(tiersJsonPath?: string): RouterConfig {
@@ -306,29 +331,33 @@ export function createTierSubagents(input: { agent?: Record<string, unknown> }, 
     input.agent[tierName] = {
       model: tier.model ?? DEFAULT_TIER_MODELS[tierName],
       mode: 'subagent',
-      systemPrompt:
-        tier.systemPrompt ??
-        (tierName === 'fast'
-          ? DEFAULT_FAST_SYSTEM_PROMPT
-          : tierName === 'medium'
-            ? DEFAULT_MEDIUM_SYSTEM_PROMPT
-            : DEFAULT_HEAVY_SYSTEM_PROMPT),
-      permission: {
-        task: 'allow',
-        read: 'allow',
-        glob: 'allow',
-        grep: 'allow',
-        list: 'allow',
-        bash: 'allow',
-        edit: 'allow',
-        write: 'allow',
-        webfetch: 'allow',
-        websearch: 'allow',
-        skill: 'allow',
-        question: 'allow',
-        tool: 'allow',
-      },
+      systemPrompt: getTierSystemPrompt(tierName, tier),
+      permission: getTierPermission(),
       description: `Tier router @${tierName} subagent`,
     };
   }
+}
+
+export function overrideBuiltinAgents(input: { agent?: Record<string, unknown> }, cfg: RouterConfig): void {
+  if (!input.agent) {
+    input.agent = {};
+  }
+
+  input.agent.explore = {
+    ...(input.agent.explore ?? {}),
+    model: cfg.tiers.fast.model,
+    mode: 'subagent',
+    systemPrompt: cfg.tiers.fast.systemPrompt ?? DEFAULT_FAST_PROMPT,
+    permission: getTierPermission(),
+    description: 'Fast tier subagent — consultas e exploração (override)',
+  };
+
+  input.agent.general = {
+    ...(input.agent.general ?? {}),
+    model: cfg.tiers.medium.model,
+    mode: 'subagent',
+    systemPrompt: cfg.tiers.medium.systemPrompt ?? DEFAULT_MEDIUM_PROMPT,
+    permission: getTierPermission(),
+    description: 'Medium tier subagent — implementação e refatoração (override)',
+  };
 }
