@@ -272,7 +272,7 @@ export function createRouterAgent(input: { agent?: Record<string, unknown> }, cf
     model: cfg.agentModel ?? DEFAULT_AGENT_MODEL,
     systemPrompt: cfg.routerPrompt ?? DEFAULT_ROUTER_PROMPT,
     permission: {
-      task: { allow: ['@fast', '@medium', '@heavy'] },
+      task: 'allow',
       read: 'deny',
       glob: 'deny',
       grep: 'deny',
