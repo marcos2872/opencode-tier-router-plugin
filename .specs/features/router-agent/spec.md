@@ -44,13 +44,13 @@ A mudança proposta substitui esse modelo por um agente Router dedicado: o plugi
 
 ### P1: Plugin configura Router dedicado com permissões bloqueadas ⭐ MVP
 
-**User Story**: Como usuário que quer delegar qualquer tarefa ao agente mais adequado, eu quero que o plugin crie um agente Router bloqueado para ferramentas nativas, para que ele só possa chamar ferramentas de task/delegação.
+**User Story**: Como usuário que quer delegar qualquer tarefa ao agente mais adequado, eu quero que o plugin crie um agente Router bloqueado para ferramentas nativas de execução, para que ele só possa chamar ferramentas de task/delegação e skill.
 
 **Why P1**: Essa é a mudança arquitetural central: substituir hard-block por permissão nativa do agente Router.
 
 **Acceptance Criteria**:
 
-1. WHEN `tiers.json` é válido THEN o plugin SHALL criar um agente Router com `name = agentName`, `model = agentModel`, `permissions` com `task: allow` e demais ferramentas bloqueadas.
+1. WHEN `tiers.json` é válido THEN o plugin SHALL criar um agente Router com `name = agentName`, `model = agentModel`, `permissions` com `task: allow`, `skill: allow` e demais ferramentas nativas de execução bloqueadas.
 2. WHEN `agentName` é omitido THEN o plugin SHALL usar `router` como nome do agente Router.
 3. WHEN `agentModel` é omitido THEN o plugin SHALL usar `opencode/big-pickle` como modelo do agente Router.
 4. WHEN `routerPrompt` é omitido THEN o plugin SHALL usar o prompt padrão do Router.
@@ -158,7 +158,7 @@ A mudança proposta substitui esse modelo por um agente Router dedicado: o plugi
 
 ## Acceptance Criteria Summary
 
-1. AC-001: Dado `tiers.json` válido, plugin cria agente Router com `name = agentName`, `model = agentModel`, `permissions` com `task: allow` e demais ferramentas bloqueadas.
+1. AC-001: Dado `tiers.json` válido, plugin cria agente Router com `name = agentName`, `model = agentModel`, `permissions` com `task: allow`, `skill: allow` e demais ferramentas nativas de execução bloqueadas.
 2. AC-002: Dado `tiers.json` com `routerPrompt`, o system prompt do Router contém esse texto.
 3. AC-003: Dado `tiers.json` sem `routerPrompt`, um prompt padrão é usado.
 4. AC-004: Dado `tiers.json` válido, subagentes @fast/@medium/@heavy são criados com `permissions: allow`, `mode: subagent` e `systemPrompt` próprio.

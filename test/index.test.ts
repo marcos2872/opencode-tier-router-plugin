@@ -112,7 +112,7 @@ describe('tierRouterPlugin', () => {
         write: 'deny',
         webfetch: 'deny',
         websearch: 'deny',
-        skill: 'deny',
+        skill: 'allow',
         question: 'deny',
         tool: 'deny',
       },

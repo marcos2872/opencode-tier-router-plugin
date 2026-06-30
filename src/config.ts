@@ -281,7 +281,7 @@ export function createRouterAgent(input: { agent?: Record<string, unknown> }, cf
       write: 'deny',
       webfetch: 'deny',
       websearch: 'deny',
-      skill: 'deny',
+      skill: 'allow',
       question: 'deny',
       tool: 'deny',
     },

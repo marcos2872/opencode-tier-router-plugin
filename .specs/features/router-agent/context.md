@@ -6,7 +6,7 @@ Este documento registra o contexto e as decisões já discutidas para a arquitet
 
 ### Decisão: substituir hard-block por agente Router dedicado
 
-Substituir hard-block via hooks por permissões nativas do agente Router. O Router deve ter ferramentas nativas bloqueadas e apenas `task` permitido.
+Substituir hard-block via hooks por permissões nativas do agente Router. O Router deve permitir `task` e `skill`, mantendo ferramentas nativas de execução bloqueadas.
 
 ### Decisão: routing via LLM do Router, não via classifier/selector
 
@@ -50,7 +50,7 @@ O plugin deve se concentrar em carregar e validar `tiers.json` e criar agentes n
 
 ### Decisão: bloqueio é nativo via permission do agente, não via hooks
 
-O bloqueio de ferramentas deve ser representado pela configuração do agente Router: `task: allow` e demais ferramentas `deny`.
+O bloqueio de ferramentas deve ser representado pela configuração do agente Router: `task: allow`, `skill: allow` e demais ferramentas nativas de execução `deny`.
 
 ### Decisão: outros agentes do usuário não são afetados
 

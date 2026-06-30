@@ -18,7 +18,7 @@ Plugin (OpenCode)
         │     name: agentName || "router"
         │     model: agentModel || "opencode/big-pickle"
         │     systemPrompt: routerPrompt || DEFAULT_ROUTER_PROMPT
-        │     permissions: { task: allow, demais: deny }
+        │     permissions: { task: allow, skill: allow, demais ferramentas nativas de execução: deny }
         │
         └── create subagents
               @fast  -> permissions: allow, mode: subagent, systemPrompt próprio
@@ -41,7 +41,8 @@ Subagent executam tarefa com suas ferramentas permitidas
 Comportamento esperado:
 
 - O plugin não intercepta `chat.message`, `permission.ask`, `tool.execute.before`, `event` ou hooks de prompt.
-- O Router não responde diretamente com ferramentas nativas; ele deve chamar `task()` para delegar.
+- O Router não responde diretamente com ferramentas nativas de execução; ele deve chamar `task()` para delegar.
+- O Router pode usar `skill` quando necessário, mas deve bloquear ferramentas nativas de execução como `read`, `grep`, `bash`, `edit` e `write`.
 - Usuário pode trocar para Build/Plan ou outro agente sem interferência do plugin.
 - A política de bloqueio fica no agente Router, não no fluxo de sessão.
 
@@ -256,14 +257,14 @@ A validação deve falhar se `tiers` ou `modes` estiverem ausentes, incompletos 
 
 ## 9. Notas de segurança
 
-- O Router deve ser configurado com permissões bloqueadas.
+- O Router deve ser configurado com permissões bloqueadas para ferramentas nativas de execução, mantendo `skill` como allow.
 - Subagentes devem continuar com ferramentas permitidas.
 - A configuração do plugin deve definir prompts em `systemPrompt` dos subagentes, não injetar prompts por hook.
 - A decisão de delegado fica no Router; não há enforcement adicional no runtime.
 
 ## 10. Critérios de aceite principais
 
-1. AC-001: dado `tiers.json` válido, plugin cria agente Router com `name = agentName`, `model = agentModel`, `permissions` com `task: allow` e demais ferramentas bloqueadas.
+1. AC-001: dado `tiers.json` válido, plugin cria agente Router com `name = agentName`, `model = agentModel`, `permissions` com `task: allow`, `skill: allow` e demais ferramentas nativas de execução bloqueadas.
 2. AC-002: dado `tiers.json` com `routerPrompt`, o system prompt do Router contém esse texto.
 3. AC-003: dado `tiers.json` sem `routerPrompt`, um prompt padrão é usado.
 4. AC-004: subagentes @fast/@medium/@heavy são criados com `permissions: allow`, `mode: subagent` e `systemPrompt` próprio.
