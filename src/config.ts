@@ -1,6 +1,6 @@
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 
 export type TierName = 'fast' | 'medium' | 'heavy';
 
@@ -127,9 +127,9 @@ const DEFAULT_CONFIG: RouterConfig = {
   },
 };
 
-async function pathExists(path: string): Promise<boolean> {
+function pathExists(path: string): boolean {
   try {
-    await readFile(path, 'utf8');
+    readFileSync(path, 'utf8');
     return true;
   } catch {
     return false;
@@ -234,25 +234,25 @@ function normalizeConfig(config: unknown): RouterConfig {
   };
 }
 
-async function readConfig(path: string): Promise<RouterConfig> {
-  const raw = await readFile(path, 'utf8');
+function readConfig(path: string): RouterConfig {
+  const raw = readFileSync(path, 'utf8');
   return normalizeConfig(JSON.parse(raw));
 }
 
-export async function loadConfig(tiersJsonPath?: string): Promise<RouterConfig> {
+export function loadConfig(tiersJsonPath?: string): RouterConfig {
   const projectPath = tiersJsonPath ?? join(process.cwd(), 'tiers.json');
   const globalPath = join(homedir(), '.config', 'opencode', 'tiers.json');
 
-  if (await pathExists(projectPath)) {
+  if (pathExists(projectPath)) {
     return readConfig(projectPath);
   }
 
-  if (await pathExists(globalPath)) {
+  if (pathExists(globalPath)) {
     return readConfig(globalPath);
   }
 
-  await mkdir(dirname(projectPath), { recursive: true });
-  await writeFile(projectPath, JSON.stringify(DEFAULT_CONFIG, null, 2), 'utf8');
+  mkdirSync(dirname(projectPath), { recursive: true });
+  writeFileSync(projectPath, JSON.stringify(DEFAULT_CONFIG, null, 2), 'utf8');
   return normalizeConfig(DEFAULT_CONFIG);
 }
 
