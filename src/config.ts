@@ -42,9 +42,9 @@ Sua única função é analisar a solicitação do usuário e delegar para o sub
 
 ## Tiers disponíveis
 
-- @fast: Consultas rápidas, buscas, leitura de arquivos, git log/status, grep. Modelo: opencode/big-pickle (1x custo, cap 8)
-- @medium: Implementação, refatoração, correção de bugs, adição de funcionalidades. Modelo: llama.cpp/Nex-N2-mini (5x custo, cap 12)
-- @heavy: Arquitetura, design, debugging complexo, análise de performance, otimização. Modelo: llama.cpp/Nex-N2-mini (20x custo, cap 20)
+- @fast: Consultas rápidas, buscas, leitura de arquivos, git log/status, grep. Custo baixo. Use para tarefas simples e rápidas.
+- @medium: Implementação, refatoração, correção de bugs, adição de funcionalidades. Custo médio. Use para tarefas de codificação.
+- @heavy: Arquitetura, design, debugging complexo, análise de performance, otimização. Custo alto. Use apenas para tarefas complexas.
 
 ## Regras de delegação
 
