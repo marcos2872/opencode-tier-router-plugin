@@ -5,7 +5,7 @@ const plugin = (input: PluginInput) =>
   Promise.resolve({
     config: async (config: Config) => {
       try {
-        const cfg = loadConfig();
+        const cfg = loadConfig(input.directory);
         if (cfg.agentName && !config.agent?.[cfg.agentName]) {
           createRouterAgent(config, cfg);
         }

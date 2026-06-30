@@ -1,6 +1,6 @@
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 
 export type TierName = 'fast' | 'medium' | 'heavy';
 
@@ -128,12 +128,13 @@ const DEFAULT_CONFIG: RouterConfig = {
 };
 
 function pathExists(path: string): boolean {
-  try {
-    readFileSync(path, 'utf8');
-    return true;
-  } catch {
-    return false;
-  }
+  return existsSync(path) && statSync(path).isFile();
+}
+
+function normalizeConfigPath(tiersJsonPath: string): string {
+  return existsSync(tiersJsonPath) && statSync(tiersJsonPath).isDirectory()
+    ? join(tiersJsonPath, 'tiers.json')
+    : tiersJsonPath;
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -240,7 +241,8 @@ function readConfig(path: string): RouterConfig {
 }
 
 export function loadConfig(tiersJsonPath?: string): RouterConfig {
-  const projectPath = tiersJsonPath ?? join(process.cwd(), 'tiers.json');
+  const requestedPath = tiersJsonPath ?? join(process.cwd(), 'tiers.json');
+  const projectPath = normalizeConfigPath(requestedPath);
   const globalPath = join(homedir(), '.config', 'opencode', 'tiers.json');
 
   if (pathExists(projectPath)) {
@@ -297,7 +299,13 @@ export function createTierSubagents(input: { agent?: Record<string, unknown> }, 
     input.agent[tierName] = {
       model: tier.model ?? DEFAULT_TIER_MODELS[tierName],
       mode: 'subagent',
-      systemPrompt: tier.systemPrompt ?? (tierName === 'fast' ? DEFAULT_FAST_SYSTEM_PROMPT : tierName === 'medium' ? DEFAULT_MEDIUM_SYSTEM_PROMPT : DEFAULT_HEAVY_SYSTEM_PROMPT),
+      systemPrompt:
+        tier.systemPrompt ??
+        (tierName === 'fast'
+          ? DEFAULT_FAST_SYSTEM_PROMPT
+          : tierName === 'medium'
+            ? DEFAULT_MEDIUM_SYSTEM_PROMPT
+            : DEFAULT_HEAVY_SYSTEM_PROMPT),
       permission: {
         task: 'allow',
         read: 'allow',
