@@ -1,163 +1,32 @@
 {
-  "mode": "normal",
+  "mode": "balanced",
+  "agentName": "router",
+  "agentModel": "opencode/big-pickle",
+  "routerPrompt": "Você é o Router, um agente orquestrador especializado em delegar tarefas para subagentes especializados.\n\nVocê NÃO tem permissão para ler arquivos, executar comandos, editar código ou acessar o projeto diretamente.\nSua única função é analisar a solicitação do usuário e delegar para o subagente mais adequado.\n\n## Tiers disponíveis\n\n- @fast: Consultas rápidas, buscas, leitura de arquivos, git log/status, grep. Modelo: opencode/big-pickle (1x custo, cap 8)\n- @medium: Implementação, refatoração, correção de bugs, adição de funcionalidades. Modelo: llama.cpp/Nex-N2-mini (5x custo, cap 12)\n- @heavy: Arquitetura, design, debugging complexo, análise de performance, otimização. Modelo: llama.cpp/Nex-N2-mini (20x custo, cap 20)\n\n## Regras de delegação\n\n1. Analise a solicitação do usuário e identifique o tipo de trabalho necessário\n2. Escolha o tier MAIS BARATO que atende à tarefa\n   - Use @fast para consultas, buscas, leitura e tarefas simples\n   - Use @medium para implementação e refatoração\n   - Use @heavy apenas para arquitetura, debugging complexo e design\n3. Chame task() com:\n   - subagent_type: o tier escolhido (fast, medium ou heavy)\n   - prompt: inclua [INSTRUÇÃO DO USUÁRIO] com o texto original e [CONTEXTO ADICIONAL] se necessário\n4. NUNCA tente executar a tarefa você mesmo — você não tem ferramentas para isso\n5. Se não conseguir classificar, use @medium como fallback",
   "tiers": {
     "fast": {
       "model": "opencode/big-pickle",
+      "systemPrompt": "Você é @fast — agente de consulta rápida e leve.\nRegras:\n- Seja direto e conciso, sem análise profunda\n- NÃO dispare sub-sub-agentes\n- NÃO pergunte ao usuário a menos que esteja bloqueado\n- Se a tarefa exigir análise complexa ou debug, avise que talvez precise do @medium ou @heavy",
       "costRatio": 1,
-      "cap": 8,
-      "thresholds": {
-        "min": 0,
-        "max": 2000
-      }
+      "cap": 8
     },
     "medium": {
       "model": "llama.cpp/Nex-N2-mini",
+      "systemPrompt": "Você é @medium — agente de implementação e refatoração.\nRegras:\n- Implemente, refatore, corrija e edite conforme solicitado\n- NÃO dispare sub-sub-agentes\n- NÃO pergunte ao usuário a menos que esteja bloqueado\n- Prefira soluções simples e diretas; para mudanças arquiteturais profundas, avise que @heavy pode ser mais adequado",
       "costRatio": 5,
-      "cap": 12,
-      "thresholds": {
-        "min": 2000,
-        "max": 10000
-      }
+      "cap": 12
     },
     "heavy": {
       "model": "llama.cpp/Nex-N2-mini",
+      "systemPrompt": "Você é @heavy — agente de análise profunda e arquitetura.\nRegras:\n- Analise, projete, debuge e otimize com profundidade\n- NÃO dispare sub-sub-agentes\n- NÃO pergunte ao usuário a menos que esteja bloqueado\n- Considere trade-offs, impacto no sistema todo, e documente decisões",
       "costRatio": 20,
-      "cap": 20,
-      "thresholds": {
-        "min": 10000,
-        "max": null
-      }
+      "cap": 20
     }
   },
   "modes": {
-    "normal": {
-      "description": "Balanced routing: fast for search, medium for implementation, heavy for architecture/debug",
-      "defaultTier": "medium"
-    },
-    "budget": {
-      "description": "Cost-first: prefer @fast whenever possible",
-      "defaultTier": "fast"
-    },
-    "quality": {
-      "description": "Quality-first: prefer @medium and @heavy over @fast",
-      "defaultTier": "medium"
-    },
-    "deep": {
-      "description": "Depth-first: route architecture and debug tasks to @heavy",
-      "defaultTier": "heavy"
-    }
+    "balanced": { "description": "Router decide o tier ideal baseado na tarefa", "defaultTier": "medium" },
+    "budget": { "description": "Router prefere @fast sempre que possível", "defaultTier": "fast" },
+    "quality": { "description": "Router prefere @medium ou @heavy", "defaultTier": "medium" }
   },
-  "taskPatterns": {
-    "fast": [
-      "find",
-      "grep",
-      "search",
-      "where",
-      "locate",
-      "list",
-      "show",
-      "read",
-      "explore",
-      "buscar",
-      "busque",
-      "busca",
-      "procurar",
-      "procure",
-      "procura",
-      "ler",
-      "leia",
-      "listar",
-      "liste",
-      "mostrar",
-      "mostre",
-      "git",
-      "branch",
-      "commit",
-      "log",
-      "diff",
-      "status",
-      "push",
-      "pull",
-      "merge",
-      "clone",
-      "onde",
-      "oque",
-      "como",
-      "qual",
-      "pergunta",
-      "duvida",
-      "doubt",
-      "arquivo",
-      "diretorio",
-      "pasta"
-    ],
-    "medium": [
-      "refactor",
-      "implement",
-      "add",
-      "write",
-      "fix",
-      "update",
-      "change",
-      "create",
-      "edit",
-      "rename",
-      "implementar",
-      "refatorar",
-      "adicionar",
-      "corrigir",
-      "atualizar",
-      "criar",
-      "editar",
-      "renomear",
-      "validar",
-      "compilar",
-      "compila",
-      "build"
-    ],
-    "heavy": [
-      "design",
-      "architecture",
-      "debug",
-      "complex",
-      "explain",
-      "reason",
-      "analyze",
-      "optimize",
-      "quality",
-      "review",
-      "arquitetura",
-      "depurar",
-      "complexo",
-      "analisar",
-      "otimizar",
-      "qualidade",
-      "revisar",
-      "diagnosticar",
-      "spec",
-      "specs",
-      "task",
-      "tasks",
-      "tasks.md",
-      "rule",
-      "rules",
-      "regra",
-      "regras",
-      "projeto",
-      "planejar",
-      "plan",
-      "especificacao",
-      "especificar"
-    ]
-  },
-  "enforcement": {
-    "mode": "hard-block",
-    "trivialDirectAllowed": false
-  },
-  "routing": {
-    "strategy": "llm",
-    "selectorModel": "opencode/big-pickle",
-    "selectorTimeoutMs": 1200,
-    "selectorMaxTokens": 16
-  }
+  "mode": "balanced"
 }
