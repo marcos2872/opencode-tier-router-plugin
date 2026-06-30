@@ -1,31 +1,11 @@
 {
-  "agentName": "router",
-  "agentModel": "opencode/big-pickle",
-  "routerPrompt": "Você é o Router, um orquestrador que DELEGA TUDO.\n\n⚠️ VOCÊ NÃO TEM ESTAS FERRAMENTAS (vão falhar):\nread, grep, glob, list, bash, edit, write, webfetch, websearch, question\n\n✅ VOCÊ SÓ PODE USAR: task()\n\n## Subagentes\n\n| Nome | Custo | Quando usar |\n|---|---|---|\n| \"fast\" ou \"explore\" | Baixo | Ler arquivos, grep, git, explorar diretórios, buscar |\n| \"medium\" ou \"general\" | Médio | Implementar, refatorar, corrigir bugs, criar testes |\n| \"heavy\" | Alto | Arquitetura, debug complexo, design, otimização |\n\n## Regras (obrigatórias)\n\n1. DELEGUE SEMPRE — nunca tente usar ferramentas diretamente\n2. PREÇO MÍNIMO — sempre escolha o subagente mais barato que resolve\n3. NÃO CRIE SUB-SUB-AGENTES — delegue direto, sem intermediários\n4. NÃO PERGUNTE AO USUÁRIO — a menos que esteja bloqueado sem informação\n5. DÚVIDA? → use \"medium\". Certeza de leitura? → \"fast\". Arquitetura? → \"heavy\"\n\n## Formato da chamada\n\ntask(subagent_type=\"fast\", prompt=\"[INSTRUÇÃO DO USUÁRIO]: texto... [CONTEXTO]: ...\")",
-  "tiers": {
-    "fast": {
-      "model": "opencode/big-pickle",
-      "systemPrompt": "Você é @fast — agente de consulta rápida e leve.\nRegras:\n- Seja direto e conciso, sem análise profunda\n- NÃO dispare sub-sub-agentes\n- NÃO pergunte ao usuário a menos que esteja bloqueado\n- Se a tarefa exigir análise complexa ou debug, avise que talvez precise do @medium ou @heavy",
-      "costRatio": 1,
-      "cap": 8
-    },
-    "medium": {
-      "model": "llama.cpp/Nex-N2-mini",
-      "systemPrompt": "Você é @medium — agente de implementação e refatoração.\nRegras:\n- Implemente, refatore, corrija e edite conforme solicitado\n- NÃO dispare sub-sub-agentes\n- NÃO pergunte ao usuário a menos que esteja bloqueado\n- Prefira soluções simples e diretas; para mudanças arquiteturais profundas, avise que @heavy pode ser mais adequado",
-      "costRatio": 5,
-      "cap": 12
-    },
-    "heavy": {
-      "model": "llama.cpp/Nex-N2-mini",
-      "systemPrompt": "Você é @heavy — agente de análise profunda e arquitetura.\nRegras:\n- Analise, projete, debuge e otimize com profundidade\n- NÃO dispare sub-sub-agentes\n- NÃO pergunte ao usuário a menos que esteja bloqueado\n- Considere trade-offs, impacto no sistema todo, e documente decisões",
-      "costRatio": 20,
-      "cap": 20
-    }
+  "explore": {
+    "model": "opencode/big-pickle"
   },
-  "modes": {
-    "balanced": { "description": "Router decide o tier ideal baseado na tarefa", "defaultTier": "medium" },
-    "budget": { "description": "Router prefere @fast sempre que possível", "defaultTier": "fast" },
-    "quality": { "description": "Router prefere @medium ou @heavy", "defaultTier": "medium" }
+  "general-medium": {
+    "model": "llama.cpp/Nex-N2-mini"
   },
-  "mode": "balanced"
+  "general-heavy": {
+    "model": "llama.cpp/Nex-N2-mini"
+  }
 }

@@ -1,334 +1,109 @@
-# opencode-tier-router-plugin — Documentação do Projeto
+# opencode-compose-plugin — Documentação do Projeto
 
 ## Visão Geral
 
-O **opencode-tier-router-plugin** é um plugin para OpenCode que implementa **roteamento inteligente de tarefas** para diferentes tiers de modelos de linguagem (`@fast`, `@medium`, `@heavy`) com o objetivo de manter a qualidade das respostas e usar o modelo mais adequado para cada tipo de trabalho.
-
-O plugin classifica automaticamente o tipo de tarefa solicitada pelo usuário e direciona para o modelo mais adequado, sem necessidade de infraestrutura externa (proxies, agentes dedicados ou routers separados).
-
-## Objetivo
-
-- **Reduzir custo**: até 83% de redução em cenários reais (referência: paper Agent-as-a-Router)
-- **Manter qualidade**: tarefas simples usam modelos rápidos/baratos; tarefas complexas usam modelos poderosos
-- **Zero fricção**: integração nativa via plugin OpenCode, sem infraestrutura adicional
-- **Transparência**: protocolo de delegação visível no system prompt
+Plugin para OpenCode que combina orquestração Compose, memória persistente BM25 e roteamento por tier de custo.
 
 ## Stack Tecnológica
 
 | Camada | Tecnologia |
 |--------|-----------|
-| Runtime | Node.js 18+ |
+| Runtime | Bun (OpenCode) |
 | Linguagem | TypeScript 5.7+ |
-| Build | tsc (TypeScript Compiler) |
-| Testes | Vitest 3.0 |
-| API | `@opencode-ai/plugin` (hooks do OpenCode) |
-| Configuração | JSON (tiers.json) |
+| Build | tsc |
+| SQLite | bun:sqlite (nativo) |
+| Busca | FTS5 (BM25) |
+| API | `@opencode-ai/plugin` |
 
-## Estrutura de Pastas
+## Estrutura
 
 ```
-opencode-tier-router-plugin/
-├── .agents/                   # Skills TLC (tlc-spec-driven)
-├── .specs/                    # Especificações e decisões arquiteturais
-│   ├── STATE.md               # Decisões ativas
-│   └── features/              # Features planejadas/implementadas
-├── dist/                      # Saída do build (dist/index.js)
-├── docs/                      # Documentação técnica
-│   ├── projeto.md             # Este arquivo
-│   └── arquitetura.md         # Decisões e componentes arquiteturais
+opencode-compose-plugin/
 ├── src/
-│   ├── index.ts               # Entry point: hooks e comandos do plugin
-│   ├── plugin-orchestrator.ts # Orquestração de hooks (SRP extraction)
-│   ├── prompts.ts             # Prompt builders (protocolo info, hard-block, routing hint)
-│   ├── narration.ts           # Detecção de narração vs. trabalho real
-│   ├── constants.ts           # Constantes nomeadas (FALLBACK_CONFIG, regex, SESSION_TTL)
-│   ├── router/
-│   │   ├── caps.ts            # Rastreamento de caps e detecção de redundância
-│   │   ├── classifier.ts      # Classificação de tarefas por keywords
-│   │   ├── config.ts          # Load/validate/save de tiers.json
-│   │   ├── enforcement-validator.ts # Validação e bloqueio de enforcement
-│   │   └── selector.ts        # Seleção de tier (keyword ou LLM) com fallback
-│   └── utils/
-│       ├── logger.ts          # FileLogger — logs em router-debug.log
-│       └── safe-json.ts       # Parsing JSON seguro com limite de tamanho
-├── test/                      # Testes unitários
-├── tiers.json                 # Configuração principal (tiers, modos, enforcement, routing)
-├── package.json               # Dependências e scripts
-├── tsconfig.json              # Config TypeScript (src)
-└── tsconfig.test.json         # Config TypeScript (test)
+│   ├── index.ts          # Plugin entry: config + tool hooks
+│   ├── config.ts         # Cria agentes compose/explore/general
+│   └── memory/
+│       ├── store.ts      # SQLite FTS5 (bun:sqlite)
+│       ├── tool.ts       # Ferramenta memory (search/write)
+│       └── reconcile.ts  # Indexa .md no SQLite
+├── agents/               # Definições dos agentes (.md)
+├── skills/compose/       # 16 skills de orquestração
+├── prompts/              # System prompts
+├── tiers.json            # Config de modelos
+└── package.json
 ```
 
-## Fluxo de Execução Principal
+## Agentes
 
-1. **Inicialização** (hook `config`):
-   - Carrega `tiers.json` (projeto local → global → defaults internos)
-   - Valida configuração e inicializa estado do plugin
+| Agente | Modo | Modelo default | Papel |
+|--------|------|----------------|-------|
+| `compose` | primary | opencode/big-pickle | Orquestrador com 16 skills |
+| `explore` | subagent | opencode/big-pickle | Leitura rápida |
+| `general-medium` | subagent | llama.cpp/Nex-N2-mini | Implementação |
+| `general-heavy` | subagent | llama.cpp/Nex-N2-mini | Arquitetura |
+| `checkpoint-writer` | hidden | — | Grava checkpoints |
+| `dream` | hidden | — | Consolida memória |
 
-2. **Mensagem do usuário** (hook `chat.message`):
-   - Analisa o texto da mensagem
-   - Classifica a tarefa usando `taskPatterns` (ou LLM selector se configurado)
-   - Determina o tier adequado (`@fast`, `@medium`, `@heavy`)
+## Memória
 
-3. **Transformação do system prompt** (hook `chat.system.transform`):
-   - Main não hard-blockada → mensagem de protocolo (`buildDelegationProtocol`)
-   - Main hard-blockada → **apenas** mensagem de hard-block (`buildHardBlockMessage`), **sem** protocolo
-   - Subagentes → recebem apenas diretivas específicas, nunca mensagens de router
+### Estrutura global
 
-4. **Controle de permissões** (hook `permission.ask`):
-   - Subagent → `output.status = 'allow'` (sem diálogo)
-   - Hard-blocked → `output.status = 'deny'` (sem diálogo)
-   - Sessão normal → runtime segue fluxo padrão
+```
+~/.config/opencode/memory/
+├── global/
+│   └── MEMORY.md                    ← dream cria
+├── projects/
+│   └── <project-id>/
+│       ├── memory.db                ← SQLite FTS5
+│       └── sessions/
+│           └── <session-id>/
+│               ├── checkpoint.md    ← checkpoint-writer cria
+│               └── tasks/
+│                   └── T1/
+│                       └── progress.md
+```
 
-5. **Evento de permissão** (hook `event`, escuta `permission.asked`):
-   - Hard-blocked → reject + toast "Tool blocked. Delegate to @tier"
-   - Subagent ou normal → auto-allow com `response: 'once'`
+### Fluxo
 
-6. **Controle de caps** (hooks `tool.execute.after`):
-   - Rastreia caps de leitura e detecta redundância
-   - Injeta banners `[cap:N/MAX]`, `[⚠ CAP WARNING]`, `[⚠ CAP REACHED]`
+1. **Agentes** (checkpoint-writer, dream) criam `.md` files
+2. **Memory tool** escreve no SQLite
+3. **Reconcile** lê `.md` e indexa no SQLite na inicialização
 
-7. **Comandos disponíveis**:
-   - `/tiers` — exibe configuração ativa
-   - `/budget` — lista modos ou troca modo
-   - `/router on|off` — liga/desliga o plugin
+### Uso
 
-## Fora de Escopo
+```
+memory({ operation: "search", query: "auth" })
+memory({ operation: "write", scope: "compose", path: "decisao.md", content: "..." })
+```
 
-- SDK OpenCode (`createOpencode()` / `createOpencodeClient()`) — N/A. Este plugin usa apenas runtime hooks e não instancia clients SDK.
+## Skills
 
-## Configuração (`tiers.json`)
+16 skills de compose: route, brainstorm, plan, tdd, debug, verify, review, execute, subagent, report, merge, parallel, worktree, feedback, ask, new-skill.
 
-O arquivo `tiers.json` controla todo o comportamento do plugin. Resolução em camadas:
+## Configuração
 
-1. `./tiers.json` (projeto local) — **prioridade máxima**
-2. `~/.config/opencode/tiers.json` (global)
-3. Defaults internos do plugin (FALLBACK_CONFIG em src/constants.ts)
-
-### Exemplo mínimo
+### tiers.json
 
 ```json
 {
-  "mode": "normal",
-  "tiers": {
-    "fast": { "model": "opencode/big-pickle", "costRatio": 1, "cap": 8 },
-    "medium": { "model": "llama.cpp/Nex-N2-mini", "costRatio": 5, "cap": 12 },
-    "heavy": { "model": "llama.cpp/Nex-N2-mini", "costRatio": 20, "cap": 20 }
-  },
-  "modes": {
-    "normal": { "description": "Balanced routing", "defaultTier": "medium" },
-    "budget": { "description": "Cost-first", "defaultTier": "fast" },
-    "quality": { "description": "Quality-first", "defaultTier": "medium" },
-    "deep": { "description": "Depth-first", "defaultTier": "heavy" }
-  },
-  "taskPatterns": {
-    "fast": ["find", "search", "read", "buscar", "procurar", "listar", "mostrar", "git/branch/commit/log/diff/status/push/pull/merge/clone/onde/oque/como/qual/pergunta/duvida/doubt/arquivo/diretorio/pasta"],
-    "medium": ["refactor", "implement", "fix", "criar", "corrigir", "editar", "validar", "build/compilar/compila"],
-    "heavy": ["design", "architecture", "debug", "analisar", "revisar", "diagnosticar", "spec/specs/task/tasks/tasks.md/rule/rules/regra/regras/projeto/planejar/plan/especificacao/especificar"]
-  },
-  "enforcement": {
-    "mode": "hard-block",
-    "trivialDirectAllowed": false
-  },
-  "routing": {
-    "strategy": "llm",
-    "selectorModel": "opencode/big-pickle",
-    "selectorTimeoutMs": 1200,
-    "selectorMaxTokens": 16
+  "explore": { "model": "opencode/big-pickle" },
+  "general-medium": { "model": "llama.cpp/Nex-N2-mini" },
+  "general-heavy": { "model": "llama.cpp/Nex-N2-mini" }
+}
+```
+
+### opencode.json
+
+```json
+{
+  "agent": {
+    "compose": { "mode": "primary" },
+    "explore": { "mode": "subagent", "model": "opencode/big-pickle" },
+    "general-medium": { "mode": "subagent", "model": "llama.cpp/Nex-N2-mini" },
+    "general-heavy": { "mode": "subagent", "model": "llama.cpp/Nex-N2-mini" }
   }
 }
 ```
-
-Ver [arquitetura.md](./arquitetura.md#configuração-tiers.json) para detalhes sobre cada campo.
-
-## Contrato: `tool.execute.before`
-
-O plugin registra o hook `tool.execute.before` em `src/index.ts` e decide no `PluginOrchestrator` antes que ferramentas nativas sensíveis sejam executadas.
-
-- **Sessões principais hard-blocked**: o runtime do OpenCode **ignora** `allow: false` em `tool.execute.before` (só `permission.ask` respeita esse campo). Portanto, em vez de negar, o plugin **redireciona os argumentos** da chamada da ferramenta.
-
-- **Mapeamento de redirect**:
-  | Ferramenta | Redirect aplicado |
-  |----------|-------------------|
-  | `bash` | `command = echo "<mensagem de delegação>"` |
-  | `read` | `filePath = /tmp/opencode-router/session-{id}.md` |
-  | `grep` | `include = /tmp/opencode-router`, `pattern = "Delegue para @"` |
-  | `glob` / `list` | `path = /tmp/opencode-router` |
-  | `edit` / `write` | `filePath = /dev/null` |
-  | demais | insere campo `_delegation` nos args |
-
-- **Tier dinâmico**: a mensagem de delegação usa o tier retornado pelo classificador/selector, não um valor fixo `@heavy`.
-
-- **Função `redirectToolArgs`**: mapeia o nome da ferramenta para os novos argumentos antes da execução, forçando a mensagem de delegação independentemente do comportamento padrão do runtime.
-
-- **Proteção de arquivos sensíveis**: `read|list|glob|grep|bash|edit|write` são tratados como operações sensíveis no fluxo do router. Quando uma sessão principal hard-blocked tenta executar qualquer ferramenta da lista, o plugin grava um evento de auditoria no `FileLogger` com `sessionID`, `callID` e `tool`.
-- **Subagentes**: se `sessionID` pertence a um subagente, o hook retorna `{ "allow": true }` imediatamente e não aplica bloqueio do router.
-- **Ferramentas não listadas**: como `task`, o fluxo permanece inalterado para sessões principais, permitindo a delegação esperada.
-
-## Comandos Úteis
-
-### Build
-
-```bash
-npm install          # Instala dependências
-npm run build        # Compila src/ → dist/index.js
-```
-
-### Verificação de Qualidade
-
-```bash
-npm run typecheck    # Verifica tipos (src + test)
-npm run test         # Roda testes unitários (vitest)
-npm run lint         # ESLint — zero erros
-npm run format       # Prettier — formata todo o código
-```
-
-### Gate Completo (CI-style)
-
-```bash
-npm run typecheck && npm run test
-```
-
-## Como Começar
-
-### 1. Instalar dependências
-
-```bash
-cd /home/marcos/Projects/opencode-router-model
-npm install
-```
-
-### 2. Fazer build
-
-```bash
-npm run build
-```
-
-### 3. Ativar no projeto OpenCode alvo
-
-No `opencode.json` do projeto onde você quer usar o router:
-
-```json
-{
-  "plugins": [
-    "/home/marcos/Projects/opencode-router-model"
-  ]
-}
-```
-
-ou
-
-```json
-{
-  "plugins": [
-    "/home/marcos/Projects/opencode-router-model/dist/index.js"
-  ]
-}
-```
-
-### 4. Reiniciar sessão OpenCode e testar
-
-```
-/tiers
-```
-
-Deve exibir a configuração ativa (modo, enforcement, tiers, mapeamento de agentes).
-
-### 5. Ajustar configuração (opcional)
-
-Crie ou edite `tiers.json` no diretório do projeto alvo para customizar:
-
-- Modelos por tier
-- Keywords de classificação
-- Modo padrão (normal/budget/quality/deep)
-- Enforcement (advisory/hard-block)
-
-## Mapeamento de Agentes Nativos
-
-O plugin mapeia automaticamente agentes nativos do OpenCode para tiers:
-
-| Agente | Tier | Modelo |
-|--------|------|--------|
-| `explore` | `@fast` | `opencode/big-pickle` |
-| `build` | `@medium` | `llama.cpp/Nex-N2-mini` |
-| `general` | `@heavy` | `llama.cpp/Nex-N2-mini` |
-| `plan` | `@heavy` | `llama.cpp/Nex-N2-mini` |
-
-Ver src/index.ts.
-
-## Exemplos de Uso
-
-### Tarefa fast (busca simples)
-
-```
-busque autenticação no projeto
-```
-
-→ Classificado como `@fast` (keyword: "busque")
-→ Roteado para `opencode/big-pickle`
-
-### Tarefa medium (implementação)
-
-```
-refatore a função de login para usar async/await
-```
-
-→ Classificado como `@medium` (keyword: "refatore")
-→ Roteado para `llama.cpp/Nex-N2-mini`
-
-### Tarefa heavy (arquitetura/debug)
-
-```
-analyze code quality and propose architecture changes
-```
-
-→ Classificado como `@heavy` (keyword: "analyze", "architecture")
-→ Roteado para `llama.cpp/Nex-N2-mini` (tier heavy)
-
-### Tarefa fast (estado do git)
-
-```
-git status
-```
-
-→ Classificado como `@fast` (keyword: "git/status")
-→ Roteado para `opencode/big-pickle`
-
-### Tarefa fast (localizar arquivo/pasta)
-
-```
-qual é o arquivo X
-onde está Y
-```
-
-→ Classificado como `@fast` (stems: "qual", "arquivo", "onde", "pasta")
-→ Roteado para `opencode/big-pickle`
-
-### Tarefa heavy (especificar feature)
-
-```
-especificar feature X
-criar spec
-```
-
-→ Classificado como `@heavy` (stems: "especificar", "spec")
-→ Roteado para `llama.cpp/Nex-N2-mini` (tier heavy)
-
-## Troubleshooting
-
-| Problema | Causa Provável | Solução |
-|----------|----------------|---------|
-| `Model not found` | ID de modelo inválido para o provider | Verificar com `/models` e ajustar `tiers.json` |
-| Não está delegando | Keywords não cobrem o prompt real | Ajustar `taskPatterns` ou usar `enforcement.mode="hard-block"` |
-| Delega mas mantém modelo errado | Tier configurado incorretamente | Verificar `/tiers` e ajustar `tiers.<tier>.model` |
-| Aviso de `tiers.json` ausente | Arquivo não existe no projeto nem no global | Criar `tiers.json` no projeto ou em `~/.config/opencode/` |
-| Hard-block bloqueia tudo | `trivialDirectAllowed=false` impede execução direta | Configurar `trivialDirectAllowed: true` se desejar |
-
-## Links Relacionados
-
-- [Arquitetura](./arquitetura.md) — decisões arquiteturais e componentes internos
-- [AGENTS.md](../AGENTS.md) — workflow de desenvolvimento TLC
-- [STATE.md](../.specs/STATE.md) — decisões ativas
-- [README.md](../README.md) — overview rápido e instalação
 
 ## Licença
 
