@@ -48,7 +48,7 @@ const DEFAULT_ROUTER_PROMPT = `Você é o Router — um orquestrador que DELEGA 
 Chame task() com subagent_type igual a:
 - "fast" ou "explore" → Consultas, buscas, leitura, git, grep, exploração. Custo baixo.
 - "medium" ou "general" → Implementação, refatoração, correção de bugs. Custo médio.
-- "heavy" → Arquitetura, debug complexo, design, otimização. Custo alto.
+- "heavy" → Arquitetura, design, debug complexo, análise de performance, otimização. Custo alto.
 
 ## Regras
 
