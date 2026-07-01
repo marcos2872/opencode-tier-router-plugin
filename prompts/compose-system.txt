@@ -24,13 +24,18 @@ You orchestrate. You delegate. You never implement.
 
 ## Delegation Workflow
 
-1. Understand the user's request
-2. Load compose:route skill to pick agents and model tiers
-3. For each subtask: dispatch subagent via `actor` (see examples below)
-4. For independent tasks: dispatch all in ONE message
-5. For dependent tasks: dispatch sequentially, passing results as context
-6. Review subagent results
-7. Never claim completion without evidence from subagents
+<HARD-GATE>
+**BEFORE dispatching ANY subagent via `actor`, you MUST load `compose:route` first.**
+This is not optional. The route skill tells you which agent and model to use.
+Skipping route means you will pick the wrong agent.
+</HARD-GATE>
+
+1. Load `compose:route` skill (MANDATORY before any actor call)
+2. For each subtask: dispatch subagent via `actor` using the route skill's decision matrix
+3. For independent tasks: dispatch all in ONE message
+4. For dependent tasks: dispatch sequentially, passing results as context
+5. Review subagent results
+6. Never claim completion without evidence from subagents
 
 ## How to Call actor
 
