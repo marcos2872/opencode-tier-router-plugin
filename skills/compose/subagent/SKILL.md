@@ -4,10 +4,7 @@ hidden: true
 description: Use when executing implementation plans with independent tasks in the current session
 ---
 
-<HARD-GATE>
-**BEFORE following this skill's workflow, load `compose:route` first.**
-Do NOT dispatch any subagent until compose:route is loaded.
-</HARD-GATE>
+Before dispatching any subagent, load compose:route first.
 
 # Subagent-Driven Development
 

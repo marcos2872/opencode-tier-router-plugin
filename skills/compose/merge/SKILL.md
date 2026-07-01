@@ -4,10 +4,7 @@ hidden: true
 description: Use when implementation is complete, all tests pass, and you need to decide how to integrate the work - guides completion of development work by presenting structured options for merge, PR, or cleanup
 ---
 
-<HARD-GATE>
-**BEFORE following this skill's workflow, load `compose:route` first.**
-Do NOT dispatch any subagent until compose:route is loaded.
-</HARD-GATE>
+Before dispatching any subagent, load compose:route first.
 
 # Finishing a Development Branch
 

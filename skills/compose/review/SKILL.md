@@ -4,10 +4,7 @@ hidden: true
 description: Use when completing tasks, implementing major features, or before merging to verify work meets requirements
 ---
 
-<HARD-GATE>
-**BEFORE following this skill's workflow, load `compose:route` first.**
-Do NOT dispatch any subagent until compose:route is loaded.
-</HARD-GATE>
+Before dispatching any subagent, load compose:route first.
 
 # Requesting Code Review
 
