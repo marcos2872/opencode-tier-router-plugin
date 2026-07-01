@@ -160,4 +160,22 @@ export function createGeneralAgent(
     },
   };
   injectModelIntoFrontmatter(join(directory ?? process.cwd(), ".opencode", "agents", "general.md"), model);
+
+  // Create general-heavy agent with the heavy model
+  const heavyModel = cfg["general-heavy"]?.model ?? DEFAULT_HEAVY_MODEL;
+  input.agent["general-heavy"] = {
+    model: heavyModel,
+    mode: "subagent",
+    description:
+      "Heavy-duty worker — architecture, design review, complex analysis",
+    permission: {
+      read: "allow",
+      edit: "allow",
+      write: "allow",
+      bash: "allow",
+      glob: "allow",
+      grep: "allow",
+    },
+  };
+  injectModelIntoFrontmatter(join(directory ?? process.cwd(), ".opencode", "agents", "general-heavy.md"), heavyModel);
 }
