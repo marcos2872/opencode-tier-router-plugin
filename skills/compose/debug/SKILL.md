@@ -4,6 +4,12 @@ hidden: true
 description: Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes
 ---
 
+<HARD-GATE>
+**BEFORE following this skill's workflow, load `compose:route` first.**
+The route skill tells you which agent (explore/general) to dispatch.
+Do NOT dispatch any subagent until compose:route is loaded.
+</HARD-GATE>
+
 # Systematic Debugging
 
 ## Overview

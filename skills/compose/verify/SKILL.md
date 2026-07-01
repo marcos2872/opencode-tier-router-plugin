@@ -4,6 +4,12 @@ hidden: true
 description: Use when about to claim work is complete, fixed, or passing, before committing or creating PRs - requires running verification commands and confirming output before making any success claims; evidence before assertions always
 ---
 
+<HARD-GATE>
+**BEFORE following this skill's workflow, load `compose:route` first.**
+The route skill tells you which agent (explore/general) to dispatch.
+Do NOT dispatch any subagent until compose:route is loaded.
+</HARD-GATE>
+
 # Verification Before Completion
 
 ## Overview
