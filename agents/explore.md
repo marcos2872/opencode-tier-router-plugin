@@ -2,6 +2,7 @@
 description: Leitura rápida — grep, glob, read, git
 mode: subagent
 hidden: false
+model: ""
 permission:
   read: allow
   glob: allow

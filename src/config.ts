@@ -1,6 +1,6 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, statSync } from "node:fs";
 
 export interface TierConfig {
   model?: string;
@@ -18,6 +18,24 @@ const DEFAULT_HEAVY_MODEL = "opencode/big-pickle";
 
 function pathExists(path: string): boolean {
   return existsSync(path) && statSync(path).isFile();
+}
+
+function injectModelIntoFrontmatter(mdPath: string, model: string): void {
+  if (!pathExists(mdPath)) return;
+  const content = readFileSync(mdPath, "utf8");
+  const updated = content.replace(
+    /^(---\n[\s\S]*?\n---)/m,
+    (frontmatter) => {
+      if (frontmatter.includes("model:")) {
+        return frontmatter.replace(/^model:.*$/m, `model: "${model}"`);
+      }
+      const lines = frontmatter.split("\n");
+      const descIdx = lines.findIndex((l) => l.startsWith("description:"));
+      lines.splice(descIdx >= 0 ? descIdx + 1 : 1, 0, `model: "${model}"`);
+      return lines.join("\n");
+    }
+  );
+  writeFileSync(mdPath, updated, "utf8");
 }
 
 function normalizeConfigPath(tiersJsonPath: string): string {
@@ -93,8 +111,9 @@ export function createExploreAgent(
   cfg: ComposeConfig,
 ): void {
   if (!input.agent) input.agent = {};
+  const model = cfg.explore?.model ?? DEFAULT_EXPLORE_MODEL;
   input.agent.explore = {
-    model: cfg.explore?.model ?? DEFAULT_EXPLORE_MODEL,
+    model,
     mode: "subagent",
     description: "Fast read-only codebase explorer",
     permission: {
@@ -106,6 +125,7 @@ export function createExploreAgent(
       write: "deny",
     },
   };
+  injectModelIntoFrontmatter(join(process.cwd(), "agents", "explore.md"), model);
 }
 
 export function createGeneralAgent(
@@ -113,8 +133,9 @@ export function createGeneralAgent(
   cfg: ComposeConfig,
 ): void {
   if (!input.agent) input.agent = {};
+  const model = cfg["general-medium"]?.model ?? DEFAULT_MEDIUM_MODEL;
   input.agent.general = {
-    model: cfg["general-medium"]?.model ?? DEFAULT_MEDIUM_MODEL,
+    model,
     mode: "subagent",
     description:
       "General-purpose worker — implements, fixes, refactors, reviews",
@@ -127,4 +148,5 @@ export function createGeneralAgent(
       grep: "allow",
     },
   };
+  injectModelIntoFrontmatter(join(process.cwd(), "agents", "general.md"), model);
 }

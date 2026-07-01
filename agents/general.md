@@ -2,6 +2,7 @@
 description: Código e análise — implementa, fixa, refatora, valida, revisa
 mode: subagent
 hidden: false
+model: ""
 permission:
   read: allow
   edit: allow
