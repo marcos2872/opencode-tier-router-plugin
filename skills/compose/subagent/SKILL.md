@@ -115,18 +115,44 @@ contradictions conservatively (strictest interpretation) and continue.
 
 ## Model Selection
 
-Use the least powerful model that can handle each role to conserve cost and increase speed.
+Read `tiers.json` from project root or `~/.config/opencode/tiers.json` to get available models. Pass the model via the Actor tool's `model` parameter to override the agent's default.
 
-**Mechanical implementation tasks** (isolated functions, clear specs, 1-2 files): use a fast, cheap model. Most implementation tasks are mechanical when the plan is well-specified.
+**How to read tiers:**
+```bash
+cat tiers.json
+```
 
-**Integration and judgment tasks** (multi-file coordination, pattern matching, debugging): use a standard model.
+**Tiers config format:**
+```json
+{
+  "explore": { "model": "opencode/big-pickle" },
+  "general-medium": { "model": "opencode/mimo-v2.5-free" },
+  "general-heavy": { "model": "opencode/big-pickle" }
+}
+```
 
-**Architecture, design, and review tasks**: use the most capable available model.
+**Decision tree for model selection:**
 
-**Task complexity signals:**
-- Touches 1-2 files with a complete spec → cheap model
-- Touches multiple files with integration concerns → standard model
-- Requires design judgment or broad codebase understanding → most capable model
+1. Is the task read-only (explore/grep/read)?
+   → Yes: use `explore.model`
+   → No: continue
+
+2. Is it a simple implementation (1-2 files, clear spec)?
+   → Yes: use `general-medium.model`
+   → No: use `general-heavy.model`
+
+**Example Actor call with model override:**
+```json
+{
+  "operation": {
+    "action": "run",
+    "subagent_type": "general",
+    "description": "Implement feature X",
+    "prompt": "...",
+    "model": "opencode/mimo-v2.5-free"
+  }
+}
+```
 
 **Reviewer tier:** Dispatch the spec reviewer at a model tier at least as capable as
 the implementer's. A reviewer weaker than the implementer shares its blind spots and
