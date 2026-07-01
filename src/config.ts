@@ -73,6 +73,10 @@ export function loadConfig(tiersJsonPath?: string): ComposeConfig {
   return normalizeConfig({});
 }
 
+export function loadTiers(directory?: string): ComposeConfig {
+  return loadConfig(directory);
+}
+
 export function createComposeAgent(input: {
   agent?: Record<string, unknown>;
 }): void {
