@@ -22,8 +22,8 @@ const plugin = (input: PluginInput) =>
       try {
         const cfg = loadConfig(input.directory);
         createComposeAgent(config);
-        createExploreAgent(config, cfg);
-        createGeneralAgent(config, cfg);
+        createExploreAgent(config, cfg, input.directory);
+        createGeneralAgent(config, cfg, input.directory);
       } catch (e) {
         console.error(`[compose-plugin] config error:`, e);
       }

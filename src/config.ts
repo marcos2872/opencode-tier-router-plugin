@@ -109,6 +109,7 @@ export function createComposeAgent(input: {
 export function createExploreAgent(
   input: { agent?: Record<string, unknown> },
   cfg: ComposeConfig,
+  directory?: string,
 ): void {
   if (!input.agent) input.agent = {};
   const model = cfg.explore?.model ?? DEFAULT_EXPLORE_MODEL;
@@ -125,12 +126,13 @@ export function createExploreAgent(
       write: "deny",
     },
   };
-  injectModelIntoFrontmatter(join(process.cwd(), ".opencode", "agents", "explore.md"), model);
+  injectModelIntoFrontmatter(join(directory ?? process.cwd(), ".opencode", "agents", "explore.md"), model);
 }
 
 export function createGeneralAgent(
   input: { agent?: Record<string, unknown> },
   cfg: ComposeConfig,
+  directory?: string,
 ): void {
   if (!input.agent) input.agent = {};
   const model = cfg["general-medium"]?.model ?? DEFAULT_MEDIUM_MODEL;
@@ -148,5 +150,5 @@ export function createGeneralAgent(
       grep: "allow",
     },
   };
-  injectModelIntoFrontmatter(join(process.cwd(), ".opencode", "agents", "general.md"), model);
+  injectModelIntoFrontmatter(join(directory ?? process.cwd(), ".opencode", "agents", "general.md"), model);
 }
