@@ -124,6 +124,8 @@ export function createExploreAgent(
       bash: "allow",
       edit: "deny",
       write: "deny",
+      actor: "allow",
+      task: "allow",
     },
   };
   injectModelIntoFrontmatter(join(directory ?? process.cwd(), ".opencode", "agents", "explore.md"), model);
