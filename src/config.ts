@@ -7,11 +7,13 @@ export interface TierConfig {
 }
 
 export interface ComposeConfig {
+  compose?: TierConfig;
   explore?: TierConfig;
   "general-medium"?: TierConfig;
   "general-heavy"?: TierConfig;
 }
 
+const DEFAULT_COMPOSE_MODEL = "opencode/mimo-v2.5-free";
 const DEFAULT_EXPLORE_MODEL = "opencode/big-pickle";
 const DEFAULT_MEDIUM_MODEL = "opencode/mimo-v2.5-free";
 const DEFAULT_HEAVY_MODEL = "opencode/big-pickle";
@@ -57,6 +59,7 @@ function validateTier(obj: unknown, name: string): void {
 function validateConfig(config: unknown): void {
   if (config !== null && typeof config === "object" && !Array.isArray(config)) {
     const cfg = config as Record<string, unknown>;
+    validateTier(cfg.compose, "compose");
     validateTier(cfg.explore, "explore");
     validateTier(cfg["general-medium"], "general-medium");
     validateTier(cfg["general-heavy"], "general-heavy");
@@ -67,6 +70,7 @@ function normalizeConfig(config: unknown): ComposeConfig {
   validateConfig(config);
   const cfg = (config ?? {}) as ComposeConfig;
   return {
+    compose: { model: cfg.compose?.model ?? DEFAULT_COMPOSE_MODEL },
     explore: { model: cfg.explore?.model ?? DEFAULT_EXPLORE_MODEL },
     "general-medium": {
       model: cfg["general-medium"]?.model ?? DEFAULT_MEDIUM_MODEL,
@@ -95,15 +99,20 @@ export function loadTiers(directory?: string): ComposeConfig {
   return loadConfig(directory);
 }
 
-export function createComposeAgent(input: {
-  agent?: Record<string, unknown>;
-}): void {
+export function createComposeAgent(
+  input: { agent?: Record<string, unknown> },
+  cfg: ComposeConfig,
+  directory?: string,
+): void {
   if (!input.agent) input.agent = {};
   if (input.agent.compose) return;
+  const model = cfg.compose?.model ?? DEFAULT_COMPOSE_MODEL;
   input.agent.compose = {
+    model,
     mode: "primary",
     description: "Compose mode — orchestrates workflows with compose skills",
   };
+  injectModelIntoFrontmatter(join(directory ?? process.cwd(), ".opencode", "agents", "compose.md"), model);
 }
 
 export function createExploreAgent(

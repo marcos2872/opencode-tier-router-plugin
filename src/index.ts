@@ -21,9 +21,11 @@ const plugin = (input: PluginInput) =>
     config: async (config: Config) => {
       try {
         const cfg = loadConfig(input.directory);
-        createComposeAgent(config);
+        console.log("[compose-plugin] loaded tiers:", JSON.stringify(cfg));
+        createComposeAgent(config, cfg, input.directory);
         createExploreAgent(config, cfg, input.directory);
         createGeneralAgent(config, cfg, input.directory);
+        console.log("[compose-plugin] agents configured");
       } catch (e) {
         console.error(`[compose-plugin] config error:`, e);
       }

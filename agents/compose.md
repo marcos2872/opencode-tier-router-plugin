@@ -2,6 +2,7 @@
 description: Orquestrador — delega tudo via actor, nunca toca código
 mode: primary
 color: "#a7a3d8"
+model: ""
 prompt: { file: "prompts/compose-system.txt" }
 permission:
   read: deny
