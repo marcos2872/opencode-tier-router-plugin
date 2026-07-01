@@ -2,7 +2,7 @@
 description: Código e análise — implementa, fixa, refatora, valida, revisa
 mode: subagent
 hidden: false
-model: ""
+model: "llama.cpp/Nex-N2-mini"
 permission:
   read: allow
   edit: allow

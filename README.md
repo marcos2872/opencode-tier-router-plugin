@@ -13,30 +13,27 @@ Plugin para OpenCode que combina orquestração Compose com memória persistente
 ### 1. Clonar e build
 
 ```bash
-git clone <repo-url> /home/marcos/Projects/opencode-router-model
-cd /home/marcos/Projects/opencode-router-model
+git clone <repo-url>
+cd opencode-tier-router-plugin
 npm install
 npm run build
 ```
 
 ### 2. Configurar no projeto alvo
 
-Crie `opencode.json` na raiz do projeto:
+Crie `.opencode/opencode.json` na raiz do projeto:
 
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
-  "plugin": ["/home/marcos/Projects/opencode-router-model/dist/index.js"],
-  "skills": {
-    "paths": ["/home/marcos/Projects/opencode-router-model/skills"]
-  }
+  "plugin": ["<caminho-absoluto>/opencode-tier-router-plugin/dist/index.js"]
 }
 ```
 
 Crie symlinks para agents e prompts:
 
 ```bash
-PLUGIN=/home/marcos/Projects/opencode-router-model
+PLUGIN=<caminho-absoluto>/opencode-tier-router-plugin
 PROJETO=/seu/projeto
 
 # Agents
@@ -52,7 +49,7 @@ ln -sf $PLUGIN/prompts/* $PROJETO/.opencode/prompts/
 
 ### 3. Configurar modelos
 
-Crie `tiers.json` na raiz do projeto:
+Crie `tiers.json` na raiz do projeto (ou `~/.config/opencode/tiers.json` para global):
 
 ```json
 {
@@ -71,20 +68,20 @@ Definidos em `.opencode/agents/*.md` (symlinks):
 | Agente | Papel | Modelo (tiers.json) |
 |--------|-------|---------------------|
 | `compose` | Orquestrador com skills | opencode/big-pickle |
-| `explore` | Leitura rápida | opencode/big-pickle |
-| `general` | Implementação/debug/arquitetura | llama.cpp/Nex-N2-mini |
+| `explore` | Leitura rápida | explore.model |
+| `general` | Implementação/debug/arquitetura | general-medium.model |
 
 ## Skills
 
-16 skills via `skills.paths` no opencode.json: route, brainstorm, plan, tdd, debug, verify, review, execute, subagent, report, merge, parallel, worktree, feedback, ask, new-skill.
+16 skills via compose: route, brainstorm, plan, tdd, debug, verify, review, execute, subagent, report, merge, parallel, worktree, feedback, ask, new-skill.
 
-## Uso
+## Roteamento de Modelo
 
-- Leitura → `explore`
-- Código → `general-medium`
-- Arquitetura → `general-heavy`
+O plugin injeta automaticamente o modelo do `tiers.json` no frontmatter dos agents. O compose decide qual tier usar baseado na complexidade da tarefa:
 
-Skills via `/skill-name`: `/brainstorm`, `/plan`, `/tdd`, `/verify`
+- **Leitura** (explore): `explore.model`
+- **Implementação simples** (1-2 arquivos): `general-medium.model`
+- **Tarefa complexa** (multi-arquivo): `general-heavy.model`
 
 ## Licença
 
