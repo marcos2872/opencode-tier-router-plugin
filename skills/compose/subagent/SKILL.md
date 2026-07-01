@@ -133,13 +133,19 @@ cat tiers.json
 
 **Decision tree for model selection:**
 
-1. Is the task read-only (explore/grep/read)?
-   → Yes: use `explore.model`
+1. Is the task pure data retrieval (grep, glob, list files, git log)?
+   → Yes: use `explore` agent with `explore.model`
    → No: continue
 
-2. Is it a simple implementation (1-2 files, clear spec)?
-   → Yes: use `general-medium.model`
-   → No: use `general-heavy.model`
+2. Is it code review, architecture analysis, or design judgment?
+   → Yes: use `general` agent with `general-heavy.model`
+   → No: continue
+
+3. Is it a simple implementation (1-2 files, clear spec)?
+   → Yes: use `general` agent with `general-medium.model`
+   → No: use `general` agent with `general-heavy.model`
+
+**Key distinction:** `explore` is for raw data retrieval only. Any task requiring analysis, judgment, or recommendations must use `general`.
 
 **Example Actor call with model override:**
 ```json
