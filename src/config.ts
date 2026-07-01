@@ -125,7 +125,7 @@ export function createExploreAgent(
       write: "deny",
     },
   };
-  injectModelIntoFrontmatter(join(process.cwd(), "agents", "explore.md"), model);
+  injectModelIntoFrontmatter(join(process.cwd(), ".opencode", "agents", "explore.md"), model);
 }
 
 export function createGeneralAgent(
@@ -148,5 +148,5 @@ export function createGeneralAgent(
       grep: "allow",
     },
   };
-  injectModelIntoFrontmatter(join(process.cwd(), "agents", "general.md"), model);
+  injectModelIntoFrontmatter(join(process.cwd(), ".opencode", "agents", "general.md"), model);
 }
