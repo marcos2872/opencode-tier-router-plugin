@@ -32,7 +32,7 @@ The `general` agent supports two model tiers. Select via the `model` parameter i
 
 | Operation | subagent_type | model | Reason |
 |-----------|---------------|-------|--------|
-| Read file | `explore` | — | Read-only |
+| Read file | `explore` | — | Read-only, no judgment needed |
 | Find usages / grep | `explore` | — | Read-only search |
 | List directory / git log | `explore` | — | Read-only lookup |
 | Diff between branches | `explore` | — | Read-only |
@@ -42,10 +42,19 @@ The `general` agent supports two model tiers. Select via the `model` parameter i
 | Write tests | `general` | `general-medium` | Code writing |
 | Create/edit file | `general` | `general-medium` | File writing |
 | Run commands + fix | `general` | `general-medium` | Bash + edit |
+| Validate/review code | `general` | `general-heavy` | Requires judgment and analysis |
+| Fact-check claims against code | `general` | `general-heavy` | Requires reasoning, not just reading |
+| Analyze code quality | `general` | `general-heavy` | Requires comparison and evaluation |
 | Design architecture | `general` | `general-heavy` | Deep reasoning |
 | Complex debugging | `general` | `general-heavy` | Multi-file analysis |
 | Security review | `general` | `general-heavy` | Deep analysis |
 | Write specs/plans | `general` | `general-heavy` | Design judgment |
+
+## Key Rule: explore vs general
+
+**explore** = read data, return raw results. No analysis, no judgment, no opinion.
+
+**general** = anything that requires thinking about what was read. If the task asks "is this correct?", "what's wrong?", "validate", "review", "analyze", "fact-check" — it's general, not explore.
 
 ## How to Dispatch
 
@@ -93,6 +102,10 @@ actor(operation: { action: "run", subagent_type: "general", model: "general-heav
 | "Fix X" | general | general-medium |
 | "Implement X" | general | general-medium |
 | "Write tests" | general | general-medium |
+| "Validate X" | general | general-heavy |
+| "Review X" | general | general-heavy |
+| "Fact-check X" | general | general-heavy |
+| "Analyze X" | general | general-heavy |
 | "Design architecture" | general | general-heavy |
 | "Write spec/plan" | general | general-heavy |
 | "Debug complex issue" | general | general-heavy |

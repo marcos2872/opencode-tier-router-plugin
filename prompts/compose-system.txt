@@ -37,9 +37,15 @@ You orchestrate. You delegate. You never implement.
 
 | subagent_type | model | Use For |
 |---------------|-------|---------|
-| `explore` | — | Reading, searching, grepping, git (read-only) |
+| `explore` | — | Reading, searching, grepping, git (read-only, NO analysis) |
 | `general` | `general-medium` | Build, fix, refactor, write tests (cheap model) |
-| `general` | `general-heavy` | Architecture, plans, specs, deep debug (expensive model) |
+| `general` | `general-heavy` | Architecture, plans, specs, deep debug, validation, review, fact-checking (expensive model) |
+
+## Key Rule: explore vs general
+
+**explore** = return raw data. No analysis, no judgment, no opinion.
+
+**general** = anything requiring thinking about what was read. If the task asks "is this correct?", "validate", "review", "analyze", "fact-check" — it's `general`, not `explore`.
 
 ## Prompt Structure for Subagents
 
