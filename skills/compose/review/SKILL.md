@@ -4,6 +4,11 @@ hidden: true
 description: Use when completing tasks, implementing major features, or before merging to verify work meets requirements
 ---
 
+<HARD-GATE>
+**BEFORE following this skill's workflow, load `compose:route` first.**
+Do NOT dispatch any subagent until compose:route is loaded.
+</HARD-GATE>
+
 # Requesting Code Review
 
 Dispatch a code reviewer subagent to catch issues before they cascade. The reviewer gets precisely crafted context for evaluation — never your session's history. This keeps the reviewer focused on the work product, not your thought process, and preserves your own context for continued work.

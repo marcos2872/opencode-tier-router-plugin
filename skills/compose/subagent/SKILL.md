@@ -4,6 +4,11 @@ hidden: true
 description: Use when executing implementation plans with independent tasks in the current session
 ---
 
+<HARD-GATE>
+**BEFORE following this skill's workflow, load `compose:route` first.**
+Do NOT dispatch any subagent until compose:route is loaded.
+</HARD-GATE>
+
 # Subagent-Driven Development
 
 Execute plan by dispatching fresh subagent per task, with two-stage review after each: spec compliance review first, then code quality review.

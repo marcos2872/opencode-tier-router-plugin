@@ -4,6 +4,11 @@ hidden: true
 description: Use when you have a written implementation plan to execute in a separate session with review checkpoints
 ---
 
+<HARD-GATE>
+**BEFORE following this skill's workflow, load `compose:route` first.**
+Do NOT dispatch any subagent until compose:route is loaded.
+</HARD-GATE>
+
 # Executing Plans
 
 ## Overview
