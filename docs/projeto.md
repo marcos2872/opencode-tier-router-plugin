@@ -1,4 +1,4 @@
-# opencode-compose-plugin — Documentação do Projeto
+# opencode-tier-router-plugin — Documentação do Projeto
 
 ## Visão Geral
 
@@ -18,16 +18,16 @@ Plugin para OpenCode que combina orquestração Compose, memória persistente BM
 ## Estrutura
 
 ```
-opencode-compose-plugin/
+opencode-tier-router-plugin/
 ├── src/
 │   ├── index.ts          # Plugin entry: config + tool hooks
-│   ├── config.ts         # Cria agentes compose/explore/general
+│   ├── config.ts         # Cria agentes compose/explore/general/general-heavy
 │   └── memory/
 │       ├── store.ts      # SQLite FTS5 (bun:sqlite)
 │       ├── tool.ts       # Ferramenta memory (search/write)
 │       └── reconcile.ts  # Indexa .md no SQLite
 ├── agents/               # Definições dos agentes (.md)
-├── skills/compose/       # 16 skills de orquestração
+├── skills/compose/       # 17 skills de orquestração
 ├── prompts/              # System prompts
 ├── tiers.json            # Config de modelos
 └── package.json
@@ -37,11 +37,22 @@ opencode-compose-plugin/
 
 | Agente | Modo | Modelo default | Papel |
 |--------|------|----------------|-------|
-| `compose` | primary | opencode/big-pickle | Orquestrador com 16 skills |
-| `explore` | subagent | opencode/big-pickle | Leitura rápida |
-| `general` | subagent | llama.cpp/Nex-N2-mini | Implementação/debug/arquitetura |
+| `compose` | primary | configurable via tiers.json | Orquestrador com 17 skills |
+| `explore` | subagent | configurable via tiers.json | Leitura rápida |
+| `general` | subagent | configurable via tiers.json | Implementação |
+| `general-heavy` | subagent | configurable via tiers.json | Análise e review |
 | `checkpoint-writer` | hidden | — | Grava checkpoints |
 | `dream` | hidden | — | Consolida memória |
+
+## Roteamento por Agent
+
+O compose escolhe o agent pelo nome. Cada agent tem seu modelo embutido via tiers.json.
+
+| Tarefa | Agent |
+|--------|-------|
+| Ler arquivo, grep, git | explore |
+| Fix bug, refactor, test | general |
+| Code review, architecture, design | general-heavy |
 
 ## Memória
 
@@ -77,7 +88,7 @@ memory({ operation: "write", scope: "compose", path: "decisao.md", content: "...
 
 ## Skills
 
-16 skills de compose: route, brainstorm, plan, tdd, debug, verify, review, execute, subagent, report, merge, parallel, worktree, feedback, ask, new-skill.
+17 skills de compose: ask, brainstorm, code-conventions, debug, execute, feedback, merge, new-skill, parallel, plan, report, review, route, subagent, tdd, verify, worktree.
 
 ## Configuração
 
@@ -85,9 +96,10 @@ memory({ operation: "write", scope: "compose", path: "decisao.md", content: "...
 
 ```json
 {
+  "compose": { "model": "opencode/big-pickle" },
   "explore": { "model": "opencode/big-pickle" },
   "general-medium": { "model": "llama.cpp/Nex-N2-mini" },
-  "general-heavy": { "model": "opencode/big-pickle" }
+  "general-heavy": { "model": "opencode/mimo-v2.5-free" }
 }
 ```
 
@@ -95,11 +107,8 @@ memory({ operation: "write", scope: "compose", path: "decisao.md", content: "...
 
 ```json
 {
-  "agent": {
-    "compose": { "mode": "primary" },
-    "explore": { "mode": "subagent", "model": "opencode/big-pickle" },
-    "general": { "mode": "subagent", "model": "llama.cpp/Nex-N2-mini" }
-  }
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["<caminho-absoluto>/opencode-tier-router-plugin/dist/index.js"]
 }
 ```
 

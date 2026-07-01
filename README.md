@@ -1,12 +1,12 @@
-# opencode-compose-plugin
+# opencode-tier-router-plugin
 
 Plugin para OpenCode que combina orquestração Compose com memória persistente BM25 e roteamento por tier de custo.
 
 ## O que faz
 
-- **Compose Agent** como orquestrador principal com 16 skills de workflow
+- **Compose Agent** como orquestrador principal com 17 skills de workflow
 - **Memory Tool** com busca BM25 via SQLite para conhecimento persistente
-- **Subagentes por tier**: explore (baixo custo), general-medium, general-heavy
+- **3 subagentes com modelos diferentes**: explore (leitura), general (implementação), general-heavy (análise)
 
 ## Instalação
 
@@ -30,7 +30,7 @@ Crie `.opencode/opencode.json` na raiz do projeto:
 }
 ```
 
-Crie symlinks para agents e prompts:
+Crie symlinks para agents, prompts e skills:
 
 ```bash
 PLUGIN=<caminho-absoluto>/opencode-tier-router-plugin
@@ -45,6 +45,12 @@ done
 # Prompts
 mkdir -p $PROJETO/.opencode/prompts
 ln -sf $PLUGIN/prompts/* $PROJETO/.opencode/prompts/
+
+# Skills
+mkdir -p $PROJETO/.opencode/skills
+for d in $PLUGIN/skills/compose/*/; do
+  ln -sf "$d" "$PROJETO/.opencode/skills/$(basename $d)"
+done
 ```
 
 ### 3. Configurar modelos
@@ -53,9 +59,10 @@ Crie `tiers.json` na raiz do projeto (ou `~/.config/opencode/tiers.json` para gl
 
 ```json
 {
+  "compose": { "model": "opencode/big-pickle" },
   "explore": { "model": "opencode/big-pickle" },
   "general-medium": { "model": "llama.cpp/Nex-N2-mini" },
-  "general-heavy": { "model": "llama.cpp/Nex-N2-mini" }
+  "general-heavy": { "model": "opencode/mimo-v2.5-free" }
 }
 ```
 
@@ -63,25 +70,28 @@ Crie `tiers.json` na raiz do projeto (ou `~/.config/opencode/tiers.json` para gl
 
 ## Agentes
 
-Definidos em `.opencode/agents/*.md` (symlinks):
+| Agente | Papel | Modelo |
+|--------|-------|--------|
+| `compose` | Orquestrador — delega tudo via actor | compose.model |
+| `explore` | Leitura rápida — grep, glob, read, git | explore.model |
+| `general` | Implementação — fix, refactor, test, create | general-medium.model |
+| `general-heavy` | Análise — review, architecture, design, debug | general-heavy.model |
+| `checkpoint-writer` | Grava checkpoints de sessão (hidden) | — |
+| `dream` | Consolida memória de longo prazo (hidden) | — |
 
-| Agente | Papel | Modelo (tiers.json) |
-|--------|-------|---------------------|
-| `compose` | Orquestrador com skills | opencode/big-pickle |
-| `explore` | Leitura rápida | explore.model |
-| `general` | Implementação/debug/arquitetura | general-medium.model |
+## Roteamento
+
+O compose escolhe o agent pelo nome. Cada agent tem seu modelo embutido:
+
+| Tarefa | Agent |
+|--------|-------|
+| Ler arquivo, grep, git | explore |
+| Fix bug, refactor, test | general |
+| Code review, architecture, design | general-heavy |
 
 ## Skills
 
-16 skills via compose: route, brainstorm, plan, tdd, debug, verify, review, execute, subagent, report, merge, parallel, worktree, feedback, ask, new-skill.
-
-## Roteamento de Modelo
-
-O plugin injeta automaticamente o modelo do `tiers.json` no frontmatter dos agents. O compose decide qual tier usar baseado na complexidade da tarefa:
-
-- **Leitura** (explore): `explore.model`
-- **Implementação simples** (1-2 arquivos): `general-medium.model`
-- **Tarefa complexa** (multi-arquivo): `general-heavy.model`
+17 skills de compose: ask, brainstorm, code-conventions, debug, execute, feedback, merge, new-skill, parallel, plan, report, review, route, subagent, tdd, verify, worktree.
 
 ## Licença
 
