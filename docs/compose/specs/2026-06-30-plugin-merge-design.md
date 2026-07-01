@@ -25,14 +25,14 @@ O Router é removido. Os tiers @fast/@medium/@heavy são absorvidos por explore 
 |--------|-------|------|----------------|
 | `compose` | Orquestrador principal, usa 15 skills | primary | opencode/big-pickle |
 | `explore` | Leitura rápida, grep, git, exploração | subagent | opencode/big-pickle |
-| `general` | Implementação, refatoração, debug, testes | subagent | llama.cpp/Nex-N2-mini |
+| `general` | Implementação, refatoração, debug, testes, arquitetura | subagent | llama.cpp/Nex-N2-mini |
 | `checkpoint-writer` | Grava checkpoints de sessão (oculto) | hidden | opencode/big-pickle |
 | `dream` | Consolida memória (oculto) | hidden | opencode/big-pickle |
 
 ### Regras de delegação do Compose
 
 - O compose delega para **explore** quando a tarefa é leitura/exploração
-- O compose delega para **general** quando a tarefa é implementação/edição
+- O compose delega para **general** quando a tarefa é implementação/edição/análise
 - Explore e general NÃO disparam sub-sub-agentes
 - O compose pode usar qualquer skill para orquestrar
 

@@ -39,8 +39,7 @@ opencode-compose-plugin/
 |--------|------|----------------|-------|
 | `compose` | primary | opencode/big-pickle | Orquestrador com 16 skills |
 | `explore` | subagent | opencode/big-pickle | Leitura rápida |
-| `general-medium` | subagent | llama.cpp/Nex-N2-mini | Implementação |
-| `general-heavy` | subagent | llama.cpp/Nex-N2-mini | Arquitetura |
+| `general` | subagent | llama.cpp/Nex-N2-mini | Implementação/debug/arquitetura |
 | `checkpoint-writer` | hidden | — | Grava checkpoints |
 | `dream` | hidden | — | Consolida memória |
 
@@ -88,7 +87,7 @@ memory({ operation: "write", scope: "compose", path: "decisao.md", content: "...
 {
   "explore": { "model": "opencode/big-pickle" },
   "general-medium": { "model": "llama.cpp/Nex-N2-mini" },
-  "general-heavy": { "model": "llama.cpp/Nex-N2-mini" }
+  "general-heavy": { "model": "opencode/big-pickle" }
 }
 ```
 
@@ -99,8 +98,7 @@ memory({ operation: "write", scope: "compose", path: "decisao.md", content: "...
   "agent": {
     "compose": { "mode": "primary" },
     "explore": { "mode": "subagent", "model": "opencode/big-pickle" },
-    "general-medium": { "mode": "subagent", "model": "llama.cpp/Nex-N2-mini" },
-    "general-heavy": { "mode": "subagent", "model": "llama.cpp/Nex-N2-mini" }
+    "general": { "mode": "subagent", "model": "llama.cpp/Nex-N2-mini" }
   }
 }
 ```

@@ -6,8 +6,7 @@ import {
   loadConfig,
   createComposeAgent,
   createExploreAgent,
-  createGeneralMediumAgent,
-  createGeneralHeavyAgent,
+  createGeneralAgent,
 } from './config.js';
 import { createMemoryTool } from './memory/tool.js';
 
@@ -24,8 +23,7 @@ const plugin = (input: PluginInput) =>
         const cfg = loadConfig(input.directory);
         createComposeAgent(config);
         createExploreAgent(config, cfg);
-        createGeneralMediumAgent(config, cfg);
-        createGeneralHeavyAgent(config, cfg);
+        createGeneralAgent(config, cfg);
       } catch (e) {
         console.error(`[compose-plugin] config error:`, e);
       }

@@ -72,8 +72,7 @@ Definidos em `.opencode/agents/*.md` (symlinks):
 |--------|-------|---------------------|
 | `compose` | Orquestrador com skills | opencode/big-pickle |
 | `explore` | Leitura rápida | opencode/big-pickle |
-| `general-medium` | Implementação | llama.cpp/Nex-N2-mini |
-| `general-heavy` | Arquitetura | llama.cpp/Nex-N2-mini |
+| `general` | Implementação/debug/arquitetura | llama.cpp/Nex-N2-mini |
 
 ## Skills
 

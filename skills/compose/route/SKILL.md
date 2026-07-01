@@ -1,59 +1,99 @@
-# Skill: compose:route
+---
+name: compose:route
+hidden: true
+description: Use when delegating any task to a subagent — chooses the most cost-effective agent for the job
+---
 
 # Task Routing — Choose the Right Agent
 
-Analyze the user's request and delegate to the most cost-effective agent.
+<HARD-GATE>
+You NEVER read files, grep, or edit code directly. Every operation is delegated to a subagent via `actor`. Use `actor` with the right `subagent_type` and `model` instead.
+</HARD-GATE>
+
+**Core principle:** Always use the cheapest agent that can handle the task.
+
+## Available Agents
+
+| subagent_type | Use For |
+|---------------|---------|
+| `explore` | Read-only: reading, grepping, git, listing |
+| `general` | Everything else: implement, fix, refactor, review, debug |
+
+## Model Tiers (from tiers.json)
+
+The `general` agent supports two model tiers. Select via the `model` parameter in `actor`:
+
+| Tier | Model | Use For |
+|------|-------|---------|
+| `general-medium` | llama.cpp/Nex-N2-mini | Build, fix, refactor, write tests, create/edit files |
+| `general-heavy` | opencode/big-pickle | Architecture, plans, specs, deep debug, security review |
 
 ## Decision Matrix
 
-| Agent | Use When | Cost |
-|-------|----------|------|
-| `explore` | Reading files, grepping, git history, listing directories, quick lookups | Low |
-| `general-medium` | Implementing features, fixing bugs, refactoring, writing tests, editing code | Medium |
-| `general-heavy` | Architecture decisions, complex debugging, performance optimization, deep analysis | High |
+| Operation | subagent_type | model | Reason |
+|-----------|---------------|-------|--------|
+| Read file | `explore` | — | Read-only |
+| Find usages / grep | `explore` | — | Read-only search |
+| List directory / git log | `explore` | — | Read-only lookup |
+| Diff between branches | `explore` | — | Read-only |
+| Implement feature | `general` | `general-medium` | Code writing |
+| Fix bug | `general` | `general-medium` | Code editing |
+| Refactor code | `general` | `general-medium` | Code editing |
+| Write tests | `general` | `general-medium` | Code writing |
+| Create/edit file | `general` | `general-medium` | File writing |
+| Run commands + fix | `general` | `general-medium` | Bash + edit |
+| Design architecture | `general` | `general-heavy` | Deep reasoning |
+| Complex debugging | `general` | `general-heavy` | Multi-file analysis |
+| Security review | `general` | `general-heavy` | Deep analysis |
+| Write specs/plans | `general` | `general-heavy` | Design judgment |
 
-## Routing Rules
-
-1. **Default to the cheapest option** that can handle the task
-2. **Only escalate** when the task genuinely requires more capability
-3. **Never ask the user** which agent to use — decide yourself
-
-## When to Use `explore`
-
-- "Read file X", "Find all usages of Y", "What's in directory Z?"
-- Git operations: "Show last 5 commits", "Diff between branches"
-- Grep/search: "Find where function X is defined"
-- Any task that is purely read-only
-
-## When to Use `general-medium`
-
-- "Implement feature X", "Fix bug Y", "Refactor module Z"
-- "Write tests for X", "Add error handling to Y"
-- "Create a new file with X", "Edit file Y to add Z"
-- Most day-to-day coding tasks
-
-## When to Use `general-heavy`
-
-- "Design the architecture for X", "How should we structure Y?"
-- "Optimize performance of Z", "Debug this complex race condition"
-- "Review this design for security issues"
-- Tasks requiring deep reasoning across multiple files/systems
-
-## Delegation Format
+## How to Dispatch
 
 ```
-task(subagent_type="<agent>", prompt="[TASK]: ... [CONTEXT]: ...")
+actor(
+  operation: {
+    action: "run",
+    subagent_type: "explore" | "general",
+    model: "general-medium" | "general-heavy",  // only for general
+    description: "short description",
+    prompt: "[TASK]: ...\n[CONTEXT]: ...\n[CONSTRAINTS]: ...\n[OUTPUT]: ..."
+  }
+)
 ```
 
-## Examples
+### Examples
 
-| User Request | Agent | Reason |
-|-------------|-------|--------|
-| "Read package.json" | explore | Read-only lookup |
-| "Add a login page" | general-medium | Feature implementation |
-| "Design the database schema" | general-heavy | Architecture decision |
-| "Find all TODOs" | explore | Search/read-only |
-| "Fix the failing test" | general-medium | Bug fix |
-| "Optimize the query performance" | general-heavy | Performance analysis |
-| "Refactor this function" | general-medium | Code refactoring |
-| "Review this PR for security" | general-heavy | Deep analysis |
+**Read a file (explore, no model override needed):**
+```
+actor(operation: { action: "run", subagent_type: "explore",
+  description: "Read auth module",
+  prompt: "[TASK]: Read src/auth.ts and report the loginUser function.\n[OUTPUT]: Function signature." })
+```
+
+**Fix a bug (general-medium — cheap model):**
+```
+actor(operation: { action: "run", subagent_type: "general", model: "general-medium",
+  description: "Fix null check",
+  prompt: "[TASK]: Fix null check at src/auth.ts:42.\n[OUTPUT]: Summary of change." })
+```
+
+**Architecture review (general-heavy — expensive model):**
+```
+actor(operation: { action: "run", subagent_type: "general", model: "general-heavy",
+  description: "Review auth architecture",
+  prompt: "[TASK]: Review auth architecture across src/.\n[OUTPUT]: Findings with recommendations." })
+```
+
+## Quick Reference
+
+| User says | subagent_type | model |
+|-----------|---------------|-------|
+| "Read X" | explore | — |
+| "Find all Y" | explore | — |
+| "Fix X" | general | general-medium |
+| "Implement X" | general | general-medium |
+| "Write tests" | general | general-medium |
+| "Design architecture" | general | general-heavy |
+| "Write spec/plan" | general | general-heavy |
+| "Debug complex issue" | general | general-heavy |
+| "Review for security" | general | general-heavy |

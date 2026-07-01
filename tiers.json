@@ -6,6 +6,6 @@
     "model": "llama.cpp/Nex-N2-mini"
   },
   "general-heavy": {
-    "model": "llama.cpp/Nex-N2-mini"
+    "model": "opencode/mimo-v2.5-free"
   }
 }
