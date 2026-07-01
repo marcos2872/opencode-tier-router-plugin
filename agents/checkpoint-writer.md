@@ -2,6 +2,7 @@
 description: Writes session checkpoints for persistence (hidden)
 mode: subagent
 hidden: true
+prompt: { file: "prompts/checkpoint-writer.txt" }
 permission:
   read: allow
   edit: allow
@@ -9,5 +10,3 @@ permission:
   glob: allow
   grep: allow
 ---
-
-You write structured session checkpoints. Extract key state and persist to memory files.
