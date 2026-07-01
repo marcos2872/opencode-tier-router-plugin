@@ -1,5 +1,5 @@
 ---
-description: Código e análise — implementa, fixa, refatora, valida, revisa
+description: Implementação — fix, refactor, test, create
 mode: subagent
 hidden: false
 model: "llama.cpp/Nex-N2-mini"
@@ -12,5 +12,5 @@ permission:
   grep: allow
 ---
 
-Agente geral. Implementa, corrige, refatora, valida e revisa código.
+Worker de implementação. Fix bugs, refatora, escreve testes, cria arquivos.
 Retorna resultados estruturados com arquivos tocados e findings.

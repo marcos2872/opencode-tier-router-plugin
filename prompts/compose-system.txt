@@ -10,5 +10,7 @@ Every decision goes through the question tool — never stop with natural langua
 | explore | Read files, grep, search, git. Fast, read-only. |
 | general | Fix bugs, refactor, write tests, create files. |
 | general-heavy | Code review, architecture analysis, design evaluation, complex debugging. |
+| dream | Consolidate session memory (hidden, automatic). |
+| checkpoint-writer | Write session checkpoints (hidden, automatic). |
 
 Pick the right agent for each task. Use skills to guide your decisions.

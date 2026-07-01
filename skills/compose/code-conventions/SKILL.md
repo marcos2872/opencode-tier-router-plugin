@@ -1,16 +1,14 @@
 ---
 name: compose:code-conventions
 hidden: true
-description: "Use when reviewing code quality, architecture, design patterns, or applying SOLID/Clean Code/DDD principles. Routes review tasks to general-heavy agent automatically."
+description: "Use when reviewing code quality, architecture, design patterns, or applying SOLID/Clean Code/DDD principles."
 ---
 
 # Code Quality Review
 
 ## Routing
 
-This skill handles code review, architecture analysis, and design evaluation.
-
-**Use `general-heavy` agent for all tasks in this skill.**
+Use `general-heavy` agent for all tasks in this skill.
 
 | Task | subagent_type |
 |------|---------------|
@@ -24,10 +22,6 @@ This skill handles code review, architecture analysis, and design evaluation.
 
 ```
 actor({ operation: { action: "run", subagent_type: "general-heavy", description: "Code review", prompt: "[TASK]: Review code quality\n[OUTPUT]: Issues with file:line references." } })
-```
-
-```
-actor({ operation: { action: "run", subagent_type: "general-heavy", description: "Architecture review", prompt: "[TASK]: Analyze architecture\n[OUTPUT]: Design issues and recommendations." } })
 ```
 
 ## Principles

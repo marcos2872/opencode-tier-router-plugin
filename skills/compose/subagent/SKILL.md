@@ -113,57 +113,43 @@ If the scan is clean, proceed without comment.
 Use `compose:ask` for the batched question. If no user is available, resolve
 contradictions conservatively (strictest interpretation) and continue.
 
-## Model Selection
+## Agent Selection
 
-Read `tiers.json` from project root or `~/.config/opencode/tiers.json` to get available models. Pass the model via the Actor tool's `model` parameter to override the agent's default.
+Each agent has its own model built-in. Pick the right agent name — do NOT pass a `model` parameter.
 
-**How to read tiers:**
-```bash
-cat tiers.json
-```
+| Agent | Use for |
+|-------|---------|
+| explore | Read files, grep, search, git. Fast, read-only. |
+| general | Fix bugs, refactor, write tests, create files. |
+| general-heavy | Review, analyze, architecture, design, complex debugging. |
 
-**Tiers config format:**
-```json
-{
-  "explore": { "model": "opencode/big-pickle" },
-  "general-medium": { "model": "opencode/mimo-v2.5-free" },
-  "general-heavy": { "model": "opencode/big-pickle" }
-}
-```
-
-**Decision tree for model selection:**
+**Decision tree:**
 
 1. Is the task pure data retrieval (grep, glob, list files, git log)?
-   → Yes: use `explore` agent with `explore.model`
+   → Yes: use `explore`
    → No: continue
 
 2. Is it code review, architecture analysis, or design judgment?
-   → Yes: use `general` agent with `general-heavy.model`
+   → Yes: use `general-heavy`
    → No: continue
 
 3. Is it a simple implementation (1-2 files, clear spec)?
-   → Yes: use `general` agent with `general-medium.model`
-   → No: use `general` agent with `general-heavy.model`
+   → Yes: use `general`
+   → No: use `general-heavy`
 
-**Key distinction:** `explore` is for raw data retrieval only. Any task requiring analysis, judgment, or recommendations must use `general`.
+**Key distinction:** `explore` is for raw data retrieval only. Any task requiring analysis, judgment, or recommendations must use `general-heavy`.
 
-**Example Actor call with model override:**
+**Example Actor calls:**
 ```json
 {
   "operation": {
     "action": "run",
-    "subagent_type": "general",
+    "subagent_type": "general-heavy",
     "description": "Implement feature X",
-    "prompt": "...",
-    "model": "opencode/mimo-v2.5-free"
+    "prompt": "..."
   }
 }
 ```
-
-**Reviewer tier:** Dispatch the spec reviewer at a model tier at least as capable as
-the implementer's. A reviewer weaker than the implementer shares its blind spots and
-rubber-stamps the same misreadings; the adversarial value of review comes from the
-reviewer interpreting the spec independently, which a weaker model cannot reliably do.
 
 ## Handling Implementer Status
 
